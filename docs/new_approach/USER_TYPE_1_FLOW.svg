@@ -47,8 +47,8 @@
   <rect x="80" y="380" width="400" height="150" rx="16" class="card"/>
   <text x="110" y="420" class="label">A · START WITH NO IDEA</text>
   <text x="110" y="456" class="node-title">Discovery</text>
-  <text x="110" y="484" class="node-copy">Choose a class to unlock optional activity picks.</text>
-  <text x="110" y="508" class="small">“I’m not sure” is a valid starting point.</text>
+  <text x="110" y="484" class="node-copy">Choose a class context, then optional activity picks.</text>
+  <text x="110" y="508" class="small">Choose class context; activities are optional.</text>
 
   <rect x="600" y="380" width="400" height="150" rx="16" class="card"/>
   <text x="630" y="420" class="label">B · BROWSE INTEREST AREAS</text>
@@ -93,7 +93,7 @@
   <text x="580" y="835" class="number">2</text>
   <text x="620" y="826" class="node-title">Areas to explore</text>
   <text x="580" y="870" class="node-copy">Activity picks suggest places to explore—not a match.</text>
-  <text x="580" y="898" class="node-copy">Browse every area. No eligibility claims or verified listings yet.</text>
+  <text x="580" y="898" class="node-copy">Browse every area. No eligibility claims; only reviewed listings.</text>
   <text x="580" y="923" class="small">If no class is chosen, keep the view general.</text>
 
   <path d="M800 940 V970 H280 V1000" class="line"/>

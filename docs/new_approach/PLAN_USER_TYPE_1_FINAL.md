@@ -2,7 +2,7 @@
 
 **Target User:** Class 10 / Class 12 student in Nagaland (Northeast India) who has **no idea** what to do after school.  
 **Status:** User-walkthrough reviewed product direction (v3.1; catalogue facts and privacy behavior require verification)  
-**Scope:** Full end-to-end flow — Landing → Discovery / Guided Explorer → Class 10 & Class 12 paths → College Detail
+**Scope:** MVP journey for the “no idea where to start” student — Landing → Discovery or direct browse → Areas to Explore (Possibilities) → verified study options → shared college list → college detail. Guided Explorer is an optional alternate entry to the same exploration results.
 
 ---
 
@@ -12,7 +12,7 @@
 |-----------|--------|
 | **Name** | User Type 1 — "No Idea" Student |
 | **Who** | Class 10 or Class 12 student, Nagaland / Northeast India |
-| **Mindset** | "I don't know what to do after school. I don't know my strengths. I'm scared of picking wrong." |
+| **Mindset** | “I don’t know what to do next. I’m worried about choosing the wrong thing.” The experience must not require the student to know their strengths or career terminology. |
 | **Device** | Likely mobile phone, possibly shared computer at cyber café |
 | **Constraints** | Minimal data collection. No account required to browse. No pressure to decide today. |
 
@@ -23,15 +23,16 @@
 | Principle | Application |
 |-----------|-------------|
 | **Guide, don't decide** | No "top match," no rankings, no "you should be a X" language. Show broad areas first. |
-| **One clear next action per page** | Each screen has an obvious way forward. Discovery asks for a class context before showing optional activities; "Browse all areas" always bypasses the questions. The core Class 10/12 path has up to 7 screens. |
+| **One clear next action per page** | Each screen has an obvious way forward. Discovery asks for a browsing context before optional activities; “Browse all areas” always bypasses questions. Keep the direct exploration route short and do not add steps solely to force a decision. |
 | **Honest about uncertainty** | Fees, exams, scholarships, course availability, and eligibility show "not verified" where unknown. Never invent numbers or imply an unverified route is an admission guarantee. |
 | **Always know where you are** | Journey pages provide a clear back action and a separate "Clear my choices" action. The labels explain whether choices are kept or removed. |
 | **Mobile-first** | Thumb-friendly buttons, readable text, no horizontal scroll, minimal data usage. |
-| **Guided Explorer is optional** | Discovery is the direct route; Guided Explorer is an optional step-by-step alternative from Discovery. Neither blocks browsing. It is not a human counsellor. |
+| **Guided Explorer is optional** | The student can continue directly from Discovery to Possibilities. Guided Explorer is a voluntary, step-by-step alternative from Discovery or Possibilities; uncertainty never automatically sends the student there. It is not a human counsellor. |
 | **Class 10 ≠ Class 12** | Separate paths after class selection. Different streams vs different course areas. |
 | **Activity picks are explainable suggestions** | Use a curated, visible mapping; say "may connect." It is exploratory, not a match score or eligibility decision. Always offer all areas and pathways. |
 | **Filters are reversible** | Changing a class or pick clears only incompatible downstream context, explains what changed, and preserves the student's activity answers. |
-| **Uncertainty is a valid outcome** | A student may choose "I’m not sure" for class, skip activities, or browse all areas without creating a profile or being forced to confirm an interpretation. |
+| **Uncertainty is a valid outcome** | A student may choose “I’m not sure” for class, skip activities, or browse all areas without creating a profile, being forced to confirm an interpretation, or being redirected to Guided Explorer. |
+| **Explain in context** | Keep short path/course explanations beside the option. Use an expandable card or focused dialog for optional detail; use a separate page for substantial, source-heavy, or frequently changing catalogue information. Do not hide essential caveats or sources. |
 
 ---
 
@@ -41,22 +42,25 @@
 
 **Download/view:** [USER_TYPE_1_FLOW.svg](./USER_TYPE_1_FLOW.svg)
 
-**Core path:** Landing -> direct Discovery (choose Class 10, Class 12, or "I’m not sure" first; then optionally pick activities) -> shared Results -> study options (when verified catalogue content is available) -> public option/course detail -> College List -> College Detail. Students can instead browse all areas without answering questions. Guided Explorer is a distinct optional route: welcome -> skippable class context -> skippable activities -> the same Results; both routes preserve a neutral browse-all action. A class choice only organizes browsing; it never decides eligibility. Direct links to valid public content work without session state.
+For the complete component-level diagrams—including Discovery, optional Guided Explorer, Class 10/12 branches, shared college pages, state boundaries, and recovery cases—see [User Type 1 MVP Architecture](./USER_TYPE_1_ARCHITECTURE.md).
 
-**Page count:** Up to 7 screens for the full class-specific path. General browse may be shorter; no screen exists solely to force a decision or confirm an invented profile.
+**Core path:** Landing -> direct Discovery (choose a browsing context: Class 10, Class 12, or “I’m not sure”; then optionally choose up to three activities or none) -> Areas to Explore (the Possibilities results page) -> study options (only where reviewed catalogue content exists) -> public option/course detail -> shared College List -> College Detail. A student may bypass questions from Landing or Discovery and browse every area in neutral order. Guided Explorer is a voluntary alternate route from Discovery or Possibilities: welcome -> optional class context -> optional activities -> the same shared Areas to Explore results. Being unsure does not trigger or require Guided Explorer. A class choice organizes browsing; it never decides eligibility. Valid public content works without session state.
+
+**Page count:** Keep the direct exploration route as short as practical. Do not add a screen solely to force a decision, confirm an invented profile, or send an unsure student to counselling. A path/course explanation may be inline when brief; public catalogue details remain directly navigable when the student needs deeper or source-rich information.
 
 ### User-perspective walkthrough
 
 | Student situation | What happens | Why they do not get stuck |
 |-------------------|--------------|----------------------------|
-| "I have no idea," chooses nothing | "Browse all areas" opens every area in neutral order without answers | Discovery's class-first path is optional; the browse-all bypass never requires a class or activity |
-| Is unsure about their class | Selects "I’m not sure" to unlock optional activity picks and broad Results; no class is inferred | They can also bypass questions and browse all areas |
-| Knows their class but no activity fits | Continues with no activity picks; Results stays broad and states that verified class-specific listings are not ready | No forced activity pick or fabricated catalogue |
+| “I have no idea,” chooses nothing | “Browse all areas” opens every area in neutral order without answers | The bypass never requires a class or activity |
+| Is unsure about class, has completed a class, or is waiting for results | Chooses the closest clearly explained context or “I’m not sure”; no class is inferred | Broad browsing remains available |
+| Knows their context but no activity fits | Continues with no activity picks; Areas to Explore shows every area neutrally unless reviewed mappings exist | No forced activity pick or fabricated catalogue |
+| Is still unsure after choosing class or activities | Goes directly to Areas to Explore, can browse all areas, or can choose Guided Explorer | Guided Explorer is optional and never a consequence of uncertainty |
 | Opens a course, college, or area link directly | Requested public content loads without a session; an optional Discovery link is available | No forced restart and no guessed class |
 | Finds no relevant course or college | Explain whether the catalogue has no verified entries or the request failed to load; offer all areas, unfiltered colleges, and retry where applicable | A missing result is not presented as an error or a dead end |
 | Wants to change their mind or is using a shared device | "Back to Discovery" preserves choices; "Clear my choices" confirms, clears them, and returns to general Discovery | Back and clear have distinct, predictable effects |
 
-**Release check:** Walk these cases on a small phone and keyboard before launch. Every screen must have a visible next action, a way back, and a route to browse all areas. Do not count a disabled or "Coming later" control as a working recovery.
+**Release check:** Walk these cases on a small phone and with a keyboard before launch; include students or representative users who are unsure where to start. Confirm they understand the class-context question, optional nature of activities, meaning of mapped areas, and how to find a next step without feeling pushed to choose. Every screen must have a visible next action, a way back, and a route to browse all areas. Test loading, empty, invalid-content, and failure states. Do not count a disabled or “Coming later” control as a working recovery.
 
 ---
 
@@ -70,8 +74,8 @@
 1. **Hero headline:** "You don't need to have your whole future figured out."
 2. **Sub-headline:** "CareerBridge helps you explore career and education options in Nagaland and the Northeast, at your own pace. No pressure to decide today."
 3. **Three entry doors (equal size):**
-   - **Door 1 (primary, highlighted):** "I have no idea where to start" — "Browse options with a few optional everyday-interest picks." → `/discover`
-   - **Door 2:** "I have some idea of what I like" — "Browse every interest area." → `/discover/results` (opens all areas with neutral ordering)
+   - **Door 1 (primary, highlighted):** “I’m not sure where to start” — “Choose a browsing context and optionally explore everyday activities.” → `/discover`
+   - **Door 2:** “I’d rather browse on my own” — “Browse every area in a neutral order, without answering questions.” → `/discover/results` (opens all areas in neutral order)
    - **Door 3:** "I know exactly what I want to study" — "Browse or search courses and colleges." → `/catalogue`
 4. **Trust strip (3 short reassurances):**
    - "No right answer required"
@@ -100,89 +104,73 @@
 
 ### 4.2 Discovery Page (`/discover`) — Self-Guided Entry
 
-**Purpose:** Help an unsure Class 10 or Class 12 student begin exploring without treating their choices as a test, recommendation, or eligibility check.
+**Purpose:** Help an unsure student begin exploring without treating their choices as a test, recommendation, profile, or eligibility check.
 
 **URL:** `/discover`
 
-**Layout — First: choose a browsing context**
-
-Ask: **"Which class are you in now?"** The student must choose one option before the optional activities and primary action appear:
+**Step 1 — Choose a browsing context.** Ask a plain-language question such as **“Which class or study stage should we use to organize browsing?”** Make clear that Class 10 and Class 12 are browsing contexts only. Students who have completed a class or are waiting for results should be able to choose the closest context, or select **“I’m not sure / another class.”** Do not infer a class or imply eligibility.
 
 | Option | Behavior |
 |--------|----------|
-| **Class 10** | Opens the Class 10 browsing context; never implies eligibility |
-| **Class 12** | Opens the Class 12 browsing context; never implies eligibility |
-| **I’m not sure** | Opens broad browsing without guessing the student's class |
+| **Class 10** | Organizes browsing around the Class 10 context; never implies eligibility |
+| **Class 12** | Organizes browsing around the Class 12 context; never implies eligibility |
+| **I’m not sure / another class** | Opens broad browsing without guessing the student’s class |
 
-**Next: optional activity cards (8 everyday examples):** Show these only after a class option is selected. The student can pick up to 3, or none. A fourth selection is not added; show the inline message **"Choose up to 3 activities. You can change them anytime."** There is no separate "not sure about these" activity toggle—choosing none is already valid.
+**Step 2 — Optional activities.** After a context is selected, show the eight everyday activity choices. The student may select up to three, change them freely, or select none. A fourth selection is not added; show **“Choose up to 3 activities. You can change them anytime.”** Do not add a separate “not sure about activities” toggle; choosing none is valid.
 
-**Primary action:** Disabled until the student chooses Class 10, Class 12, or "I’m not sure." Use **"Show me options"** for Class 10/12 and **"Browse broadly"** for "I’m not sure."
+**Continue actions:** The primary action is available as soon as a browsing context is selected, whether or not activities were picked. Use **“Show me possibilities”** for Class 10/12 and **“Browse broadly”** for “I’m not sure / another class.” Activity picks are optional; zero picks must not block continuing. Continuing stores only the MVP browsing context and activity picks in the current tab and opens the shared Areas to Explore results. Do not put student answers in URLs.
 
-**Always-available bypass:** Keep **"I’d rather browse all areas"** visible in the opening section. It opens `/discover/results/all#all-areas` without requiring class or activity answers and keeps existing choices available to edit.
+**Always-available bypass:** Keep **“I’d rather browse all areas”** visible before any answer is required. It opens the shared Results in neutral all-areas mode without requiring class or activity answers and without clearing saved choices.
 
-**Guidance callout:** Clearly say this is not a test; class is only a browsing context; activities are optional starting points; and nothing determines eligibility.
+**Guidance:** State close to the controls that this is not a test; class only organizes browsing; activities are optional starting points; and none of the choices determines eligibility. Guided Explorer may be offered as an optional, clearly labeled alternative, but uncertainty must not automatically send the student there.
 
-**Results limitation:** Verified class-specific streams, courses, and college records are not yet available. State this plainly on Results; any mapped areas are broad editorial exploration prompts, not a class-specific catalogue.
-
-**Accessibility and motion:** Use a native single-choice radio group with a correctly associated legend and helper text; make activity selection keyboard operable; honor `prefers-reduced-motion`.
+**Accessibility and motion:** Use a native single-choice radio group with a correctly associated legend and helper text; make activity selection keyboard operable; honor `prefers-reduced-motion`. Ensure all actions have visible focus and touch targets.
 
 ---
 
-### 4.3 Discovery Results Page (`/discover/results`)
+### 4.3 Areas to Explore / Possibilities (`/discover/results`)
 
-**Purpose:** Show broad study areas that a student may explore based on optional activity picks. **No hidden algorithm, no usage-data claims, and no career assignment.**
+**Student-facing heading:** **“Here are areas you can explore.”** “Possibilities” may be used as a concise internal or navigation label, but the visible page heading should explain the page’s purpose plainly.
 
-**URL:** `/discover/results` (student answers are not placed in query parameters; public content slugs may appear on their own detail URLs).
+**Purpose:** Show broad study areas a student may browse, with literal explanations of any optional activity connections. This is not a counselling outcome, profile, eligibility check, ranking, or career assignment. There is no hidden algorithm or usage-data claim.
 
-**Curated mapping (activity → area):**
+**URL:** `/discover/results`. Student answers are not placed in query parameters. Public content slugs may appear on their own detail URLs.
 
-| Activity Pick | Mapped Area | Example Wording on Card |
-|---------------|-------------|------------------------|
-| Fixing things | Technology & Computing | "You said you like fixing things — this area may connect to repair and technical work." |
-| Computers & phones | Technology & Computing | "You said you like working with computers — this area may connect to IT and digital work." |
-| Helping people feel better | Health & Care | "You said you like helping people — this area may connect to care and health work." |
-| Working outdoors | Nature & Fieldwork | "You said you like working outdoors — this area may connect to nature-based work." |
-| Organising & planning | Business & Office | "You said you like organising — this area may connect to office and business work." |
-| Drawing & making | Creative & Design | "You said you like drawing and making — this area may connect to creative work." |
-| Working with numbers | Finance & Data | "You said you like working with numbers — this area may connect to finance and data work." |
-| Teaching & explaining | Education & Social | "You said you like teaching — this area may connect to education work." |
+**Results behavior:**
+- If activities were selected, render every distinct mapped area. Deduplicate activities mapping to the same area and explain all relevant picks on that card; never cap the result to an arbitrary two or three areas.
+- If no activity was selected, or no reviewed mapping is available, show all areas in neutral order and say **“No problem—let’s browse broadly.”** Do not fabricate a starting picture or imply a profile was created.
+- Visibly label the chosen context as Class 10, Class 12, or general / no class selected. General browsing never silently assumes a class.
+- Keep every area and public option reachable regardless of answers. Picks can suggest where to begin but never filter out options or establish eligibility.
+- State plainly: **“These ideas help you browse; they do not tell you which courses you qualify for.”**
 
-**Mapping rules:**
-- Every mapping is an editorial exploration prompt, not a verified qualification, admission route, or claim about outcomes. Label it "A place you could explore," and review it with educators before launch.
-- State on the page: "These ideas help you browse; they do not tell you which courses you qualify for."
-- Show the relationship from activity → broad area → available Class 10/12 options on the same card. Use only options that exist in the verified catalogue; if there is no verified connection, say so and keep the area browseable without a class-specific claim.
-- For Class 10, show applicable next-study categories (including streams only where confirmed by the catalogue). For Class 12, show course categories from the catalogue. Do not show course titles, prerequisites, or eligibility based only on an interest.
-- Every card includes "See study options" and the page has a prominent "Browse every area" action. These never clear activity picks.
-- If no activity is selected or mapped, show all areas in neutral order and say "Browse all areas"; do not fabricate a starting picture.
-- Render every distinct mapped area, not an arbitrary 2–3. Multiple picks may map to the same area; deduplicate areas and explain all relevant picks on that card.
-- Class 10, Class 12, and general browse are visibly labeled. General browse never silently assumes a class.
+**Curated activity → area mapping:**
+
+| Activity pick | Broad area | Example wording |
+|---------------|-------------|-----------------|
+| Fixing things | Technology & Computing | “You said you like fixing things—this area may connect to repair and technical work.” |
+| Computers & phones | Technology & Computing | “You said you like using computers—this area may connect to digital work.” |
+| Helping people | Health & Care | “You said you like helping people—this area may connect to care and wellbeing.” |
+| Working outdoors | Nature & Fieldwork | “You said you like working outdoors—this area may connect to nature-based work.” |
+| Organising and planning | Business & Office | “You said you like organising—this area may connect to planning and office work.” |
+| Drawing and making | Creative & Design | “You said you like drawing and making—this area may connect to creative work.” |
+| Working with numbers | Finance & Data | “You said you like working with numbers—this area may connect to finance and data work.” |
+| Teaching and explaining | Education & Social | “You said you like teaching—this area may connect to education and community work.” |
+
+Every mapping is an editorial exploration prompt, not a verified qualification, admission route, or claim about outcomes. Have mappings reviewed before publication.
 
 **Area cards:**
-- Area name
-- One-sentence plain-language description
-- "You picked [activity]. This is one area you could explore—not a prediction."
-- "Options in this area:" verified public catalogue links grouped by Class 10, Class 12, or class not specified. A class choice can reorganize the view but never gates access.
-- Button: "See study options" → `/catalogue?area=[area-slug]`. This is a public content filter, not an answer or personal profile. Show available catalogue entries grouped by Class 10, Class 12, or "class not specified"; never infer eligibility. If there are no verified entries for that area, show the honest no-listings state and recovery links below.
-- Link: "See all areas" / "Change my picks"
+- Area name and concise plain-language description; keep enough explanation visible to understand the card without opening a popup.
+- Where applicable, a literal explanation such as **“You picked [activity]. This is one area you could explore—not a prediction.”** Combine all relevant picks when multiple activities map to the same area.
+- A clear **“Explore study options”** action only when a real public destination exists. Use reviewed catalogue entries only; if none are verified, explain that honestly and provide working browse/recovery actions.
+- **“Browse every area”** never clears activity picks.
+- **“Change my choices”** returns to Discovery with existing class and activity picks preserved.
+- An optional **“Want a step-by-step way to look around?”** link to Guided Explorer. Explain that it is self-guided and no person is involved. It is never the required next action and must not appear as an automatic response to uncertainty.
 
-**Bottom links:**
-- "Browse every area" — opens the complete set in neutral order without clearing picks
-- "Change my picks" — returns to Discovery with selections preserved
-- "Help me look around" → Guided Explorer (`/counselling`)
+**Explanation interaction rule:** Keep a short, stable definition or introductory explanation inline or in an expandable card so the student can stay in context. A focused, accessible dialog or mobile bottom sheet is appropriate for optional context that is longer but self-contained. Use a separate public page when the student is moving into substantial detail, comparing multiple related options, or needs current admission, eligibility, fee, institution, or source/check-date information. Do not hide essential cautions or verification status in a popup, and do not make students open repeated popups just to compare basic differences.
 
-**Area-to-path content table (editorial draft, not an eligibility map):**
+**Class-to-option associations:** Class 10 and Class 12 categories may organize browsing only where reviewed catalogue records support the connection. Broad editorial associations are not claims that a route or course exists locally. Do not show course titles, prerequisites, or eligibility solely because of an activity or class choice. Every area remains browseable.
 
-| Area | Class 10: possible browse categories | Class 12: possible browse categories |
-|------|--------------------------------------|--------------------------------------|
-| Technology & Computing | Science; vocational/technical options where listed | Computing/IT degrees, diplomas, and skills courses where listed |
-| Health & Care | Science; health-related vocational options where listed | Health-related degrees, diplomas, and skills courses where listed |
-| Nature & Fieldwork | Science; agriculture/environment options where listed | Agriculture, environment, science, and related courses where listed |
-| Business & Office | Commerce; vocational/business options where listed | Commerce/business, office, and related courses where listed |
-| Creative & Design | Arts; design/vocational options where listed | Arts, design, media, and related courses where listed |
-| Finance & Data | Commerce; mathematics-related options where listed | Commerce, finance, statistics, and data courses where listed |
-| Education & Social | Arts; education/social options where listed | Education, social science, and related courses where listed |
-
-These are broad editorial associations for navigation only—not claims that every listed category or course is available locally. Before publication, replace each category with actual catalogue entries and source links; omit any association that is not supported by reviewed content. A student may always browse every category regardless of their activity picks.
+**Bottom actions:** **“Browse every area,” “Change my choices,”** and the optional Guided Explorer link. All retain or preserve choices except the separate, explicitly confirmed **“Clear my choices”** action.
 
 ---
 
@@ -203,7 +191,7 @@ These are broad editorial associations for navigation only—not claims that eve
 | Commerce | Business, accounting, and economics-focused study | Show subjects only when verified for the institution/board |
 | Vocational / Skill | Practical or occupational study options | Show actual options only when verified in the catalogue |
 
-**Each card:** Name · plain-language description · verified subjects/options where available · "Possible areas to research" only when sourced · Button: "Explore this option." Do not imply that a stream guarantees entry to a course or job.
+**Each card:** Name · plain-language summary · verified subjects/options where available · “Possible areas to research” only when sourced. Provide a short **“Learn more”** expansion for optional explanatory detail when that detail is brief and stable. Keep **“Explore this option”** as the separate action to navigate to deeper study-option content. Do not imply that a stream guarantees entry to a course or job.
 
 **Bottom links:** "Browse every option" and "I don't know my class" return to the general catalogue without clearing activity picks. The latter leads to `/discover/results` in general-browse mode.
 
@@ -217,7 +205,7 @@ These are broad editorial associations for navigation only—not claims that eve
 
 **Header:** Back link → `/discover/streams` | Title: "[Stream Name]"
 
-**Content:** Verified next-study categories and course pages associated with this stream. Do not prescribe a career or assert eligibility unless current official requirements are cited.
+**Content:** Verified next-study categories and course pages associated with this stream. Do not prescribe a career or assert eligibility unless current official requirements are cited. Short definitions and stable introductory explanations may be expanded inline or shown in a focused, accessible dialog/bottom sheet so students can stay in context. Use a separate public page for substantial content, multiple related options, current admission facts, or material requiring source/check-date presentation. Essential cautions and source status must not be hidden.
 
 | Study area | What to explore | Requirement source |
 |------------|-----------------|-------------------|
@@ -246,7 +234,7 @@ Each item links to public course details or the shared college list. Keep exampl
 | Skill training | Shorter occupational training | Actual listed courses and verified details |
 | Professional study | Specialized study with defined requirements | Actual listed courses and official requirements |
 
-**Each card:** Area name · plain-language description · actual listed courses · verified duration/admission details where available · Button: "See courses in this area." Do not infer eligibility from subjects or interest.
+**Each card:** Area name · plain-language summary · actual listed courses · verified duration/admission details where available. A brief explanation may expand in place; a separate destination is for deeper course exploration and source-rich or changing facts. Keep **“See courses in this area”** distinct from **“Learn more.”** Do not infer eligibility from subjects or interest.
 
 ---
 
@@ -264,7 +252,7 @@ Each item links to public course details or the shared college list. Keep exampl
 |--------|------------------------|----------|--------------|
 | Verified course entry | Officially sourced; label unknowns | Officially sourced or "Not verified" | Verified listings only |
 
-Each course type: Button "See colleges" · verification status and source.
+Each course type: a concise description and a **“Learn more”** disclosure for brief, stable explanation where useful; **“See colleges”** navigates to the shared college list. Show verification status and source for changing or consequential facts. Do not make students open repeated popups just to compare basic differences: keep a useful summary visible on each option card.
 
 Do not ship placeholder examples or present unverified course availability, exams, duration, or institution names as facts.
 
@@ -332,7 +320,7 @@ Do not ship placeholder examples or present unverified course availability, exam
 
 **URL:** `/counselling`
 
-**Entry points:** From Discovery ("Try Guided Explorer") or Results ("Help me look around").
+**Entry points:** From Discovery or Areas to Explore using a clearly optional **“Try Guided Explorer”** / **“Help me look around”** action. It is not an automatic next step for students who choose “I’m not sure” or remain uncertain after seeing possibilities.
 
 **Page header:**
 ```
@@ -342,7 +330,7 @@ Self-guided browsing — no person involved. You can skip questions and browse a
 
 **Persistence:** Seed the questions with existing choices from the current tab when available. Keep edits as an in-memory draft until the student continues to Results; leaving earlier leaves the previously saved choices unchanged. On continuing, store only the class context and activity picks in the existing tab-scoped `sessionStorage` state. Do not promise that answers are private or never reach a server; disclose hosting logs and analytics behavior before launch.
 
-**Relationship to Discovery:** This is a separate, optional route. Direct Discovery keeps its class-first interaction; Guided Explorer makes both questions skippable. Class context only labels or organizes a browse view and never qualifies or excludes the student. Verified Class 10/12 catalogue records are not available in this MVP.
+**Relationship to Discovery and Possibilities:** This is an optional alternate entry, not a required counselling step. The direct Discovery route continues straight to the shared Areas to Explore results. Guided Explorer uses the same limited choices, makes them skippable, and reaches the same results. A student who remains unsure can keep browsing broadly without entering Guided Explorer. Class context only labels or organizes browsing and never qualifies or excludes the student. Show only catalogue records that have passed the review/readiness gate; never imply availability before verification.
 
 #### Step 1: Welcome
 
@@ -377,9 +365,9 @@ At every stage, keep "Browse every area" available. It opens the shared neutral 
 
 **Header:** "Here are areas you can explore"
 
-**Content:** Reuse the Discovery Results component at `/counselling/results`. If answers were supplied, show only their literal values ("You chose Class 12" / "You picked working outdoors") and mapped areas with the caveat that these are exploration prompts, not recommendations. Keep every area available. If no answers were supplied, omit the answer summary and say "No problem—let's browse broadly." Verified course and college records are not available yet; do not imply that an area card opens a course catalogue.
+**Content:** Reuse the shared Areas to Explore results component at `/discover/results`. If answers were supplied, show only their literal values (“You chose Class 12” / “You picked working outdoors”) and mapped areas with the caveat that these are exploration prompts, not recommendations. Keep every area available. If no answers were supplied, omit the answer summary and say “No problem—let’s browse broadly.” Only describe or link catalogue content that has passed the review/readiness gate; do not imply an area card opens a catalogue if no such destination or verified records are available.
 
-**Actions:** "Change answers" returns to the Guided Explorer start with saved answers prefilled. "Browse every area" opens neutral Results without clearing saved choices. No confirmation is needed to browse.
+**Actions:** “Change answers” returns to Guided Explorer with saved choices prefilled. “Browse every area” opens the shared neutral Results without clearing saved choices. An area action opens the same public study-options path available from direct Discovery. No confirmation is needed to browse. Guided Explorer never becomes mandatory because the student is unsure.
 
 **Privacy:** No free-text fields or profile in MVP. Do not imply answers are private until the actual data flow has been verified. Leaving before continuing does not save the in-memory draft; continuing updates the existing session-scoped browsing state.
 
@@ -546,4 +534,4 @@ Do not include My Guidance Home, save/compare, scholarships/exam hubs, or action
 
 ---
 
-**End of specification.** This document defines the User Type 1 journey, including class-first Discovery, optional activities, unsure/general browsing, public direct-link behavior, and MVP boundaries. Before implementation, validate catalogue facts and the deployed privacy/data flow; the broad area associations above are editorial prompts, not verified educational guidance.
+**End of specification.** This document is the MVP source of truth for the User Type 1 journey: low-pressure landing, class-context-first Discovery, optional activities, broad Areas to Explore, directly reachable public catalogue content, optional Guided Explorer, and honest recovery behavior. Before release, validate catalogue facts and deployed privacy/data flow; broad area associations are editorial prompts, not verified educational guidance. Validate the experience with students or representative users on mobile and keyboard before treating the flow as proven.
