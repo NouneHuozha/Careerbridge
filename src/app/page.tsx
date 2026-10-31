@@ -3,25 +3,47 @@ import Link from "next/link";
 import {
   ArrowRight,
   BookOpen,
-  BriefcaseBusiness,
   Building2,
   Clock3,
   Compass,
-  FileText,
   GitFork,
   GraduationCap,
   Leaf,
   Search,
   Signpost,
+  type LucideIcon,
 } from "lucide-react";
 
-const libraryLinks = [
-  { label: "Explore broad areas", detail: "Browse without choosing a career", icon: Compass },
-  { label: "After Class 10", detail: "Explore streams and skill options", icon: GraduationCap },
-  { label: "After Class 12", detail: "Explore courses and study routes", icon: BookOpen },
-  { label: "Courses", detail: "Degrees, diplomas, and training", icon: BriefcaseBusiness },
-  { label: "Colleges", detail: "Find institutions and course details", icon: Building2 },
-  { label: "Requirements and fees", detail: "Check source status and what is confirmed", icon: FileText },
+const libraryLinks: {
+  label: string;
+  detail: string;
+  icon: LucideIcon;
+  href: string;
+}[] = [
+  {
+    label: "Explore broad areas",
+    detail: "Browse without choosing a career",
+    icon: Compass,
+    href: "/discover/results?mode=all",
+  },
+  {
+    label: "After Class 10",
+    detail: "Explore streams and skill options",
+    icon: GraduationCap,
+    href: "/discover/streams",
+  },
+  {
+    label: "After Class 12",
+    detail: "Explore courses and study routes",
+    icon: BookOpen,
+    href: "/discover/courses",
+  },
+  {
+    label: "Colleges",
+    detail: "Browse source-checked institutions",
+    icon: Building2,
+    href: "/colleges",
+  },
 ];
 
 const steps = [
@@ -72,7 +94,10 @@ export default function HomePage() {
             <Link href="#how-it-works" className="transition hover:text-white">
               How it works
             </Link>
-            <Link href="#explore" className="transition hover:text-white">
+            <Link
+              href="/discover/results?mode=all"
+              className="rounded-sm transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+            >
               Browse options
             </Link>
           </nav>
@@ -140,8 +165,8 @@ export default function HomePage() {
                   Browse all topics without answering questions first.
                 </span>
                 <Link
-                  href="#explore"
-                  className="group/button mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#f2cf78] px-5 text-sm font-semibold text-[#263b2e] transition hover:bg-[#ebc45e]"
+            href="/discover/results?mode=all"
+            className="group/button mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#f2cf78] px-5 text-sm font-semibold text-[#263b2e] transition hover:bg-[#ebc45e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 >
                   Browse options
                   <ArrowRight
@@ -276,22 +301,27 @@ export default function HomePage() {
             Start broad, then choose your class context whenever you’re ready.
           </p>
         </div>
-        <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {libraryLinks.map(({ label, detail, icon: Icon }) => (
-            <article
+        <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {libraryLinks.map(({ label, detail, icon: Icon, href }) => (
+            <Link
               key={label}
-              className="flex min-h-[94px] items-center gap-5 rounded-xl border border-[#ddded6] bg-transparent px-5 py-4"
+              href={href}
+              className="group flex min-h-[112px] items-center gap-4 rounded-xl border border-[#ddded6] bg-white px-5 py-4 transition-colors hover:border-[#b8c8bd] hover:bg-[#f7f7f2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
             >
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#e4f0e8] text-[#145543]">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#e4f0e8] text-[#145543] transition-colors group-hover:bg-[#d8e9dd]">
                 <Icon aria-hidden="true" className="h-6 w-6" />
               </span>
-              <span className="min-w-0">
+              <span className="min-w-0 flex-1">
                 <span className="block font-serif text-lg font-semibold text-[#18372e]">
                   {label}
                 </span>
                 <span className="block text-sm text-[#68736d]">{detail}</span>
               </span>
-            </article>
+              <ArrowRight
+                aria-hidden="true"
+                className="h-4 w-4 shrink-0 text-[#718078] transition-transform group-hover:translate-x-1"
+              />
+            </Link>
           ))}
         </div>
       </section>

@@ -103,9 +103,26 @@ export const DISCOVERY_STORAGE_KEY = "careerbridge:type-1-discovery:v1";
 const DISCOVERY_CHANGE_EVENT = "careerbridge-discovery-change";
 const LOADING_SNAPSHOT = "\u0000loading";
 const UNAVAILABLE_SNAPSHOT = "\u0000unavailable";
+let guidedExplorerDraftSeed: DiscoveryAnswers | null = null;
 
 export function createEmptyAnswers(): DiscoveryAnswers {
   return { activityIds: [], notSure: false, classContext: null };
+}
+
+export function setGuidedExplorerDraftSeed(answers: DiscoveryAnswers) {
+  guidedExplorerDraftSeed = {
+    activityIds: [...answers.activityIds],
+    notSure: false,
+    classContext: answers.classContext,
+  };
+}
+
+export function takeGuidedExplorerDraftSeed() {
+  const seed = guidedExplorerDraftSeed;
+  guidedExplorerDraftSeed = null;
+  return seed
+    ? { ...seed, activityIds: [...seed.activityIds] }
+    : null;
 }
 
 function getSnapshot() {

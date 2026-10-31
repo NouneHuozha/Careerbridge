@@ -1,0 +1,14 @@
+{
+  "routes": [
+    { "path": "/", "title": "Home" },
+    { "path": "/discover", "title": "Discovery" },
+    { "path": "/counselling", "title": "Guided Explorer" },
+    { "path": "/discover/results", "title": "Areas to Explore" },
+    { "path": "/discover/streams", "title": "After Class 10: Study Streams" },
+    { "path": "/streams/:stream", "title": "Class 10 Stream Guide" },
+    { "path": "/discover/courses", "title": "After Class 12: Course Areas" },
+    { "path": "/courses/:area", "title": "Class 12 Course-Area Guide" },
+    { "path": "/colleges", "title": "College List" },
+    { "path": "/college/:code", "title": "College Details" }
+  ]
+}

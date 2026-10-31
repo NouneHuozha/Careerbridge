@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+  ArrowRight,
   BookOpen,
   Check,
   Compass,
@@ -15,6 +17,7 @@ import {
   clearAnswers,
   createEmptyAnswers,
   saveAnswers,
+  setGuidedExplorerDraftSeed,
   useStoredDiscoveryAnswers,
   type ActivityId,
   type ClassContext,
@@ -42,13 +45,14 @@ const classOptions: {
   },
   {
     value: "general",
-    label: "I’m not sure",
-    description: "That’s okay. Browse broadly without choosing a class.",
+    label: "I’m not sure / another class",
+    description: "That’s okay. Browse broadly without guessing your class.",
     icon: Compass,
   },
 ];
 
 export default function DiscoveryForm() {
+  const router = useRouter();
   const stored = useStoredDiscoveryAnswers();
   const [draft, setDraft] = useState<DiscoveryAnswers | null>(null);
   const [notice, setNotice] = useState("");
@@ -95,11 +99,11 @@ export default function DiscoveryForm() {
     setNotice("");
     if (!saveAnswers(answers)) {
       setNotice(
-        "We couldn’t save your choices in this tab. Your current selections are still shown here.",
+        "We couldn’t save your choices in this tab. Your selections are still shown here; you can browse all areas without saving.",
       );
       return;
     }
-    setNotice("Your choices are saved in this tab. This is the current stopping point.");
+    router.push("/discover/results");
   }
 
   function clearCurrentChoices() {
@@ -155,8 +159,8 @@ export default function DiscoveryForm() {
           </div>
 
           <aside className="max-w-sm rounded-2xl border border-white/15 bg-white/[.06] p-4 text-sm leading-relaxed text-white/85">
-            This is the current Discovery page. The pages that would follow it
-            are not included right now.
+            Your class only organizes browsing. Class 10 and Class 12 lead to
+            different study paths, and activity picks are optional.
           </aside>
         </div>
       </section>
@@ -203,15 +207,16 @@ export default function DiscoveryForm() {
                 First, a little context
               </span>
               <span className="mt-1.5 block text-[1.55rem] sm:text-[clamp(1.8rem,3.2vw,2.7rem)]">
-                Choose your class
+                Which class or study stage should organize your browsing?
               </span>
             </legend>
             <p
               id="class-help"
               className="mt-1.5 max-w-3xl text-sm leading-relaxed text-[#59665e] sm:text-base"
             >
-              Your class organizes browsing—it doesn’t decide eligibility. If
-              you’re unsure, choose “I’m not sure.”
+              Choose the closest context if you’ve completed a class or are
+              waiting for results, or choose “I’m not sure / another class.”
+              This only organizes browsing; it doesn’t decide eligibility.
             </p>
 
             <div
@@ -374,7 +379,7 @@ export default function DiscoveryForm() {
                 {!answers.classContext ? (
                   <>
                     <p className="font-semibold text-[#18372e]">
-                      Choose a class or “I’m not sure” to continue.
+                      Choose a class context or browse all areas without answering.
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-[#59665e]">
                       Activities are optional. Your class choice only sets browsing context.
@@ -398,16 +403,52 @@ export default function DiscoveryForm() {
                     className="inline-flex min-h-12 items-center justify-center px-3 text-sm font-semibold text-[#59665e] underline underline-offset-4 transition-colors hover:text-[#145543] disabled:opacity-60"
                   />
                 ) : null}
+                <Link
+                  href="/discover/results?mode=all"
+                  className="inline-flex min-h-12 items-center justify-center rounded-full border border-[#b8c8bd] bg-white px-5 text-sm font-semibold text-[#145543] transition-colors hover:bg-[#eaf2ed] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+                >
+                  Browse all areas
+                </Link>
                 <button
                   type="button"
                   disabled={!ready || !answers.classContext}
                   onClick={saveChoices}
                   className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#145543] px-6 text-sm font-semibold text-white transition-[background-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-[#0f4537] motion-reduce:transform-none motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-[#aab7ad] disabled:text-white"
                 >
-                  Save my choices
+                  {answers.classContext === "general"
+                    ? "Browse broadly"
+                    : "Show me possibilities"}
                 </button>
               </div>
             </div>
+            <section
+              aria-labelledby="guided-entry-title"
+              className="mt-8 flex flex-col gap-4 rounded-2xl border border-[#d9ddd5] bg-white p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
+            >
+              <div className="max-w-3xl">
+                <p className="text-xs font-semibold uppercase tracking-[.15em] text-[#718078]">
+                  Optional · step by step
+                </p>
+                <h2
+                  id="guided-entry-title"
+                  className="mt-2 font-serif text-xl font-semibold text-[#18372e]"
+                >
+                  Want a gentler way to look around?
+                </h2>
+                <p className="mt-1 text-sm leading-relaxed text-[#59665e]">
+                  Guided Explorer is self-guided; no person is involved. It
+                  keeps this page’s choices as a draft until you continue.
+                </p>
+              </div>
+              <Link
+                href="/counselling"
+                onClick={() => setGuidedExplorerDraftSeed(answers)}
+                className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full border border-[#b8c8bd] bg-white px-5 text-sm font-semibold text-[#145543] transition-colors hover:bg-[#eaf2ed] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+              >
+                Try Guided Explorer
+                <ArrowRight aria-hidden="true" className="h-4 w-4" />
+              </Link>
+            </section>
           </div>
         </div>
       </div>
