@@ -1,32 +1,35 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
-  ArrowRight,
   BookOpen,
   Check,
-  Compass,
   GraduationCap,
   Info,
   Plus,
+  ArrowRight,
 } from "lucide-react";
+import {
+  saveEducationStage,
+  useEducationStage,
+  type EducationStage,
+} from "../education-stage";
 import {
   activityOptions,
   clearAnswers,
   createEmptyAnswers,
   saveAnswers,
-  setGuidedExplorerDraftSeed,
   useStoredDiscoveryAnswers,
   type ActivityId,
-  type ClassContext,
   type DiscoveryAnswers,
 } from "./flow-data";
+import { SiteHeader } from "../site-header";
 import ClearChoicesButton from "./clear-choices-button";
+import { Breadcrumbs } from "../breadcrumbs";
 
 const classOptions: {
-  value: ClassContext;
+  value: EducationStage;
   label: string;
   description: string;
   icon: typeof GraduationCap;
@@ -34,41 +37,43 @@ const classOptions: {
   {
     value: "class-10",
     label: "Class 10",
-    description: "Explore what you can study after Class 10.",
+    description: "I'm currently studying in Class 10.",
     icon: GraduationCap,
   },
   {
     value: "class-12",
     label: "Class 12",
-    description: "Explore what you can study after Class 12.",
+    description: "I'm currently studying in Class 12.",
     icon: BookOpen,
-  },
-  {
-    value: "general",
-    label: "I’m not sure / another class",
-    description: "That’s okay. Browse broadly without guessing your class.",
-    icon: Compass,
   },
 ];
 
 export default function DiscoveryForm() {
   const router = useRouter();
   const stored = useStoredDiscoveryAnswers();
+  const savedEducation = useEducationStage();
   const [draft, setDraft] = useState<DiscoveryAnswers | null>(null);
+  const [stageDraft, setStageDraft] = useState<EducationStage | null>(null);
   const [notice, setNotice] = useState("");
   const [selectionMessage, setSelectionMessage] = useState("");
-  const ready = stored.status !== "loading";
+  const ready = stored.status !== "loading" && savedEducation.status !== "loading";
   const answers =
     draft ??
     (stored.status === "saved" || stored.status === "empty"
       ? stored.answers
       : createEmptyAnswers());
+  const educationStage =
+    savedEducation.status === "saved" ? savedEducation.stage : stageDraft;
   const storageNotice =
     stored.status === "invalid"
-      ? "We couldn’t read your earlier choices. They haven’t been used. Start fresh or browse all areas."
+      ? "We couldn’t read your earlier activity choices. They haven’t been used. Choose activities again or leave them unselected."
       : stored.status === "unavailable"
-        ? "We couldn’t access choices saved in this tab. You can still browse all areas."
-        : "";
+        ? "We couldn’t access choices saved in this tab. Your choices may not carry over to the next page."
+        : savedEducation.status === "invalid"
+          ? "We couldn’t read your saved education stage. Please choose Class 10 or Class 12 again."
+          : savedEducation.status === "unavailable"
+            ? "We couldn’t access your saved education stage. Check your browser storage settings before continuing."
+            : "";
 
   function toggleActivity(id: ActivityId) {
     setNotice("");
@@ -77,7 +82,6 @@ export default function DiscoveryForm() {
     if (answers.activityIds.includes(id)) {
       setDraft({
         ...answers,
-        notSure: false,
         activityIds: answers.activityIds.filter((activityId) => activityId !== id),
       });
       return;
@@ -90,16 +94,28 @@ export default function DiscoveryForm() {
 
     setDraft({
       ...answers,
-      notSure: false,
       activityIds: [...answers.activityIds, id],
     });
   }
 
+  function chooseEducationStage(stage: EducationStage) {
+    setStageDraft(stage);
+    if (!saveEducationStage(stage)) {
+      setNotice("We couldn’t save your education stage on this device. Check your browser storage settings before continuing.");
+      return;
+    }
+    setNotice("");
+  }
+
   function saveChoices() {
     setNotice("");
+    if (savedEducation.status !== "saved") {
+      setNotice("Your education stage must be saved before you can continue. Please check your browser storage settings.");
+      return;
+    }
     if (!saveAnswers(answers)) {
       setNotice(
-        "We couldn’t save your choices in this tab. Your selections are still shown here; you can browse all areas without saving.",
+        "We couldn’t save your choices in this tab. Your selections are still shown here.",
       );
       return;
     }
@@ -118,24 +134,9 @@ export default function DiscoveryForm() {
   }
 
   return (
-    <main className="cb-page-enter min-h-screen overflow-hidden bg-[#fbfaf6] text-[#18352d]">
-      <header className="relative z-10 bg-[#123f34] text-white">
-        <div className="cb-container flex min-h-16 items-center justify-between gap-4">
-          <Link
-            href="/"
-            className="font-serif text-xl font-semibold tracking-tight sm:text-2xl"
-          >
-            CareerBridge
-          </Link>
-          <Link
-            href="/"
-            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/35 px-4 text-sm font-semibold transition-colors hover:bg-white/10"
-          >
-            <span aria-hidden="true">←</span> Home
-          </Link>
-        </div>
-      </header>
-
+    <>
+      <SiteHeader />
+      <main className="cb-page-enter min-h-screen overflow-hidden bg-[#fbfaf6] text-[#18352d]">
       <section className="relative overflow-hidden bg-[#123f34] pb-4 text-white sm:pb-6 lg:pb-8">
         <div
           aria-hidden="true"
@@ -145,7 +146,8 @@ export default function DiscoveryForm() {
           aria-hidden="true"
           className="pointer-events-none absolute -right-20 -top-36 h-[24rem] w-[24rem] rounded-full border border-[#f2cf78]/20"
         />
-        <div className="cb-container relative grid gap-6 pt-6 sm:gap-8 sm:pt-8 md:grid-cols-[minmax(0,1.2fr)_minmax(260px,.8fr)] md:items-center lg:pt-10">
+        <Breadcrumbs items={[{ label: "Discovery" }]} dark className="relative pt-3" />
+        <div className="cb-container relative grid gap-6 pt-5 sm:gap-8 sm:pt-7 md:grid-cols-[minmax(0,1.2fr)_minmax(260px,.8fr)] md:items-center lg:pt-10">
           <div className="max-w-4xl">
             <p className="text-xs font-semibold uppercase tracking-[.2em] text-[#f2cf78] sm:text-sm">
               Discovery <span className="px-2 text-white/40">/</span> A first step
@@ -154,13 +156,12 @@ export default function DiscoveryForm() {
               You can be unsure.
             </h1>
             <p className="mt-3 max-w-[48ch] text-sm leading-relaxed text-white/80 sm:text-base">
-              Choose a class context, then optionally pick activities.
+              Let&apos;s start with a little context. You don&apos;t need to have a career in mind.
             </p>
           </div>
 
           <aside className="max-w-sm rounded-2xl border border-white/15 bg-white/[.06] p-4 text-sm leading-relaxed text-white/85">
-            Your class only organizes browsing. Class 10 and Class 12 lead to
-            different study paths, and activity picks are optional.
+            Your class only organises browsing. Activity choices are optional.
           </aside>
         </div>
       </section>
@@ -190,123 +191,111 @@ export default function DiscoveryForm() {
             <Info aria-hidden="true" className="h-5 w-5" />
           </span>
           <p className="max-w-5xl text-sm leading-relaxed">
-            <strong className="font-semibold text-[#243a2f]">Not a test:</strong>{" "}
-            class organizes browsing; activities are optional ideas. Nothing
-            decides what you qualify for.
+            <strong className="font-semibold text-[#243a2f]">A little reassurance:</strong>{" "}
+            This isn&apos;t a test. Your answers won&apos;t decide what you qualify for.
+            They simply help organise what you explore.
           </p>
         </div>
 
-        <div aria-busy={!ready} className="space-y-8 sm:space-y-16">
+        <div aria-busy={!ready} className="space-y-6 sm:space-y-10">
           <fieldset
             disabled={!ready}
             aria-describedby="class-help"
             className="min-w-0"
           >
-            <legend className="block font-serif text-[clamp(1.8rem,3.2vw,2.7rem)] font-semibold leading-tight tracking-[-.04em] text-[#102d26]">
-              <span className="block font-sans text-xs font-semibold uppercase tracking-[.15em] text-[#718078]">
-                First, a little context
-              </span>
-              <span className="mt-1.5 block text-[1.55rem] sm:text-[clamp(1.8rem,3.2vw,2.7rem)]">
-                Which class or study stage should organize your browsing?
-              </span>
-            </legend>
-            <p
-              id="class-help"
-              className="mt-1.5 max-w-3xl text-sm leading-relaxed text-[#59665e] sm:text-base"
-            >
-              Choose the closest context if you’ve completed a class or are
-              waiting for results, or choose “I’m not sure / another class.”
-              This only organizes browsing; it doesn’t decide eligibility.
-            </p>
+              <legend className="block font-serif text-[clamp(1.8rem,3.2vw,2.7rem)] font-semibold leading-tight tracking-[-.04em] text-[#102d26]">
+                <span className="block font-sans text-xs font-semibold uppercase tracking-[.15em] text-[#718078]">
+                  First, your education stage
+                </span>
+                <span className="mt-1.5 block text-[1.55rem] sm:text-[clamp(1.8rem,3.2vw,2.7rem)]">
+                  Where are you in your education journey?
+                </span>
+              </legend>
+              <p
+                id="class-help"
+                className="mt-1.5 max-w-3xl text-sm leading-relaxed text-[#59665e] sm:text-base"
+              >
+                Your education stage helps organise information. It doesn&apos;t limit what you can explore.
+              </p>
 
-            <div
-              className="mt-3 grid gap-2.5 md:mt-4 md:grid-cols-3 md:gap-3 lg:gap-5"
-            >
-              {classOptions.map(({ value, label, description, icon: Icon }, index) => {
-                const selected = answers.classContext === value;
-                return (
-                  <label
-                    key={value}
-                    className={`cb-reveal group relative flex min-h-[72px] cursor-pointer flex-row items-center justify-start gap-3 rounded-2xl border p-3 transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-[#759586] focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#145543] motion-reduce:transform-none motion-reduce:transition-none md:min-h-[120px] md:flex-col md:items-stretch md:justify-between md:gap-0 md:p-5 ${
-                      selected
-                        ? "border-[#145543] bg-[#eaf2ed] shadow-[0_12px_30px_-24px_rgba(20,85,67,.7)]"
-                        : "border-[#d9ddd5] bg-white hover:bg-[#fffefa]"
-                    }`}
-                    style={{ animationDelay: `${index * 65}ms` }}
-                  >
-                    <span className="flex w-auto shrink-0 items-center justify-between gap-2 md:w-full md:items-start md:gap-4">
-                      <span
-                        className={`grid h-9 w-9 place-items-center rounded-full transition-colors md:h-10 md:w-10 ${
-                          selected
-                            ? "bg-[#145543] text-white"
-                            : "bg-[#eaf2ed] text-[#145543]"
-                        }`}
-                      >
-                        <Icon aria-hidden="true" className="h-5 w-5" />
+              <div className="mt-3 grid gap-2.5 md:mt-4 md:grid-cols-2 md:gap-3 lg:gap-5">
+                {classOptions.map(({ value, label, description, icon: Icon }, index) => {
+                  const selected = educationStage === value;
+                  return (
+                    <label
+                      key={value}
+                      className={`cb-reveal group relative flex min-h-[72px] cursor-pointer flex-row items-center justify-start gap-3 rounded-2xl border p-3 transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-[#759586] focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#145543] motion-reduce:transform-none motion-reduce:transition-none md:min-h-[120px] md:flex-col md:items-stretch md:justify-between md:gap-0 md:p-5 ${
+                        selected
+                          ? "border-[#145543] bg-[#eaf2ed] shadow-[0_12px_30px_-24px_rgba(20,85,67,.7)]"
+                          : "border-[#d9ddd5] bg-white hover:bg-[#fffefa]"
+                      }`}
+                      style={{ animationDelay: `${index * 65}ms` }}
+                    >
+                      <span className="flex w-auto shrink-0 items-center justify-between gap-2 md:w-full md:items-start md:gap-4">
+                        <span
+                          className={`grid h-9 w-9 place-items-center rounded-full transition-colors md:h-10 md:w-10 ${
+                            selected
+                              ? "bg-[#145543] text-white"
+                              : "bg-[#eaf2ed] text-[#145543]"
+                          }`}
+                        >
+                          <Icon aria-hidden="true" className="h-5 w-5" />
+                        </span>
+                        <input
+                          type="radio"
+                          name="class-context"
+                          value={value}
+                          checked={selected}
+                          onChange={() => chooseEducationStage(value)}
+                          className="sr-only"
+                          required
+                        />
+                        <span
+                          aria-hidden="true"
+                          className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition-colors ${
+                            selected
+                              ? "border-[#145543] bg-[#145543] text-white"
+                              : "border-[#aab7ad] bg-white text-transparent group-hover:border-[#759586]"
+                          }`}
+                        >
+                          <Check className="h-4 w-4" />
+                        </span>
                       </span>
-                      <input
-                        type="radio"
-                        name="class-context"
-                        value={value}
-                        checked={selected}
-                        onChange={() => {
-                          setDraft({
-                            ...answers,
-                            classContext: value,
-                          });
-                          setNotice("");
-                        }}
-                        className="sr-only"
-                        required
-                      />
-                      <span
-                        aria-hidden="true"
-                        className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition-colors ${
-                          selected
-                            ? "border-[#145543] bg-[#145543] text-white"
-                            : "border-[#aab7ad] bg-white text-transparent group-hover:border-[#759586]"
-                        }`}
-                      >
-                        <Check className="h-4 w-4" />
+                      <span className="block min-w-0 flex-1 md:mt-3 md:flex-none">
+                        <span className="block font-serif text-base font-semibold tracking-[-.02em] text-[#18372e] md:text-lg">
+                          {label}
+                        </span>
+                        <span className="mt-0.5 block max-w-[42ch] text-xs leading-snug text-[#626e67] md:mt-1 md:text-sm md:leading-relaxed">
+                          {description}
+                        </span>
                       </span>
-                    </span>
-                    <span className="block min-w-0 flex-1 md:mt-3 md:flex-none">
-                      <span className="block font-serif text-base font-semibold tracking-[-.02em] text-[#18372e] md:text-lg">
-                        {label}
-                      </span>
-                      <span className="mt-0.5 block max-w-[42ch] text-xs leading-snug text-[#626e67] md:mt-1 md:text-sm md:leading-relaxed">
-                        {description}
-                      </span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
+                    </label>
+                  );
+                })}
+              </div>
           </fieldset>
 
-          {answers.classContext && (
+          {educationStage && (
             <section
               aria-labelledby="activity-title"
-              className="cb-reveal border-t border-[#dddcd4] pt-10 sm:pt-12"
+              className="cb-reveal border-t border-[#dddcd4] pt-8 sm:pt-9"
             >
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[.15em] text-[#718078]">
-                    Optional activities — skip anytime
+                    Optional — skip anytime
                   </p>
                   <h2
                     id="activity-title"
                     className="mt-2 font-serif text-[clamp(1.8rem,3.2vw,2.7rem)] font-semibold leading-tight tracking-[-.04em] text-[#102d26]"
                   >
-                    What do you enjoy—or want to try?
+                    What do you enjoy — or want to try?
                   </h2>
                   <p
                     id="activity-help"
-                    className="mt-3 max-w-3xl rounded-xl border border-[#e7d5a8] bg-[#fff9eb] px-4 py-3 text-sm leading-relaxed text-[#4c3922]"
+                    className="mt-3 max-w-3xl text-sm leading-relaxed text-[#59665e] sm:text-base"
                   >
-                    <strong className="font-semibold">Optional:</strong> Pick
-                    up to 3, or leave them all unselected. You can still
-                    continue.
+                    Choose up to 3 activities, or leave them unselected and continue.
                   </p>
                 </div>
                 <span className="rounded-full border border-[#d9ddd5] bg-white px-4 py-2 text-sm font-medium text-[#59665e]">
@@ -373,85 +362,48 @@ export default function DiscoveryForm() {
             </section>
           )}
 
-          <div className="border-t border-[#d9ddd5] pt-6 sm:pt-8">
+          <div className="border-t border-[#d9ddd5] pt-5 sm:pt-6">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-3xl">
-                {!answers.classContext ? (
+                {!educationStage ? (
                   <>
                     <p className="font-semibold text-[#18372e]">
-                      Choose a class context or browse all areas without answering.
+                      Choose your education stage to continue.
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-[#59665e]">
-                      Activities are optional. Your class choice only sets browsing context.
+                      Activities are optional. You can leave them unselected.
                     </p>
                   </>
                 ) : (
                   <p className="text-sm leading-relaxed text-[#59665e]">
-                    {answers.classContext === "general"
-                      ? "No class assumed. You’ll browse broad areas."
-                      : `Your ${answers.classContext === "class-10" ? "Class 10" : "Class 12"} choice organizes browsing only; it does not decide eligibility.`}
+                    Your education stage helps organise information. It doesn&apos;t limit what you can explore.
                   </p>
                 )}
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 {answers.activityIds.length > 0 ||
-                answers.notSure ||
-                answers.classContext ? (
+                stored.status === "invalid" ? (
                   <ClearChoicesButton
                     onConfirm={clearCurrentChoices}
                     disabled={!ready}
                     className="inline-flex min-h-12 items-center justify-center px-3 text-sm font-semibold text-[#59665e] underline underline-offset-4 transition-colors hover:text-[#145543] disabled:opacity-60"
                   />
                 ) : null}
-                <Link
-                  href="/discover/results?mode=all"
-                  className="inline-flex min-h-12 items-center justify-center rounded-full border border-[#b8c8bd] bg-white px-5 text-sm font-semibold text-[#145543] transition-colors hover:bg-[#eaf2ed] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
-                >
-                  Browse all areas
-                </Link>
                 <button
                   type="button"
-                  disabled={!ready || !answers.classContext}
+                  disabled={!ready || savedEducation.status !== "saved"}
                   onClick={saveChoices}
-                  className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#145543] px-6 text-sm font-semibold text-white transition-[background-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-[#0f4537] motion-reduce:transform-none motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-[#aab7ad] disabled:text-white"
+                  className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#145543] px-7 text-base font-semibold text-white shadow-[0_8px_22px_-12px_rgba(20,85,67,.8)] transition-[background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:bg-[#0f4537] hover:shadow-[0_12px_26px_-12px_rgba(20,85,67,.8)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#145543] motion-reduce:transform-none motion-reduce:transition-none disabled:cursor-not-allowed disabled:bg-[#aab7ad] disabled:text-white disabled:shadow-none"
                 >
-                  {answers.classContext === "general"
-                    ? "Browse broadly"
-                    : "Show me possibilities"}
+                  Explore possible fields
+                  <ArrowRight aria-hidden="true" className="h-5 w-5" />
                 </button>
               </div>
             </div>
-            <section
-              aria-labelledby="guided-entry-title"
-              className="mt-8 flex flex-col gap-4 rounded-2xl border border-[#d9ddd5] bg-white p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
-            >
-              <div className="max-w-3xl">
-                <p className="text-xs font-semibold uppercase tracking-[.15em] text-[#718078]">
-                  Optional · step by step
-                </p>
-                <h2
-                  id="guided-entry-title"
-                  className="mt-2 font-serif text-xl font-semibold text-[#18372e]"
-                >
-                  Want a gentler way to look around?
-                </h2>
-                <p className="mt-1 text-sm leading-relaxed text-[#59665e]">
-                  Guided Explorer is self-guided; no person is involved. It
-                  keeps this page’s choices as a draft until you continue.
-                </p>
-              </div>
-              <Link
-                href="/counselling"
-                onClick={() => setGuidedExplorerDraftSeed(answers)}
-                className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full border border-[#b8c8bd] bg-white px-5 text-sm font-semibold text-[#145543] transition-colors hover:bg-[#eaf2ed] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
-              >
-                Try Guided Explorer
-                <ArrowRight aria-hidden="true" className="h-4 w-4" />
-              </Link>
-            </section>
           </div>
         </div>
       </div>
-    </main>
+      </main>
+    </>
   );
 }

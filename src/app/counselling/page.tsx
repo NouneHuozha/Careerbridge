@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import GuidedExplorer from "./guided-explorer";
+import { CounsellingIntroduction } from "./counselling-intro";
 
 export const metadata: Metadata = {
-  title: "Guided Explorer — CareerBridge",
+  title: "Guided Explorer | CareerBridge",
   description:
-    "A voluntary, self-guided way to browse education and study areas. No person is involved, and no answer decides eligibility.",
+    "Self-guided questions to help you reflect on what interests you and explore what comes next.",
 };
 
-export default function GuidedExplorerPage() {
-  return <GuidedExplorer />;
+export default function CounsellingIntroductionPage() {
+  return <CounsellingIntroduction />;
 }

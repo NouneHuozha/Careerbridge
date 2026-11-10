@@ -49,8 +49,8 @@ export default function ClearChoicesButton({
             id="clear-choices-description"
             className="mt-2 text-sm leading-relaxed text-[#59665e]"
           >
-            Your class and activity choices will be removed from this tab.
-            You can start again anytime.
+            Your activity choices will be removed from this tab. Your saved
+            education stage will remain. You can choose activities again anytime.
           </p>
           <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button

@@ -3,16 +3,17 @@ import Link from "next/link";
 import {
   ArrowRight,
   BookOpen,
-  Building2,
   Clock3,
   Compass,
   GitFork,
-  GraduationCap,
-  Leaf,
   Search,
   Signpost,
   type LucideIcon,
 } from "lucide-react";
+import { SiteHeader } from "./site-header";
+
+const landingCardActionClass =
+  "cb-card-action mt-5 w-fit border-[#e9c66b] bg-[#f2cf78] text-[#18352d] hover:border-[#e1b94f] hover:bg-[#e9c15d] active:bg-[#dcb34b]";
 
 const libraryLinks: {
   label: string;
@@ -21,28 +22,10 @@ const libraryLinks: {
   href: string;
 }[] = [
   {
-    label: "Explore broad areas",
-    detail: "Browse without choosing a career",
+    label: "Start with Discovery",
+    detail: "Choose a class context and optional activities",
     icon: Compass,
-    href: "/discover/results?mode=all",
-  },
-  {
-    label: "After Class 10",
-    detail: "Explore streams and skill options",
-    icon: GraduationCap,
-    href: "/discover/streams",
-  },
-  {
-    label: "After Class 12",
-    detail: "Explore courses and study routes",
-    icon: BookOpen,
-    href: "/discover/courses",
-  },
-  {
-    label: "Colleges",
-    detail: "Browse source-checked institutions",
-    icon: Building2,
-    href: "/colleges",
+    href: "/discover",
   },
 ];
 
@@ -67,6 +50,7 @@ const steps = [
 export default function HomePage() {
   return (
     <main className="bg-[#fbfaf6] text-[#18352d]">
+      <SiteHeader home />
       <section className="relative isolate min-h-[710px] overflow-visible bg-[#123f34] text-white lg:min-h-[760px]">
         <Image
           src="/SunlitModernLibraryStudyWorkspace.png"
@@ -80,35 +64,6 @@ export default function HomePage() {
           aria-hidden="true"
           className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(8,52,43,.97)_0%,rgba(8,52,43,.91)_30%,rgba(8,52,43,.62)_49%,rgba(8,52,43,.05)_77%),linear-gradient(0deg,rgba(8,52,43,.20),transparent_42%)]"
         />
-        <header className="cb-container absolute inset-x-0 top-0 z-20 flex min-h-20 items-center justify-between gap-6">
-          <Link
-            href="#top"
-            className="font-serif text-xl font-semibold tracking-tight text-white sm:text-2xl"
-          >
-            CareerBridge
-          </Link>
-          <nav
-            aria-label="Main navigation"
-            className="hidden items-center gap-8 text-sm font-medium text-white/90 sm:flex"
-          >
-            <Link href="#how-it-works" className="transition hover:text-white">
-              How it works
-            </Link>
-            <Link
-              href="/discover/results?mode=all"
-              className="rounded-sm transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
-            >
-              Browse options
-            </Link>
-          </nav>
-          <Link
-            href="#getting-started"
-            className="inline-flex min-h-11 items-center rounded-full border border-white/35 bg-[#103f35]/60 px-5 text-sm font-semibold text-white transition hover:bg-[#103f35]/80"
-          >
-            Choose a starting point
-          </Link>
-        </header>
-
         <div
           id="top"
           className="cb-container relative flex min-h-[710px] flex-col justify-center pb-36 pt-32 lg:min-h-[760px] lg:pb-40"
@@ -129,7 +84,7 @@ export default function HomePage() {
           className="cb-container relative z-10 -mt-20 lg:absolute lg:inset-x-0 lg:bottom-0 lg:mt-0 lg:translate-y-[34%]"
         >
           <div className="grid gap-4 rounded-[1.55rem] border border-white/80 bg-[#fffefa] p-4 shadow-[0_18px_55px_-30px_rgba(8,39,31,.42)] lg:grid-cols-3 lg:gap-5 lg:p-5">
-            <article className="flex min-h-[230px] items-start gap-4 rounded-[1.15rem] border border-[#e3e2d9] bg-[#f7f7f2] p-6 sm:gap-5 sm:p-7">
+            <article className="flex min-h-[230px] items-start gap-4 rounded-[1.15rem] border border-[#e3e2d9] bg-white p-6 sm:gap-5 sm:p-7">
               <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[#e4f0e8] text-[#145543] sm:h-16 sm:w-16">
                 <Compass aria-hidden="true" className="h-7 w-7 sm:h-8 sm:w-8" />
               </span>
@@ -143,13 +98,10 @@ export default function HomePage() {
                 </span>
                 <Link
                   href="/discover"
-                  className="group/button mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#f2cf78] px-5 text-sm font-semibold text-[#263b2e] transition hover:bg-[#ebc45e]"
+                  className={landingCardActionClass}
                 >
                   Start exploring
-                  <ArrowRight
-                    aria-hidden="true"
-                    className="h-4 w-4 transition-transform group-hover/button:translate-x-1"
-                  />
+                  <ArrowRight aria-hidden="true" className="h-4 w-4" />
                 </Link>
               </span>
             </article>
@@ -165,14 +117,11 @@ export default function HomePage() {
                   Browse all topics without answering questions first.
                 </span>
                 <Link
-            href="/discover/results?mode=all"
-            className="group/button mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#f2cf78] px-5 text-sm font-semibold text-[#263b2e] transition hover:bg-[#ebc45e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                  href="/explore"
+                  className={landingCardActionClass}
                 >
                   Browse options
-                  <ArrowRight
-                    aria-hidden="true"
-                    className="h-4 w-4 transition-transform group-hover/button:translate-x-1"
-                  />
+                  <ArrowRight aria-hidden="true" className="h-4 w-4" />
                 </Link>
               </span>
             </article>
@@ -188,7 +137,10 @@ export default function HomePage() {
                   Find a course or college by name. Direct search is not
                   available yet.
                 </span>
-                <span className="mt-5 inline-flex min-h-11 items-center rounded-full bg-[#f1f1e9] px-5 text-sm font-semibold text-[#52645a]">
+                <span
+                  aria-disabled="true"
+                  className={`${landingCardActionClass} cursor-not-allowed opacity-60`}
+                >
                   Search coming soon
                 </span>
               </span>
@@ -202,11 +154,6 @@ export default function HomePage() {
         aria-label="A supportive way to explore"
       >
         <div className="flex flex-wrap items-center justify-center gap-x-9 gap-y-4 border-b border-[#dddcd4] pb-9 text-sm text-[#59665e] sm:gap-x-12">
-          <span className="inline-flex items-center gap-2">
-            <Leaf aria-hidden="true" className="h-5 w-5 text-[#145543]" />
-            Browse without answering
-          </span>
-          <span aria-hidden="true" className="hidden h-5 w-px bg-[#cccfc6] sm:block" />
           <span className="inline-flex items-center gap-2">
             <Clock3 aria-hidden="true" className="h-5 w-5 text-[#145543]" />
             Go at your own pace
@@ -298,10 +245,10 @@ export default function HomePage() {
             What you can explore
           </h2>
           <p className="mt-1 text-[#606b65]">
-            Start broad, then choose your class context whenever you’re ready.
+            Start with a class context and optional activity choices.
           </p>
         </div>
-        <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-7 grid max-w-2xl gap-4">
           {libraryLinks.map(({ label, detail, icon: Icon, href }) => (
             <Link
               key={label}

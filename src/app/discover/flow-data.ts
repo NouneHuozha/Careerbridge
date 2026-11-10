@@ -5,124 +5,67 @@ export const activityOptions = [
     id: "fixing",
     label: "Fixing or building things",
     description: "Repairing or making useful things",
-    areaId: "technology",
   },
   {
     id: "helping",
     label: "Helping or caring for people",
-    description: "Caregiving, health support, or first aid",
-    areaId: "health",
+    description: "Supporting, caring or helping others",
   },
   {
     id: "outdoors",
     label: "Being outdoors with plants or animals",
-    description: "Plants, animals, nature, fieldwork",
-    areaId: "nature",
+    description: "Plants, animals or nature",
   },
   {
     id: "computers",
     label: "Using computers or phones",
-    description: "Exploring apps, devices, or the internet",
-    areaId: "technology",
+    description: "Apps, devices or the internet",
   },
   {
     id: "organising",
     label: "Organising activities or plans",
-    description: "Planning events, schedules, or group tasks",
-    areaId: "business",
+    description: "Planning events or group tasks",
   },
   {
     id: "creative",
-    label: "Drawing, designing, or making things",
-    description: "Art, crafts, design, or creative projects",
-    areaId: "creative",
+    label: "Drawing, designing or making things",
+    description: "Art, crafts or creative projects",
   },
   {
     id: "numbers",
     label: "Working with numbers or information",
-    description: "Calculations, accounts, or organizing data",
-    areaId: "finance",
+    description: "Calculations or organising information",
   },
   {
     id: "teaching",
     label: "Teaching or explaining things",
-    description: "Helping someone understand a topic",
-    areaId: "education",
+    description: "Helping someone understand something",
+  },
+  {
+    id: "talking",
+    label: "Talking with people and sharing ideas",
+    description: "Sharing ideas and talking with others",
+  },
+  {
+    id: "problem-solving",
+    label: "Solving problems and figuring things out",
+    description: "Thinking through challenges",
   },
 ] as const;
 
 export type ActivityId = (typeof activityOptions)[number]["id"];
-export type ClassContext = "class-10" | "class-12" | "general";
-export type AreaId = (typeof areas)[number]["id"];
 
 export type DiscoveryAnswers = {
   activityIds: ActivityId[];
-  notSure: boolean;
-  classContext: ClassContext | null;
 };
-
-export const areas = [
-  {
-    id: "technology",
-    name: "Technology & Computing",
-    description: "Computers, devices, digital tools, and technical work.",
-  },
-  {
-    id: "health",
-    name: "Health & Care",
-    description: "Health, care, and supporting people's wellbeing.",
-  },
-  {
-    id: "nature",
-    name: "Nature & Fieldwork",
-    description: "Plants, animals, the environment, and outdoor work.",
-  },
-  {
-    id: "business",
-    name: "Business & Office",
-    description: "Planning, organising, business, and office work.",
-  },
-  {
-    id: "creative",
-    name: "Creative & Design",
-    description: "Making, visual ideas, design, and creative work.",
-  },
-  {
-    id: "finance",
-    name: "Finance & Data",
-    description: "Numbers, accounts, information, and data.",
-  },
-  {
-    id: "education",
-    name: "Education & Social",
-    description: "Teaching, learning, and supporting communities.",
-  },
-] as const;
 
 export const DISCOVERY_STORAGE_KEY = "careerbridge:type-1-discovery:v1";
 const DISCOVERY_CHANGE_EVENT = "careerbridge-discovery-change";
 const LOADING_SNAPSHOT = "\u0000loading";
 const UNAVAILABLE_SNAPSHOT = "\u0000unavailable";
-let guidedExplorerDraftSeed: DiscoveryAnswers | null = null;
 
 export function createEmptyAnswers(): DiscoveryAnswers {
-  return { activityIds: [], notSure: false, classContext: null };
-}
-
-export function setGuidedExplorerDraftSeed(answers: DiscoveryAnswers) {
-  guidedExplorerDraftSeed = {
-    activityIds: [...answers.activityIds],
-    notSure: false,
-    classContext: answers.classContext,
-  };
-}
-
-export function takeGuidedExplorerDraftSeed() {
-  const seed = guidedExplorerDraftSeed;
-  guidedExplorerDraftSeed = null;
-  return seed
-    ? { ...seed, activityIds: [...seed.activityIds] }
-    : null;
+  return { activityIds: [] };
 }
 
 function getSnapshot() {
@@ -155,7 +98,7 @@ function parseSnapshot(raw: string) {
   }
 
   if (!isDiscoveryAnswers(value)) return { status: "invalid" } as const;
-  return { status: "saved", answers: value } as const;
+  return { status: "saved", answers: { activityIds: value.activityIds } } as const;
 }
 
 export function useStoredDiscoveryAnswers() {
@@ -184,24 +127,14 @@ export function clearAnswers() {
   }
 }
 
-export function getMappedAreas(activityIds: ActivityId[]) {
-  const mappedIds = new Set(
-    activityIds.map(
-      (id) => activityOptions.find((activity) => activity.id === id)?.areaId,
-    ),
-  );
-
-  return areas.filter((area) => mappedIds.has(area.id));
-}
-
 function isDiscoveryAnswers(value: unknown): value is DiscoveryAnswers {
   if (typeof value !== "object" || value === null) return false;
 
-  if (!("activityIds" in value) || !("notSure" in value) || !("classContext" in value)) {
+  if (!("activityIds" in value)) {
     return false;
   }
 
-  const { activityIds, notSure, classContext } = value;
+  const { activityIds } = value;
 
   if (
     !Array.isArray(activityIds) ||
@@ -211,15 +144,7 @@ function isDiscoveryAnswers(value: unknown): value is DiscoveryAnswers {
         typeof id === "string" &&
         activityOptions.some((activity) => activity.id === id),
     ) ||
-    new Set(activityIds).size !== activityIds.length ||
-    typeof notSure !== "boolean" ||
-    (notSure && activityIds.length > 0) ||
-    !(
-      classContext === null ||
-      classContext === "class-10" ||
-      classContext === "class-12" ||
-      classContext === "general"
-    )
+    new Set(activityIds).size !== activityIds.length
   ) {
     return false;
   }
