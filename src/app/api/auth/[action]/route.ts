@@ -60,6 +60,8 @@ export async function POST(request: Request, context: { params: Promise<{ action
   const email = String(form.get("email") ?? "");
   const password = String(form.get("password") ?? "");
   const confirm = String(form.get("confirm") ?? "");
+  const ageAttestation = String(form.get("ageAttestation") ?? "");
+  const privacyAccepted = form.get("privacyAccepted") === "yes";
   if (isSignUp && password !== confirm) {
     return redirectTo(
       request,
@@ -73,6 +75,8 @@ export async function POST(request: Request, context: { params: Promise<{ action
           email,
           password,
           fullName: String(form.get("fullName") ?? ""),
+          privacyAccepted,
+          ageAttestation,
         })
       : await signIn({ email, password });
 
