@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ArrowRight, BookOpen, CheckCircle2 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "../../../breadcrumbs";
+import { SavedItemButton } from "../../saved-item-button";
+import { HistoryVisit } from "../../history-visit";
 import { possibilityFields } from "../../../discover/possibility-fields";
 import {
   getStageLabel,
@@ -56,11 +58,19 @@ export default async function StudyRouteDetailsPage({
 
   return (
     <main className="min-h-svh bg-[#fbfaf6] text-[#18352d]">
+      <HistoryVisit
+        type="pathway"
+        id={route.id}
+        context={{
+          stage: route.stage,
+          ...(field ? { fieldId: field.id } : {}),
+        }}
+      />
       <div className="cb-container pb-14 pt-6 sm:pb-20 sm:pt-8">
         <Breadcrumbs
           items={[
             { label: "Explore", href: "/explore" },
-            { label: "Study routes", href: routesHref },
+            { label: "Pathways", href: routesHref },
             { label: route.title },
           ]}
           className="!px-0"
@@ -78,6 +88,16 @@ export default async function StudyRouteDetailsPage({
             <p className="mt-5 max-w-[64ch] text-lg leading-relaxed text-[#354b40] sm:text-xl">
               {route.introduction}
             </p>
+            <div className="mt-5">
+              <SavedItemButton
+                type="pathway"
+                id={route.id}
+                context={{
+                  stage: route.stage,
+                  ...(field ? { fieldId: field.id } : {}),
+                }}
+              />
+            </div>
           </div>
           <aside className="rounded-2xl bg-[#eaf2ed] p-5 sm:p-6">
             <p className="text-sm font-semibold text-[#145543]">A route overview</p>

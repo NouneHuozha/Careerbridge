@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { PageLoadingSkeleton } from "../../../page-loading-skeleton";
 import { possibilityFields } from "../../../discover/possibility-fields";
 
 export const metadata: Metadata = {
@@ -15,7 +16,7 @@ type PageProps = {
 
 export default function CourseCatalogPage({ searchParams }: PageProps) {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoadingSkeleton variant="collection" showHeader={false} />}>
       <CourseCatalogRedirect searchParams={searchParams} />
     </Suspense>
   );

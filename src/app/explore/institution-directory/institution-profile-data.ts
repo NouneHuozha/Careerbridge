@@ -1,4 +1,5 @@
 import {
+  institutionRecords,
   institutionRecordsById,
   type InformationSource,
   type InstitutionRecord,
@@ -209,7 +210,7 @@ export const institutionProfiles: InstitutionProfileRecord[] = [
   },
 ];
 
-export const institutionProfilePages: InstitutionProfilePageRecord[] =
+const verifiedInstitutionProfiles: InstitutionProfilePageRecord[] =
   institutionProfiles.map((profile) => {
     const institution = institutionRecordsById.get(profile.institutionId);
     if (!institution) {
@@ -220,6 +221,21 @@ export const institutionProfilePages: InstitutionProfilePageRecord[] =
 
     return { ...institution, ...profile };
   });
+
+const sampleInstitutionProfiles = institutionRecords
+  .filter((institution) => institution.isDemo)
+  .map<InstitutionProfilePageRecord>((institution) => ({
+    ...institution,
+    sources: [],
+    limitedInfo:
+      "This fictional institution is included only to demonstrate the directory design. Its name, location and other details are sample data, not verified information.",
+    lastReviewed: "Sample data",
+  }));
+
+export const institutionProfilePages: InstitutionProfilePageRecord[] = [
+  ...verifiedInstitutionProfiles,
+  ...sampleInstitutionProfiles,
+];
 
 export function isVerifiedProgramme(programme: InstitutionProgramme) {
   const verifiedAt = programme.verifiedDate

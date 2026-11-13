@@ -12,6 +12,9 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Breadcrumbs } from "../../../breadcrumbs";
+import { SavedItemButton } from "../../saved-item-button";
+import { HistoryVisit } from "../../history-visit";
+import { possibilityFields } from "../../../discover/possibility-fields";
 import { examinations } from "../examination-data";
 
 export const instant = false;
@@ -106,9 +109,28 @@ export default async function ExaminationDetailsPage({
   const listingHref = `/explore/examinations${listingParams.size ? `?${listingParams.toString()}` : ""}`;
   const coursesHref = "/explore/courses?stage=class-12&field=engineering";
   const officialUrl = examination.officialUrl;
+  const savedStage =
+    query.stage === "class-10" ||
+    query.stage === "class-12" ||
+    query.stage === "all"
+      ? query.stage
+      : undefined;
+  const savedFieldId =
+    typeof query.field === "string" &&
+    possibilityFields.some((field) => field.id === query.field)
+      ? query.field
+      : undefined;
 
   return (
     <main className="cb-page-enter min-h-svh bg-[#fbfaf6] text-[#18352d]">
+      <HistoryVisit
+        type="examination"
+        id={examination.id}
+        context={{
+          ...(savedStage ? { stage: savedStage } : {}),
+          ...(savedFieldId ? { fieldId: savedFieldId } : {}),
+        }}
+      />
       <div className="cb-container pb-14 pt-6 sm:pb-20 sm:pt-8">
         <Breadcrumbs
           items={[
@@ -145,6 +167,16 @@ export default async function ExaminationDetailsPage({
               <span className="h-1.5 w-1.5 rounded-full bg-[#d2b778]" aria-hidden="true" />
               Conducted by {examination.authority}
             </p>
+            <div className="mt-5">
+              <SavedItemButton
+                type="examination"
+                id={examination.id}
+                context={{
+                  ...(savedStage ? { stage: savedStage } : {}),
+                  ...(savedFieldId ? { fieldId: savedFieldId } : {}),
+                }}
+              />
+            </div>
           </div>
 
           <div className="exam-hero-papers rounded-2xl border border-white/15 bg-white/[.07] p-5 sm:p-6">

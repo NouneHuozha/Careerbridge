@@ -11,6 +11,7 @@ import {
   type LucideIcon,
   X,
 } from "lucide-react";
+import { SavedItemButton } from "../saved-item-button";
 import type { PossibilityField, StudyStage } from "./field-data";
 
 export function FieldOverviewDialog({
@@ -198,6 +199,13 @@ export function FieldOverviewDialog({
                 </span>
               </Link>
             ))}
+          </div>
+          <div className="mt-4">
+            <SavedItemButton
+              type="field"
+              id={field.id}
+              context={stage ? { stage } : undefined}
+            />
           </div>
           <p className="mt-4 text-xs leading-relaxed text-[#6b7b71]">
             Field guides and study routes are general starting points, not eligibility or career

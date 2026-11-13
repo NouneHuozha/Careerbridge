@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import { PageLoadingSkeleton } from "../../../page-loading-skeleton";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -14,7 +15,10 @@ import {
   Wallet,
 } from "lucide-react";
 import { Breadcrumbs } from "../../../breadcrumbs";
+import { SavedItemButton } from "../../saved-item-button";
+import { HistoryVisit } from "../../history-visit";
 import { possibilityFields } from "../../../discover/possibility-fields";
+import { courseCatalog } from "../../courses/catalog/course-catalog-data";
 import {
   resolvedInstitutionCampusOfferings,
   type InformationFact,
@@ -126,7 +130,7 @@ export default function InstitutionDetailsPage({
   searchParams: Promise<SearchParams>;
 }) {
   return (
-    <Suspense fallback={<div className="min-h-svh bg-[#fbfaf6]" />}>
+    <Suspense fallback={<PageLoadingSkeleton variant="detail" showHeader={false} />}>
       <InstitutionDetails params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -146,7 +150,16 @@ async function InstitutionDetails({
   const courseId = firstParam(query.course) ?? institution.courseId;
   if (courseId !== institution.courseId) notFound();
   const courseName = firstParam(query.courseName) ?? (courseId === "bca" ? "Bachelor of Computer Applications (BCA)" : courseId);
-  const stage = firstParam(query.stage);
+  const savedCourseName =
+    courseCatalog.find((course) => course.id === courseId)?.name ??
+    courseName.slice(0, 200);
+  const requestedStage = firstParam(query.stage);
+  const stage =
+    requestedStage === "class-10" ||
+    requestedStage === "class-12" ||
+    requestedStage === "all"
+      ? requestedStage
+      : undefined;
   const fieldId = firstParam(query.field) ?? "";
   const field = possibilityFields.find((item) => item.id === fieldId);
   const returnParams = new URLSearchParams();
@@ -179,7 +192,12 @@ async function InstitutionDetails({
       : undefined);
   const breadcrumbs = [
     { label: "Explore", href: "/explore" },
-    ...(field ? [{ label: field.name, href: "/explore/fields" }] : []),
+    ...(field
+      ? [{
+          label: field.name,
+          href: `/explore/fields/${field.id}${stage === "class-10" || stage === "class-12" ? `?stage=${stage}` : ""}`,
+        }]
+      : []),
     { label: courseName, href: returnTo },
     { label: "Institutions", href: returnTo },
     { label: institution.institution.name },
@@ -187,6 +205,16 @@ async function InstitutionDetails({
 
   return (
     <main className="min-h-svh bg-[#fbfaf6] pb-20 text-[#18352d]">
+      <HistoryVisit
+        type="institution-offering"
+        id={institution.slug}
+        context={{
+          courseId,
+          courseName: savedCourseName,
+          ...(field ? { fieldId: field.id } : {}),
+          ...(stage ? { stage } : {}),
+        }}
+      />
       <Breadcrumbs items={breadcrumbs} className="pt-6 sm:pt-8" />
       <div className="w-full px-5 pt-7 sm:px-8 lg:px-12 lg:pt-10 2xl:px-16">
         {institution.isDemo && (
@@ -212,6 +240,18 @@ async function InstitutionDetails({
               </>
             )}
             {stageLabel && <span className="rounded-full bg-[#eaf2ed] px-3 py-1 text-xs font-semibold text-[#315345]">{stageLabel}</span>}
+          </div>
+          <div className="mt-5">
+            <SavedItemButton
+              type="institution-offering"
+              id={institution.slug}
+              context={{
+                courseId,
+                courseName: savedCourseName,
+                ...(field ? { fieldId: field.id } : {}),
+                ...(stage ? { stage } : {}),
+              }}
+            />
           </div>
         </header>
 

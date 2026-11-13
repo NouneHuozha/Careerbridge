@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import { PageLoadingSkeleton } from "../../../page-loading-skeleton";
+import { HistoryVisit } from "../../history-visit";
 import InstitutionProfile from "./institution-profile";
 import { institutionProfilePages } from "../institution-profile-data";
 
@@ -16,7 +18,7 @@ export const metadata: Metadata = {
 
 export default function InstitutionProfilePage({ params }: PageProps) {
   return (
-    <Suspense fallback={<div className="min-h-svh bg-[#fbfaf6]" />}>
+    <Suspense fallback={<PageLoadingSkeleton variant="detail" showHeader={false} />}>
       <InstitutionProfileRoute params={params} />
     </Suspense>
   );
@@ -28,5 +30,10 @@ async function InstitutionProfileRoute({ params }: PageProps) {
 
   if (!institution) notFound();
 
-  return <InstitutionProfile institution={institution} />;
+  return (
+    <>
+      <HistoryVisit type="institution" id={institution.slug} />
+      <InstitutionProfile institution={institution} />
+    </>
+  );
 }

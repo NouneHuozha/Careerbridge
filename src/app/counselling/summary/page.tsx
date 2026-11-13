@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRight, Pencil, Trash2 } from "lucide-react";
+import { PageLoadingSkeleton } from "../../page-loading-skeleton";
 import { SiteHeader } from "../../site-header";
 import { Breadcrumbs } from "../../breadcrumbs";
 import { CounsellingAnswerEditor } from "../answer-editor";
@@ -39,15 +40,7 @@ export default function CounsellingSummaryPage() {
   const [error, setError] = useState("");
 
   if (stored.status === "loading") {
-    return (
-      <>
-      <SiteHeader />
-      <Breadcrumbs items={[{ label: "Guided Explorer", href: "/counselling" }, { label: "Your notes" }]} className="pt-4" />
-      <main className="min-h-svh bg-[#fbfaf6] px-5 pb-20 pt-5 text-[#18352d]">
-        <p role="status">Opening your summary…</p>
-      </main>
-      </>
-    );
+    return <PageLoadingSkeleton variant="summary" />;
   }
   if (stored.status !== "saved") {
     const unavailable = stored.status === "unavailable" || stored.status === "invalid";

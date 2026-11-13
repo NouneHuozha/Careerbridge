@@ -5,6 +5,7 @@ import { ArrowRight, Search } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Breadcrumbs } from "../../breadcrumbs";
 import { useEducationStage } from "../../education-stage";
+import { SavedItemButton } from "../saved-item-button";
 import { possibilityFields, type PossibilityFieldId } from "./field-data";
 import { FieldOverviewDialog } from "./field-overview-dialog";
 
@@ -86,35 +87,45 @@ export default function FieldsDirectoryPage() {
         {filteredFields.length > 0 ? (
           <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredFields.map((field) => (
-              <button
+              <article
                 key={field.id}
-                type="button"
-                onClick={(event) => {
-                  triggerRef.current = event.currentTarget;
-                  setSelectedFieldId(field.id);
-                }}
-                aria-label={`Preview ${field.name}`}
-                className="group flex min-h-32 items-center gap-4 rounded-2xl border border-[#dce7df] bg-white p-3 text-left transition-colors hover:border-[#9fc5ad] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543] sm:min-h-40 sm:p-4"
+                className="group flex min-h-32 items-center gap-4 rounded-2xl border border-[#dce7df] bg-white p-3 transition-colors hover:border-[#9fc5ad] sm:min-h-40 sm:p-4"
               >
-                <Image
-                  src={field.image}
-                  alt=""
-                  width={112}
-                  height={112}
-                  className="h-24 w-24 shrink-0 rounded-xl object-cover sm:h-28 sm:w-28"
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    triggerRef.current = event.currentTarget;
+                    setSelectedFieldId(field.id);
+                  }}
+                  aria-label={`Preview ${field.name}`}
+                  className="flex min-w-0 flex-1 items-center gap-4 rounded-sm text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+                >
+                  <Image
+                    src={field.image}
+                    alt=""
+                    width={112}
+                    height={112}
+                    className="h-20 w-20 shrink-0 rounded-xl object-cover sm:h-28 sm:w-28"
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col self-stretch py-1">
+                    <span className="font-serif text-xl font-semibold tracking-[-.025em] sm:text-2xl">
+                      {field.name}
+                    </span>
+                    <span className="mt-2 text-sm leading-relaxed text-[#59665e]">
+                      {field.description}
+                    </span>
+                    <span className="cb-card-action mt-auto pt-3">
+                      Preview field <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                    </span>
+                  </span>
+                </button>
+                <SavedItemButton
+                  type="field"
+                  id={field.id}
+                  context={stage ? { stage } : undefined}
+                  className="self-start"
                 />
-                <span className="flex min-w-0 flex-1 flex-col self-stretch py-1">
-                  <span className="font-serif text-xl font-semibold tracking-[-.025em] sm:text-2xl">
-                    {field.name}
-                  </span>
-                  <span className="mt-2 text-sm leading-relaxed text-[#59665e]">
-                    {field.description}
-                  </span>
-                  <span className="cb-card-action mt-auto pt-3">
-                    Preview field <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                  </span>
-                </span>
-              </button>
+              </article>
             ))}
           </div>
         ) : (

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { possibilityFields, type StudyStage } from "../field-data";
 import { FieldDetail } from "../field-detail";
+import { HistoryVisit } from "../../history-visit";
 
 export const instant = false;
 
@@ -39,10 +40,17 @@ export default async function FieldPage({
     stage === "class-10" || stage === "class-12" ? stage : undefined;
 
   return (
-    <FieldDetail
-      field={field}
-      initialStage={initialStage}
-      fromGuidedExplorer={from === "guided"}
-    />
+    <>
+      <HistoryVisit
+        type="field"
+        id={field.id}
+        context={initialStage ? { stage: initialStage } : undefined}
+      />
+      <FieldDetail
+        field={field}
+        initialStage={initialStage}
+        fromGuidedExplorer={from === "guided"}
+      />
+    </>
   );
 }

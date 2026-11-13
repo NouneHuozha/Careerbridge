@@ -13,6 +13,7 @@ import {
   type PossibilityField,
 } from "../possibility-fields";
 import { FieldOverviewDialog } from "./field-overview-dialog";
+import { PageLoadingSkeleton } from "../../page-loading-skeleton";
 import { SiteHeader } from "../../site-header";
 import { Breadcrumbs } from "../../breadcrumbs";
 
@@ -89,15 +90,7 @@ export default function PossibilitiesPage() {
   }
 
   if (stored.status === "loading" || education.status === "loading") {
-    return (
-      <main
-        aria-busy="true"
-        className="min-h-svh bg-[#fbfaf6] text-[#18352d]"
-      >
-        <SiteHeader />
-        <p className="sr-only" role="status">Loading your choices…</p>
-      </main>
-    );
+    return <PageLoadingSkeleton variant="results" />;
   }
 
   if (stored.status !== "saved" || education.status !== "saved") {

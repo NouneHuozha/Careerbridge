@@ -9,6 +9,12 @@
     scroll-behavior: smooth;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
   body {
     min-width: 0;
     margin: 0;
@@ -104,6 +110,54 @@
     }
   }
 
+  @keyframes cb-auth-card-enter {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes cb-auth-panel-enter {
+    from {
+      opacity: 0;
+      transform: translateX(-24px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes cb-auth-form-enter {
+    from {
+      opacity: 0;
+      transform: translateX(24px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .cb-auth-card-enter {
+    animation: cb-auth-card-enter 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .cb-auth-panel-enter {
+    animation: cb-auth-panel-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
+  }
+
+  .cb-auth-form-enter {
+    animation: cb-auth-form-enter 620ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+  }
+
   .cb-page-enter {
     animation: cb-enter 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
@@ -159,9 +213,53 @@
     .cb-page-enter,
     .cb-reveal,
     .cb-scroll-reveal,
+    .cb-auth-card-enter,
+    .cb-auth-panel-enter,
+    .cb-auth-form-enter,
     .exam-hero-copy,
     .exam-hero-papers,
     .exam-paper-row {
+      animation: none;
+    }
+  }
+
+  /* Course catalog filter panel entrance */
+  @keyframes cc-filter-enter {
+    from {
+      opacity: 0;
+      transform: translateY(18px) scale(0.985);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .cc-filter-enter {
+    animation: cc-filter-enter 600ms cubic-bezier(0.22, 1, 0.36, 1) 200ms both;
+  }
+
+  /* Course card staggered entrance */
+  @keyframes cc-card-enter {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.97);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .cc-card-enter {
+    animation: cc-card-enter 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cc-filter-enter,
+    .cc-card-enter {
       animation: none;
     }
   }

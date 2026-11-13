@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import {
+  AlertTriangle,
   ArrowRight,
   ArrowUpRight,
   CircleCheck,
@@ -10,6 +11,7 @@ import {
   Search,
 } from "lucide-react";
 import { Breadcrumbs } from "../../../breadcrumbs";
+import { SavedItemButton } from "../../saved-item-button";
 import { courseCatalog } from "../../courses/catalog/course-catalog-data";
 import type {
   InstitutionFinancialRecord,
@@ -88,6 +90,20 @@ export default function InstitutionProfile({
       />
 
       <div className="cb-container">
+        {institution.isDemo && (
+          <aside
+            role="note"
+            className="mt-6 flex gap-3 rounded-2xl border border-[#e7d6a8] bg-[#fff8e8] p-4 text-[#594c32] sm:p-5"
+          >
+            <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-[#9a752c]" />
+            <div>
+              <h2 className="text-sm font-semibold">Fictional sample profile</h2>
+              <p className="mt-1 text-sm leading-6">
+                This profile is a fictional example for directory design review. Its name, location and any sample links are not real or verified institution information.
+              </p>
+            </div>
+          </aside>
+        )}
         <section className="border-b border-[#dce5dd] pb-6 pt-5 sm:pb-7 sm:pt-6">
           <div className="flex flex-wrap gap-2">
             <span className="rounded-full bg-[#eaf2ed] px-3 py-1.5 text-xs font-semibold text-[#315345]">
@@ -118,18 +134,23 @@ export default function InstitutionProfile({
               {institution.introduction}
             </p>
           )}
+          <div className="mt-4">
+            <SavedItemButton type="institution" id={institution.slug} />
+          </div>
           {institution.website && (
             <>
               <SourceLink
                 source={institution.website}
                 className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#145543] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
               />
-              <p className="mt-0.5 text-xs text-[#718078]">
-                Official website · {verificationLabel(
-                  institution.website.verificationStatus,
-                  institution.website.checkedOn,
-                )}
-              </p>
+              {!institution.isDemo && (
+                <p className="mt-0.5 text-xs text-[#718078]">
+                  Official website · {verificationLabel(
+                      institution.website.verificationStatus,
+                      institution.website.checkedOn,
+                    )}
+                </p>
+              )}
             </>
           )}
         </section>
@@ -685,7 +706,9 @@ export default function InstitutionProfile({
             </div>
           </div>
           <p className="shrink-0 text-xs text-[#718078]">
-            CareerBridge record reviewed · {institution.lastReviewed}
+            {institution.isDemo
+              ? "Fictional sample profile · not verified"
+              : `CareerBridge record reviewed · ${institution.lastReviewed}`}
           </p>
         </section>
       </div>

@@ -14,6 +14,7 @@ import {
 import { Breadcrumbs } from "../../breadcrumbs";
 import { possibilityFields } from "../../discover/possibility-fields";
 import { useEducationStage } from "../../education-stage";
+import { SavedItemButton } from "../saved-item-button";
 import {
   getStageLabel,
   getStudyRoutes,
@@ -237,13 +238,21 @@ export default function PathwaysExplorer() {
                             </ol>
                           </div>
 
-                          <Link
-                            href={href}
-                            className="cb-card-action mt-5 w-fit"
-                          >
-                            Understand this route{" "}
-                            <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                          </Link>
+                          <div className="mt-5 flex flex-wrap items-center gap-3">
+                            <Link href={href} className="cb-card-action w-fit">
+                              Understand this route{" "}
+                              <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                            </Link>
+                            <SavedItemButton
+                              type="pathway"
+                              id={id}
+                              className="ml-auto"
+                              context={{
+                                ...(stage ? { stage } : {}),
+                                ...(field ? { fieldId: field.id } : {}),
+                              }}
+                            />
+                          </div>
                         </article>
                       );
                     },

@@ -14,6 +14,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Breadcrumbs } from "../../../breadcrumbs";
+import { SavedItemButton } from "../../saved-item-button";
+import { HistoryVisit } from "../../history-visit";
 import {
   scholarships,
   scholarshipStudyLevels,
@@ -126,6 +128,15 @@ export default async function ScholarshipDetailsPage({
   if (!scholarship) notFound();
 
   const listingHref = getListingHref(query);
+  const stage = query.stage;
+  const fieldId = query.field;
+  const context = {
+    ...(typeof stage === "string" &&
+    (stage === "class-10" || stage === "class-12" || stage === "all")
+      ? { stage }
+      : {}),
+    ...(typeof fieldId === "string" ? { fieldId } : {}),
+  };
   const studyLevels = getStudyLevelLabels(scholarship.studyLevels);
   const hasRelatedOptions = Boolean(
     scholarship.detail.relatedCourses?.length ||
@@ -148,6 +159,11 @@ export default async function ScholarshipDetailsPage({
 
   return (
     <main className="cb-page-enter min-h-svh bg-[#fbfaf6] text-[#18352d]">
+      <HistoryVisit
+        type="scholarship"
+        id={scholarship.id}
+        context={Object.keys(context).length ? context : undefined}
+      />
       <div className="cb-container pb-14 pt-6 sm:pb-20 sm:pt-8">
         <Breadcrumbs
           items={[
@@ -190,6 +206,9 @@ export default async function ScholarshipDetailsPage({
                 <ShieldCheck aria-hidden="true" className="h-4 w-4" />
                 Use the official scheme information to confirm current details.
               </p>
+              <div className="mt-5">
+                <SavedItemButton type="scholarship" id={scholarship.id} />
+              </div>
             </div>
 
             <div className="rounded-2xl border border-white/15 bg-white/[.07] p-5 sm:p-6">

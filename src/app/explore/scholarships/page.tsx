@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { PageLoadingSkeleton } from "../../page-loading-skeleton";
 import ScholarshipExplorer from "./scholarship-explorer";
 
 export const metadata: Metadata = {
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function ScholarshipsPage() {
   return (
-    <Suspense fallback={<main className="min-h-svh bg-[#fbfaf6]" />}>
+    <Suspense fallback={<PageLoadingSkeleton variant="collection" showHeader={false} />}>
       <ScholarshipExplorer />
     </Suspense>
   );

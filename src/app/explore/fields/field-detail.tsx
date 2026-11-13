@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, BookOpen, Landmark, Map, type LucideIcon } from 
 import { useState } from "react";
 import { Breadcrumbs } from "../../breadcrumbs";
 import { getGuidedExploreStartingPoints } from "../explore-data";
+import { SavedItemButton } from "../saved-item-button";
 import { useCounsellingSession } from "../../counselling/counselling-engine";
 import type { PossibilityField, StudyStage } from "./field-data";
 
@@ -62,12 +63,16 @@ export function FieldDetail({
               {field.description} Discover what people do, what you might learn and some routes
               you could explore.
             </p>
-            <a
-              href="#field-overview"
-              className="cb-card-action mt-6 inline-flex"
-            >
-              Understand the field <ArrowRight aria-hidden="true" className="h-4 w-4" />
-            </a>
+            <div className="mt-6 flex flex-wrap items-center gap-4">
+              <a href="#field-overview" className="cb-card-action inline-flex">
+                Understand the field <ArrowRight aria-hidden="true" className="h-4 w-4" />
+              </a>
+              <SavedItemButton
+                type="field"
+                id={field.id}
+                context={initialStage ? { stage: initialStage } : undefined}
+              />
+            </div>
           </div>
           <div className="relative min-h-56 overflow-hidden rounded-[1.75rem] bg-[#dce7df] sm:min-h-80">
             <Image

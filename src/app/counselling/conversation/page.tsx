@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Pencil, RotateCcw, X } from "lucide-react";
+import { PageLoadingSkeleton } from "../../page-loading-skeleton";
 import { SiteHeader } from "../../site-header";
 import { Breadcrumbs } from "../../breadcrumbs";
 import { CounsellingAnswerEditor } from "../answer-editor";
@@ -681,7 +682,11 @@ export default function CounsellingConversationPage() {
     save(goToPreviousQuestion(session));
   }
 
-  if (stored.status === "loading" || !session) {
+  if (stored.status === "loading") {
+    return <PageLoadingSkeleton variant="conversation" />;
+  }
+
+  if (!session) {
     const unavailable = stored.status === "unavailable" || stored.status === "invalid";
     return (
       <>

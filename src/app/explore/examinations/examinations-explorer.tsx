@@ -3,8 +3,18 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { ArrowRight, Search } from "lucide-react";
+import {
+  ArrowRight,
+  Building2,
+  ClipboardCheck,
+  Filter,
+  GraduationCap,
+  MapPin,
+  Search,
+  X,
+} from "lucide-react";
 import { Breadcrumbs } from "../../breadcrumbs";
+import { SavedItemButton } from "../saved-item-button";
 import { useEducationStage } from "../../education-stage";
 import { possibilityFields } from "../../discover/possibility-fields";
 import {
@@ -18,8 +28,6 @@ const levelValues = ["all", "national", "state", "institution"] as const;
 type LevelFilter = (typeof levelValues)[number];
 const stageValues = ["class-10", "class-12", "all"] as const;
 type StageFilter = (typeof stageValues)[number];
-const sortValues = ["relevance", "az", "za"] as const;
-type SortOrder = (typeof sortValues)[number];
 
 function isLevel(value: string | null): value is LevelFilter {
   return value !== null && levelValues.some((level) => level === value);
@@ -27,10 +35,6 @@ function isLevel(value: string | null): value is LevelFilter {
 
 function isStageFilter(value: string | null): value is StageFilter {
   return value !== null && stageValues.some((stage) => stage === value);
-}
-
-function isSortOrder(value: string | null): value is SortOrder {
-  return value !== null && sortValues.some((sort) => sort === value);
 }
 
 export default function ExaminationsExplorer() {
@@ -47,8 +51,6 @@ export default function ExaminationsExplorer() {
     : savedStage ?? "all";
   const queryLevel = searchParams.get("level");
   const level: LevelFilter = isLevel(queryLevel) ? queryLevel : "all";
-  const querySort = searchParams.get("sort");
-  const sort: SortOrder = isSortOrder(querySort) ? querySort : "relevance";
   const region = searchParams.get("region") ?? "all";
   const courseContext =
     searchParams.get("course") ?? searchParams.get("courseName") ?? "";
@@ -56,9 +58,11 @@ export default function ExaminationsExplorer() {
   const fieldId = searchParams.get("field");
   const field = possibilityFields.find((item) => item.id === fieldId);
   const [visibleCount, setVisibleCount] = useState(pageSize);
+  const filterParams = new URLSearchParams(searchParams.toString());
+  filterParams.delete("sort");
 
   function updateParams(updates: Record<string, string>) {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(filterParams);
     for (const [key, value] of Object.entries(updates)) {
       if (key === "stage" && value === "all") {
         params.set(key, value);
@@ -77,45 +81,52 @@ export default function ExaminationsExplorer() {
     setVisibleCount(pageSize);
   }
 
-  const normalizedQuery = searchQuery.trim().toLowerCase();
-  const filteredExaminations = examinations
-    .filter((exam) => {
-      const matchesStage = stage === "all" || exam.stages.includes(stage);
-      const matchesLevel = level === "all" || exam.level === level;
-      const matchesRegion =
-        region === "all" ||
-        exam.level === "national" ||
-        exam.regions.includes(region);
-      const matchesField =
-        !field || exam.fields.length === 0 || exam.fields.includes(field.id);
-      const searchableText = [
-        exam.name,
-        exam.purpose,
-        exam.authority,
-        ...exam.programmes,
-        ...exam.fields,
-      ]
-        .join(" ")
-        .toLowerCase();
-      const matchesQuery =
-        !normalizedQuery || searchableText.includes(normalizedQuery);
-      return (
-        matchesStage &&
-        matchesLevel &&
-        matchesRegion &&
-        matchesField &&
-        matchesQuery
-      );
-    })
-    .sort((a, b) => {
-      if (sort === "relevance") return 0;
-      const order = a.name.localeCompare(b.name);
-      return sort === "az" ? order : -order;
+  function clearFilters() {
+    updateParams({
+      q: courseContext,
+      level: "all",
+      region: "all",
     });
+  }
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredExaminations = examinations.filter((exam) => {
+    const matchesStage = stage === "all" || exam.stages.includes(stage);
+    const matchesLevel = level === "all" || exam.level === level;
+    const matchesRegion =
+      region === "all" ||
+      exam.level === "national" ||
+      exam.regions.includes(region);
+    const matchesField =
+      !field || exam.fields.length === 0 || exam.fields.includes(field.id);
+    const searchableText = [
+      exam.name,
+      exam.purpose,
+      exam.authority,
+      ...exam.programmes,
+      ...exam.fields,
+    ]
+      .join(" ")
+      .toLowerCase();
+    const matchesQuery =
+      !normalizedQuery || searchableText.includes(normalizedQuery);
+    return (
+      matchesStage &&
+      matchesLevel &&
+      matchesRegion &&
+      matchesField &&
+      matchesQuery
+    );
+  });
   const visibleExaminations = filteredExaminations.slice(0, visibleCount);
+  const hasFilters =
+    level !== "all" ||
+    region !== "all" ||
+    searchQuery.trim() !== courseContext.trim();
+  const levelCount = new Set(examinations.map((exam) => exam.level)).size;
 
   return (
-    <main className="min-h-svh bg-[#fbfaf6] text-[#18352d]">
+    <main className="cb-page-enter min-h-svh bg-[#fbfaf6] text-[#18352d]">
       <Breadcrumbs
         items={[
           { label: "Explore", href: "/explore" },
@@ -124,33 +135,69 @@ export default function ExaminationsExplorer() {
         className="pt-6 sm:pt-8"
       />
 
-      <section className="bg-[#f5f7f2]">
-        <div className="cb-container py-8 sm:py-10">
-          <div className="exam-hero-copy">
-            <h1 className="max-w-4xl font-serif text-4xl font-semibold leading-[1.05] tracking-[-.045em] sm:text-5xl">
-              Understand entrance examinations.
-            </h1>
-            <p className="mt-3 max-w-3xl text-base leading-relaxed text-[#354b40] sm:text-lg">
-              Discover which examinations are used for different courses and how they work.
-            </p>
+      <section className="border-b border-[#e0e6e2] bg-[#fbfaf6]">
+        <div className="cb-container pb-8 pt-6 sm:pb-10 sm:pt-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#c8dece] bg-white/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[.14em] text-[#3d7a5c] shadow-[0_1px_3px_rgba(16,45,36,0.06)]">
+                <ClipboardCheck aria-hidden="true" className="h-3 w-3" />
+                Admissions
+              </div>
+              <h1 className="mt-3 font-serif text-4xl font-semibold leading-[1.05] tracking-[-.045em] sm:text-5xl">
+                Understand entrance examinations.
+              </h1>
+              <p className="mt-3 max-w-[58ch] text-base leading-relaxed text-[#4a5a50] sm:text-lg">
+                See which examinations are used for different courses and what
+                to check before you apply.
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-5">
+              <div className="text-center">
+                <p className="font-serif text-3xl font-semibold text-[#145543]">
+                  {examinations.length}
+                </p>
+                <p className="mt-0.5 text-xs font-medium text-[#6b7b71]">
+                  Exams listed
+                </p>
+              </div>
+              <div className="w-px bg-[#d6ddd9]" />
+              <div className="text-center">
+                <p className="font-serif text-3xl font-semibold text-[#145543]">
+                  {levelCount}
+                </p>
+                <p className="mt-0.5 text-xs font-medium text-[#6b7b71]">
+                  Exam levels
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-6 grid gap-3 md:grid-cols-[minmax(0,48rem)_auto] md:items-center md:justify-start">
-            <label className="flex min-h-13 items-center gap-3 rounded-xl border border-[#cbd8d0] bg-white px-4 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#145543]">
-              <Search aria-hidden="true" className="h-5 w-5 shrink-0 text-[#59665e]" />
+          <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <label className="group flex min-h-13 items-center gap-3 rounded-xl border border-[#c5cfc8] bg-white px-4 shadow-[0_2px_12px_rgba(16,45,36,0.05)] transition-all duration-200 focus-within:border-[#2d6e56] focus-within:shadow-[0_0_0_3px_rgba(45,110,86,0.12)]">
+              <Search aria-hidden="true" className="h-5 w-5 shrink-0 text-[#9eada5] transition-colors group-focus-within:text-[#2d6e56]" />
               <span className="sr-only">Search examinations, courses or fields</span>
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(event) => updateParams({ q: event.target.value })}
-                placeholder="Search examinations, courses or fields..."
-                className="min-w-0 flex-1 bg-transparent text-base text-[#18352d] outline-none placeholder:text-[#718078]"
+                placeholder="Search examinations, courses or fields…"
+                className="min-w-0 flex-1 bg-transparent text-base text-[#18352d] outline-none placeholder:text-[#aab8b1]"
               />
+              {searchQuery !== courseContext && searchQuery && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => updateParams({ q: courseContext })}
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[#718078] transition-colors hover:bg-[#f0f3f0] hover:text-[#29483a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+                >
+                  <X aria-hidden="true" className="h-4 w-4" />
+                </button>
+              )}
             </label>
 
-            <fieldset className="rounded-xl border border-[#dce7df] bg-white px-3 py-2">
+            <fieldset className="min-w-0 rounded-xl border border-[#dce7df] bg-white px-3 py-2.5">
               <legend className="sr-only">Study stage</legend>
-              <p className="mb-1 text-xs font-medium text-[#59665e]">Study stage</p>
+              <p className="mb-1.5 text-xs font-semibold text-[#60766a]">Study stage</p>
               <div className="flex flex-wrap gap-1">
                 {stageValues.map((option) => {
                   const label =
@@ -166,7 +213,7 @@ export default function ExaminationsExplorer() {
                       type="button"
                       aria-pressed={active}
                       onClick={() => updateParams({ stage: option })}
-                      className={`min-h-8 rounded-full px-3 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543] ${
+                      className={`min-h-9 rounded-full px-3.5 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543] ${
                         active
                           ? "bg-[#145543] text-white"
                           : "bg-[#f1f3f0] text-[#354b40] hover:bg-[#e6eee8]"
@@ -197,7 +244,7 @@ export default function ExaminationsExplorer() {
         className="cb-container pb-10 sm:pb-14"
         aria-labelledby="browse-exams-title"
       >
-        <div className="border-t border-[#dce7df] pt-6 sm:pt-8">
+        <div className="pt-6 sm:pt-8">
           <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
             <div>
               <h2
@@ -215,7 +262,11 @@ export default function ExaminationsExplorer() {
                 Examinations relevant to your education journey.
               </p>
             </div>
-            <span className="text-sm font-medium text-[#52645a]">
+            <span
+              className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-[#c8dece] bg-[#eef5f0] px-3.5 py-1 text-sm font-semibold text-[#235e47]"
+              aria-live="polite"
+            >
+              <ClipboardCheck aria-hidden="true" className="h-3.5 w-3.5" />
               {filteredExaminations.length}{" "}
               {filteredExaminations.length === 1
                 ? "result"
@@ -223,51 +274,55 @@ export default function ExaminationsExplorer() {
             </span>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[#e5ebe7] pb-4">
-            <span className="text-sm font-medium text-[#59665e]">Filter:</span>
-            <label className="sr-only" htmlFor="examination-level-filter">
-              Examination level
-            </label>
-            <select
-              id="examination-level-filter"
-              value={level}
-              onChange={(event) => updateParams({ level: event.target.value })}
-              className="min-h-10 rounded-xl border border-[#cbd9cf] bg-white px-3 text-sm text-[#18352d] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
-            >
-              <option value="all">All levels</option>
-              <option value="national">National</option>
-              <option value="state">State</option>
-              <option value="institution">Institution-specific</option>
-            </select>
-            <label className="sr-only" htmlFor="examination-region-filter">
-              State or region
-            </label>
-            <select
-              id="examination-region-filter"
-              value={region}
-              onChange={(event) => updateParams({ region: event.target.value })}
-              className="min-h-10 rounded-xl border border-[#cbd9cf] bg-white px-3 text-sm text-[#18352d] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
-            >
-              <option value="all">All Northeast</option>
-              {northeastStates.map((stateName) => (
-                <option key={stateName} value={stateName}>
-                  {stateName}
-                </option>
-              ))}
-            </select>
-
-            <label className="ml-0 flex min-h-10 items-center gap-2 text-sm font-medium text-[#59665e] sm:ml-auto">
-              Sort
+          <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#dce7df] bg-white px-4 py-3 shadow-[0_1px_4px_rgba(16,45,36,0.04)]">
+            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[.1em] text-[#7a8f83]">
+              <Filter aria-hidden="true" className="h-3 w-3" />
+              Filter
+            </span>
+            <div aria-hidden="true" className="hidden h-5 w-px bg-[#e4ece7] sm:block" />
+            <label className="flex min-h-10 items-center text-sm text-[#59665e]">
               <select
-                value={sort}
-                onChange={(event) => updateParams({ sort: event.target.value })}
-                className="min-h-10 rounded-xl border border-[#cbd9cf] bg-white px-3 text-sm text-[#18352d] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+                id="examination-level-filter"
+                aria-label="Examination level"
+                value={level}
+                onChange={(event) => updateParams({ level: event.target.value })}
+                className="min-h-10 max-w-full rounded-xl border border-[#d4ddd7] bg-[#f8faf8] px-3 text-sm text-[#29483a] outline-none transition-all duration-200 focus:border-[#2d6e56] focus:bg-white focus:shadow-[0_0_0_3px_rgba(45,110,86,0.12)]"
               >
-                <option value="relevance">Relevance</option>
-                <option value="az">Name A–Z</option>
-                <option value="za">Name Z–A</option>
+                <option value="all">All levels</option>
+                <option value="national">National</option>
+                <option value="state">State</option>
+                <option value="institution">Institution-specific</option>
               </select>
             </label>
+            <label className="flex min-h-10 items-center text-sm text-[#59665e]">
+              <select
+                id="examination-region-filter"
+                aria-label="State or region"
+                value={region}
+                onChange={(event) => updateParams({ region: event.target.value })}
+                className="min-h-10 max-w-full rounded-xl border border-[#d4ddd7] bg-[#f8faf8] px-3 text-sm text-[#29483a] outline-none transition-all duration-200 focus:border-[#2d6e56] focus:bg-white focus:shadow-[0_0_0_3px_rgba(45,110,86,0.12)]"
+              >
+                <option value="all">All Northeast</option>
+                {northeastStates.map((stateName) => (
+                  <option key={stateName} value={stateName}>
+                    {stateName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {hasFilters && (
+              <>
+                <div aria-hidden="true" className="hidden h-5 w-px bg-[#e4ece7] sm:block" />
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[#e0cfc0] bg-[#fdf7f2] px-3 text-sm font-semibold text-[#8a5a28] transition-colors hover:bg-[#faf0e6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+                >
+                  <X aria-hidden="true" className="h-3.5 w-3.5" />
+                  Clear
+                </button>
+              </>
+            )}
           </div>
 
           <p className="mt-3 text-sm leading-relaxed text-[#59665e]">
@@ -277,57 +332,104 @@ export default function ExaminationsExplorer() {
           {visibleExaminations.length > 0 ? (
             <>
               <div className="mt-5 grid items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {visibleExaminations.map((exam, index) => (
-                    <article
-                      key={exam.id}
-                      className="cb-reveal exam-card group relative flex h-full flex-col overflow-hidden rounded-2xl border border-[#dce7df] bg-white p-5 transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-[#9fc5ad] hover:shadow-[0_16px_34px_rgba(16,45,36,0.1)] motion-reduce:transform-none sm:p-6"
-                      style={{ animationDelay: `${index * 70}ms` }}
-                    >
-                      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 origin-bottom scale-y-0 bg-[#77b996] transition-transform duration-300 group-hover:scale-y-100" />
-                      <div className="flex items-start justify-between gap-3">
-                        <h3 className="font-serif text-[1.4rem] font-semibold leading-tight tracking-[-.025em]">
-                          {exam.name}
-                        </h3>
-                        <span className="shrink-0 rounded-full bg-[#eaf2ed] px-3 py-1 text-xs font-semibold text-[#145543]">
-                          {examinationLevels[exam.level]}
-                        </span>
-                      </div>
-                      <p className="mt-3 text-sm leading-relaxed text-[#52645a]">
-                        {exam.purpose}
-                      </p>
-                      <dl className="mt-4 flex-1 space-y-3 rounded-xl border border-[#dce7df] bg-[#f5f8f5] px-3.5 py-3 text-sm leading-relaxed text-[#52645a]">
-                        <div>
-                          <dt className="font-semibold text-[#18352d]">
-                            Used for
-                          </dt>
-                          <dd className="mt-1">
+              {visibleExaminations.map((exam, index) => (
+                <article
+                  key={exam.id}
+                  className="cb-reveal exam-card group relative flex h-full flex-col overflow-hidden rounded-2xl border border-[#dce7df] bg-white transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-[#9fc5ad] hover:shadow-[0_16px_40px_-8px_rgba(16,45,36,0.12)] motion-reduce:transform-none motion-reduce:transition-none"
+                  style={{ animationDelay: `${index * 70}ms` }}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-y-0 left-0 w-1 origin-bottom scale-y-0 rounded-r-sm bg-[#77b996] transition-transform duration-300 group-hover:scale-y-100 group-focus-within:scale-y-100 motion-reduce:transition-none"
+                  />
+                  <div className="flex flex-1 flex-col p-5 sm:p-6">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="rounded-full bg-[#eaf2ed] px-3 py-1 text-xs font-semibold text-[#145543]">
+                        {examinationLevels[exam.level]}
+                      </span>
+                      <span className="rounded-full bg-[#f3eed9] px-3 py-1 text-xs font-semibold text-[#6d5a1e]">
+                        {exam.stages
+                          .map((examStage) =>
+                            examStage === "class-10" ? "Class 10" : "Class 12",
+                          )
+                          .join(" · ")}
+                      </span>
+                    </div>
+                    <h3 className="mt-4 font-serif text-[1.35rem] font-semibold leading-snug tracking-[-.025em] transition-colors duration-200 group-hover:text-[#145543]">
+                      {exam.name}
+                    </h3>
+                    <p className="mt-2.5 min-h-[3.5rem] text-sm leading-relaxed text-[#59665e]">
+                      {exam.purpose}
+                    </p>
+
+                    <dl className="mt-5 flex-1 divide-y divide-[#e4ece7] border-y border-[#e4ece7] text-sm">
+                      <div className="flex items-start gap-3 py-3">
+                        <GraduationCap
+                          aria-hidden="true"
+                          className="mt-0.5 h-4 w-4 shrink-0 text-[#9eada5]"
+                        />
+                        <div className="min-w-0">
+                          <dt className="font-semibold text-[#18352d]">Used for</dt>
+                          <dd className="mt-0.5 leading-relaxed text-[#52645a]">
                             {exam.programmes.join(", ")}
                           </dd>
                         </div>
-                        <div>
-                          <dt className="font-semibold text-[#18352d]">
-                            Conducted by
-                          </dt>
-                          <dd className="mt-1">{exam.authority}</dd>
-                        </div>
-                      </dl>
-                      <div className="mt-5">
-                        {exam.id === "jee-main" ? (
-                          <Link
-                            href={`/explore/examinations/${exam.id}?${searchParams.toString()}`}
-                            className="cb-card-action"
-                          >
-                            Understand this examination
-                            <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                          </Link>
-                        ) : (
-                          <span className="cb-card-action cb-card-action-disabled">
-                            Examination details coming soon
-                          </span>
-                        )}
                       </div>
-                    </article>
-                  ))}
+                      <div className="flex items-start gap-3 py-3">
+                        <Building2
+                          aria-hidden="true"
+                          className="mt-0.5 h-4 w-4 shrink-0 text-[#9eada5]"
+                        />
+                        <div className="min-w-0">
+                          <dt className="font-semibold text-[#18352d]">Conducted by</dt>
+                          <dd className="mt-0.5 leading-relaxed text-[#52645a]">
+                            {exam.authority}
+                          </dd>
+                        </div>
+                      </div>
+                      {exam.regions.length > 0 && (
+                        <div className="flex items-start gap-3 py-3">
+                          <MapPin
+                            aria-hidden="true"
+                            className="mt-0.5 h-4 w-4 shrink-0 text-[#9eada5]"
+                          />
+                          <div className="min-w-0">
+                            <dt className="font-semibold text-[#18352d]">Region</dt>
+                            <dd className="mt-0.5 leading-relaxed text-[#52645a]">
+                              {exam.regions.join(", ")}
+                            </dd>
+                          </div>
+                        </div>
+                      )}
+                    </dl>
+
+                    <div className="mt-5 flex flex-wrap items-center gap-3">
+                      {exam.id === "jee-main" ? (
+                        <Link
+                          href={`/explore/examinations/${exam.id}?${filterParams.toString()}`}
+                          className="cb-card-action"
+                        >
+                          Understand this examination
+                          <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                        </Link>
+                      ) : (
+                        <span className="cb-card-action cb-card-action-disabled">
+                          Details coming soon
+                        </span>
+                      )}
+                      <SavedItemButton
+                        type="examination"
+                        id={exam.id}
+                        className="ml-auto"
+                        context={{
+                          ...(stage !== "all" ? { stage } : {}),
+                          ...(field ? { fieldId: field.id } : {}),
+                        }}
+                      />
+                    </div>
+                  </div>
+                </article>
+              ))}
               </div>
               {filteredExaminations.length > visibleCount && (
                 <button

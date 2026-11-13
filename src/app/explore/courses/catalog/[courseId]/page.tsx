@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "../../../../breadcrumbs";
+import { SavedItemButton } from "../../../saved-item-button";
+import { HistoryVisit } from "../../../history-visit";
 import { possibilityFields } from "../../../../discover/possibility-fields";
 import { courseCatalog } from "../course-catalog-data";
 import { courseDetails } from "../course-detail-data";
@@ -62,6 +64,7 @@ export default async function CourseDetailPage({
     course: course.id,
     courseName: course.name,
     field: course.fieldId,
+    stage,
   }).toString()}`;
   const verifiedInstitutions = resolvedInstitutionCampusOfferings
     .filter(
@@ -87,6 +90,11 @@ export default async function CourseDetailPage({
 
   return (
     <main className="cb-page-enter min-h-svh bg-[#fbfaf6] text-[#18352d]">
+      <HistoryVisit
+        type="course"
+        id={course.id}
+        context={{ fieldId: course.fieldId, stage }}
+      />
       <div className="cb-container pb-16 pt-5 sm:pb-20 sm:pt-7">
         <Breadcrumbs
           items={[
@@ -126,16 +134,23 @@ export default async function CourseDetailPage({
               making a decision.
             </p>
           )}
-          <Link
-            href={institutionsHref}
-            className="group mt-5 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#145543] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4537] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
-          >
-            Explore institutions offering this course
-            <ArrowRight
-              aria-hidden="true"
-              className="h-4 w-4 transition-transform group-hover:translate-x-1"
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <Link
+              href={institutionsHref}
+              className="group inline-flex min-h-12 items-center gap-2 rounded-full bg-[#145543] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#0f4537] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+            >
+              Explore institutions offering this course
+              <ArrowRight
+                aria-hidden="true"
+                className="h-4 w-4 transition-transform group-hover:translate-x-1"
+              />
+            </Link>
+            <SavedItemButton
+              type="course"
+              id={course.id}
+              context={{ fieldId: course.fieldId, stage }}
             />
-          </Link>
+          </div>
         </section>
 
         <section
