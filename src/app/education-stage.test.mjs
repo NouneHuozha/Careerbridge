@@ -19,6 +19,7 @@ loadModule.extensions[".ts"] = (module, filename) => {
   module._compile(output, filename);
 };
 
+const { setAccountMode } = loadModule("./account-data-sync.ts");
 const { saveEducationStage, useEducationStage } = loadModule("./education-stage.ts");
 function createStorage() {
   const values = new Map();
@@ -38,6 +39,7 @@ globalThis.window = {
   removeEventListener() {},
   dispatchEvent() {},
 };
+setAccountMode(false);
 
 after(() => {
   React.useSyncExternalStore = originalUseSyncExternalStore;
@@ -50,8 +52,9 @@ test("education stage persists independently and migrates a saved legacy stage",
     status: "saved",
     stage: "class-12",
   });
-  assert.equal(sessionStorage.getItem("careerbridge:education-stage:v1"), null);
+  assert.equal(sessionStorage.getItem("careerbridge:education-stage:v1"), "class-12");
 
+  sessionStorage.removeItem("careerbridge:education-stage:v1");
   localStorage.removeItem("careerbridge:education-stage:v1");
   sessionStorage.setItem(
     "careerbridge:type-1-discovery:v1",
@@ -61,5 +64,5 @@ test("education stage persists independently and migrates a saved legacy stage",
     status: "saved",
     stage: "class-10",
   });
-  assert.equal(localStorage.getItem("careerbridge:education-stage:v1"), "class-10");
+  assert.equal(sessionStorage.getItem("careerbridge:education-stage:v1"), "class-10");
 });

@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from "react";
+import { enqueueAccountMutation, isPersonalDataReady } from "./account-data-sync";
+import { EDUCATION_STAGE_STORAGE_KEY } from "./personal-data-storage-keys";
 
 export type EducationStage = "class-10" | "class-12";
 
-const EDUCATION_STAGE_STORAGE_KEY = "careerbridge:education-stage:v1";
 const LEGACY_DISCOVERY_STORAGE_KEY = "careerbridge:type-1-discovery:v1";
 const EDUCATION_STAGE_CHANGE_EVENT = "careerbridge-education-stage-change";
 const LOADING_SNAPSHOT = "\u0000loading";
@@ -14,8 +15,19 @@ function isEducationStage(value: unknown): value is EducationStage {
 }
 
 function getSnapshot() {
+  if (!isPersonalDataReady()) return LOADING_SNAPSHOT;
   try {
-    const savedStage = window.localStorage.getItem(EDUCATION_STAGE_STORAGE_KEY);
+    let savedStage = window.sessionStorage.getItem(EDUCATION_STAGE_STORAGE_KEY);
+    if (savedStage === null) {
+      const legacyStage = window.localStorage.getItem(EDUCATION_STAGE_STORAGE_KEY);
+      if (legacyStage !== null && isEducationStage(legacyStage)) {
+        window.sessionStorage.setItem(EDUCATION_STAGE_STORAGE_KEY, legacyStage);
+        window.localStorage.removeItem(EDUCATION_STAGE_STORAGE_KEY);
+        savedStage = legacyStage;
+      } else if (legacyStage !== null) {
+        return INVALID_SNAPSHOT;
+      }
+    }
     if (savedStage !== null) {
       return isEducationStage(savedStage) ? savedStage : INVALID_SNAPSHOT;
     }
@@ -30,7 +42,7 @@ function getSnapshot() {
           "classContext" in legacyData &&
           isEducationStage(legacyData.classContext)
         ) {
-          window.localStorage.setItem(
+          window.sessionStorage.setItem(
             EDUCATION_STAGE_STORAGE_KEY,
             legacyData.classContext,
           );
@@ -54,9 +66,11 @@ function getServerSnapshot() {
 function subscribe(callback: () => void) {
   window.addEventListener(EDUCATION_STAGE_CHANGE_EVENT, callback);
   window.addEventListener("storage", callback);
+  window.addEventListener("careerbridge-personal-data-ready", callback);
   return () => {
     window.removeEventListener(EDUCATION_STAGE_CHANGE_EVENT, callback);
     window.removeEventListener("storage", callback);
+    window.removeEventListener("careerbridge-personal-data-ready", callback);
   };
 }
 
@@ -70,9 +84,11 @@ export function useEducationStage() {
 }
 
 export function saveEducationStage(stage: EducationStage) {
+  if (!isPersonalDataReady()) return false;
   try {
-    window.localStorage.setItem(EDUCATION_STAGE_STORAGE_KEY, stage);
+    window.sessionStorage.setItem(EDUCATION_STAGE_STORAGE_KEY, stage);
     window.dispatchEvent(new Event(EDUCATION_STAGE_CHANGE_EVENT));
+    enqueueAccountMutation({ type: "progress.educationStage", value: stage });
     return true;
   } catch {
     return false;

@@ -1,6 +1,7 @@
 "use client";
 
 import { Eye, EyeOff, LockKeyhole, Mail, UserRound } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 export default function SignUpForm({
@@ -54,6 +55,30 @@ export default function SignUpForm({
             </button>
           </div>
         </div>
+        <fieldset className="space-y-2 border-t border-[#e7ece8] pt-3">
+          <legend className="text-sm font-semibold text-[#273d34]">Age and guardian review</legend>
+          <label className="flex items-start gap-2.5 text-xs leading-5 text-[#52645a]">
+            <input className="mt-1 accent-[#145543]" type="radio" name="ageAttestation" value="adult" required />
+            <span>I am 18 or older.</span>
+          </label>
+          <label className="flex items-start gap-2.5 text-xs leading-5 text-[#52645a]">
+            <input className="mt-1 accent-[#145543]" type="radio" name="ageAttestation" value="minor-guardian" required />
+            <span>I am under 18 and my parent or guardian has reviewed the Privacy Notice and agrees to this account.</span>
+          </label>
+          <p className="text-xs leading-5 text-[#735b23]">
+            Guardian approval is self-reported and is not independently verified by CareerBridge.
+          </p>
+        </fieldset>
+        <label className="flex items-start gap-2.5 text-xs leading-5 text-[#52645a]">
+          <input className="mt-1 accent-[#145543]" type="checkbox" name="privacyAccepted" value="yes" required />
+          <span>
+            I have read and agree to the{" "}
+            <Link href="/privacy" target="_blank" className="font-semibold text-[#145543] underline underline-offset-2">
+              Privacy Notice
+            </Link>
+            .
+          </span>
+        </label>
         <button type="submit" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#145543] px-5 text-base font-semibold text-white transition-colors hover:bg-[#0f4537] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3d8b72]">
           Create my account <span aria-hidden="true" className="text-xl">→</span>
         </button>
