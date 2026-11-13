@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
+import { useAccount } from "../account-provider";
 import { SiteHeader } from "../site-header";
 import { Breadcrumbs } from "../breadcrumbs";
 import {
@@ -14,6 +15,7 @@ import {
 } from "./counselling-engine";
 
 export function CounsellingIntroduction() {
+  const account = useAccount();
   const router = useRouter();
   const stored = useCounsellingSession();
   const [storageError, setStorageError] = useState(false);
@@ -52,7 +54,7 @@ export function CounsellingIntroduction() {
   function deleteSaved() {
     if (
       !window.confirm(
-        "Delete this saved progress? Your answers and progress will be removed from this device.",
+        "Delete this saved progress? Your answers and progress will be removed from this tab and your account if you’re signed in.",
       )
     ) {
       return;
@@ -187,7 +189,9 @@ export function CounsellingIntroduction() {
             </div>
             {canResume && (
               <p className="mt-4 text-sm leading-relaxed text-[#145543]" role="status">
-                Your progress is saved on this device.
+                {account.status === "authenticated"
+                  ? "Your progress is saved to your account."
+                  : "Your progress is temporary and remains in this tab."}
               </p>
             )}
             {canResume && (
@@ -201,12 +205,12 @@ export function CounsellingIntroduction() {
             )}
             {storageError && (
               <p className="mt-4 text-sm leading-relaxed text-[#8a2e24]" role="alert">
-                This browser couldn’t save your progress. Check that local storage is available, then try again.
+                This browser couldn’t save your progress. Check that session storage is available, then try again.
               </p>
             )}
             {stored.status === "unavailable" && (
               <p className="mt-4 text-sm leading-relaxed text-[#8a2e24]" role="alert">
-                This browser doesn’t allow local storage, so your progress can’t be safely saved here.
+                This browser doesn’t allow session storage, so your progress can’t be safely saved here.
               </p>
             )}
             {stored.status === "invalid" && (

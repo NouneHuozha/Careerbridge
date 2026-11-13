@@ -94,7 +94,7 @@ const faqs = [
   {
     question: "Can I use CareerBridge without an account?",
     answer:
-      "Yes. You can browse without an account. Some choices and saved items are stored in your browser and are not currently synced to your account.",
+      "Yes. You can browse and explore as a guest. Temporary progress stays in this tab; sign in or create an account to save items and keep supported progress across visits and devices.",
   },
   {
     question: "What if some information is missing?",

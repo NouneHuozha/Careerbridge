@@ -1,65 +1,16 @@
 import { useSyncExternalStore } from "react";
+import { enqueueAccountMutation, isPersonalDataReady } from "../account-data-sync";
+import { DISCOVERY_STORAGE_KEY } from "../personal-data-storage-keys";
+import { activityOptions, type ActivityId } from "./activity-options";
 
-export const activityOptions = [
-  {
-    id: "fixing",
-    label: "Fixing or building things",
-    description: "Repairing or making useful things",
-  },
-  {
-    id: "helping",
-    label: "Helping or caring for people",
-    description: "Supporting, caring or helping others",
-  },
-  {
-    id: "outdoors",
-    label: "Being outdoors with plants or animals",
-    description: "Plants, animals or nature",
-  },
-  {
-    id: "computers",
-    label: "Using computers or phones",
-    description: "Apps, devices or the internet",
-  },
-  {
-    id: "organising",
-    label: "Organising activities or plans",
-    description: "Planning events or group tasks",
-  },
-  {
-    id: "creative",
-    label: "Drawing, designing or making things",
-    description: "Art, crafts or creative projects",
-  },
-  {
-    id: "numbers",
-    label: "Working with numbers or information",
-    description: "Calculations or organising information",
-  },
-  {
-    id: "teaching",
-    label: "Teaching or explaining things",
-    description: "Helping someone understand something",
-  },
-  {
-    id: "talking",
-    label: "Talking with people and sharing ideas",
-    description: "Sharing ideas and talking with others",
-  },
-  {
-    id: "problem-solving",
-    label: "Solving problems and figuring things out",
-    description: "Thinking through challenges",
-  },
-] as const;
-
-export type ActivityId = (typeof activityOptions)[number]["id"];
+export { activityOptions } from "./activity-options";
+export type { ActivityId } from "./activity-options";
 
 export type DiscoveryAnswers = {
   activityIds: ActivityId[];
 };
 
-export const DISCOVERY_STORAGE_KEY = "careerbridge:type-1-discovery:v1";
+export { DISCOVERY_STORAGE_KEY };
 const DISCOVERY_CHANGE_EVENT = "careerbridge-discovery-change";
 const LOADING_SNAPSHOT = "\u0000loading";
 const UNAVAILABLE_SNAPSHOT = "\u0000unavailable";
@@ -69,6 +20,7 @@ export function createEmptyAnswers(): DiscoveryAnswers {
 }
 
 function getSnapshot() {
+  if (!isPersonalDataReady()) return LOADING_SNAPSHOT;
   try {
     return window.sessionStorage.getItem(DISCOVERY_STORAGE_KEY) ?? "";
   } catch {
@@ -82,7 +34,11 @@ function getServerSnapshot() {
 
 function subscribe(callback: () => void) {
   window.addEventListener(DISCOVERY_CHANGE_EVENT, callback);
-  return () => window.removeEventListener(DISCOVERY_CHANGE_EVENT, callback);
+  window.addEventListener("careerbridge-personal-data-ready", callback);
+  return () => {
+    window.removeEventListener(DISCOVERY_CHANGE_EVENT, callback);
+    window.removeEventListener("careerbridge-personal-data-ready", callback);
+  };
 }
 
 function parseSnapshot(raw: string) {
@@ -108,9 +64,11 @@ export function useStoredDiscoveryAnswers() {
 }
 
 export function saveAnswers(answers: DiscoveryAnswers) {
+  if (!isPersonalDataReady()) return false;
   try {
     window.sessionStorage.setItem(DISCOVERY_STORAGE_KEY, JSON.stringify(answers));
     window.dispatchEvent(new Event(DISCOVERY_CHANGE_EVENT));
+    enqueueAccountMutation({ type: "progress.discoveryAnswers", value: answers });
     return true;
   } catch {
     return false;
@@ -118,9 +76,11 @@ export function saveAnswers(answers: DiscoveryAnswers) {
 }
 
 export function clearAnswers() {
+  if (!isPersonalDataReady()) return false;
   try {
     window.sessionStorage.removeItem(DISCOVERY_STORAGE_KEY);
     window.dispatchEvent(new Event(DISCOVERY_CHANGE_EVENT));
+    enqueueAccountMutation({ type: "progress.discoveryAnswers", value: null });
     return true;
   } catch {
     return false;

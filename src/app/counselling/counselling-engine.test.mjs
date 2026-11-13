@@ -74,10 +74,19 @@ function answer(questionId, optionIds, responseState = "answered", interpretatio
 }
 
 function withBrowserStorage(run) {
+  const values = new Map();
   globalThis.window = {
-    localStorage: { setItem: () => {} },
+    sessionStorage: {
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, String(value)),
+      removeItem: (key) => values.delete(key),
+    },
+    localStorage: { getItem: () => null, removeItem: () => {}, setItem: () => {} },
+    addEventListener() {},
+    removeEventListener() {},
     dispatchEvent: () => true,
   };
+  loadModule("../account-data-sync.ts").setAccountMode(false);
   try {
     return run();
   } finally {
@@ -170,7 +179,7 @@ test("accepts a written response without requiring a selected option", () => {
   const current = session();
   let persisted;
   globalThis.window = {
-    localStorage: {
+    sessionStorage: {
       setItem: (_key, value) => {
         persisted = JSON.parse(value);
       },
@@ -795,7 +804,7 @@ test("continues only from the saved current question, without forcing an optiona
   test("records an early finish separately and clears it when the session is reopened", () => {
     let persisted;
     globalThis.window = {
-      localStorage: {
+      sessionStorage: {
         setItem: (_key, value) => {
           persisted = JSON.parse(value);
         },
@@ -819,7 +828,7 @@ test("continues only from the saved current question, without forcing an optiona
   });
   let persisted;
   globalThis.window = {
-    localStorage: {
+    sessionStorage: {
       setItem: (_key, value) => {
         persisted = JSON.parse(value);
       },
@@ -870,7 +879,7 @@ test("editing an opening interest confirms and removes its dependent motivation 
 
   let persisted;
   globalThis.window = {
-    localStorage: {
+    sessionStorage: {
       setItem: (_key, value) => {
         persisted = JSON.parse(value);
       },
@@ -918,7 +927,7 @@ test("editing a topic requires confirmation before removing dependent answers an
 
   let persisted;
   globalThis.window = {
-    localStorage: {
+    sessionStorage: {
       setItem: (_key, value) => {
         persisted = JSON.parse(value);
       },
@@ -945,7 +954,7 @@ test("editing a topic requires confirmation before removing dependent answers an
 test("starting a new conversation resets the saved flow with a fresh session id", () => {
   let persisted;
   globalThis.window = {
-    localStorage: {
+    sessionStorage: {
       setItem: (_key, value) => {
         persisted = JSON.parse(value);
       },
@@ -992,7 +1001,7 @@ test("editing Q005 removes only obsolete curiosity-branch answers and selects a 
 
   let persisted;
   globalThis.window = {
-    localStorage: {
+    sessionStorage: {
       setItem: (_key, value) => {
         persisted = JSON.parse(value);
       },
@@ -1077,7 +1086,7 @@ test("follows distinct topics selected in the curiosity question", () => {
 
 test("preserves free text without interpreting it and asks at most one clarification", () => {
   globalThis.window = {
-    localStorage: { setItem: () => {} },
+    sessionStorage: { setItem: () => {} },
     dispatchEvent: () => true,
   };
   try {
@@ -1143,7 +1152,7 @@ test("requires confirmation before skipping a saved answer with dependent respon
 
   let persisted;
   globalThis.window = {
-    localStorage: {
+    sessionStorage: {
       setItem: (_key, value) => {
         persisted = JSON.parse(value);
       },
@@ -1188,7 +1197,7 @@ test("removes dependent answers only after confirmation and preserves unrelated 
 
   let persisted;
   globalThis.window = {
-    localStorage: {
+    sessionStorage: {
       setItem: (_key, value) => {
         persisted = JSON.parse(value);
       },
@@ -1217,7 +1226,7 @@ test("clears all answers and resets the active conversation to its opening quest
   });
   let persisted;
   globalThis.window = {
-    localStorage: {
+    sessionStorage: {
       setItem: (_key, value) => {
         persisted = JSON.parse(value);
       },

@@ -1,6 +1,8 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { enqueueAccountMutation, isPersonalDataReady } from "../account-data-sync";
+import { COUNSELLING_STORAGE_KEY } from "../personal-data-storage-keys";
 import {
   allCounsellingQuestions,
   allowsMultipleCounsellingSelections,
@@ -77,15 +79,30 @@ export type NextAction =
   | { action: "follow_up" | "discover"; questionId: string; reasonCode: string }
   | { action: "complete"; reasonCode: string };
 
-export const COUNSELLING_STORAGE_KEY = "careerbridge:user1-counselling:v1";
+export { COUNSELLING_STORAGE_KEY } from "../personal-data-storage-keys";
 const CHANGE_EVENT = "careerbridge-counselling-change";
 const LOADING_SNAPSHOT = "\u0000loading";
 const UNAVAILABLE_SNAPSHOT = "\u0000unavailable";
 const questionIds = new Set(allCounsellingQuestions.map(({ id }) => id));
 
 function getSnapshot() {
+  if (!isPersonalDataReady()) return LOADING_SNAPSHOT;
   try {
-    return window.localStorage.getItem(COUNSELLING_STORAGE_KEY) ?? "";
+    let snapshot = window.sessionStorage.getItem(COUNSELLING_STORAGE_KEY);
+    if (snapshot === null) {
+      const legacy = window.localStorage.getItem(COUNSELLING_STORAGE_KEY);
+      if (legacy !== null) {
+        const parsed = parseSnapshot(legacy);
+        if (parsed.status === "saved") {
+          window.sessionStorage.setItem(COUNSELLING_STORAGE_KEY, legacy);
+          window.localStorage.removeItem(COUNSELLING_STORAGE_KEY);
+          snapshot = legacy;
+        } else {
+          return legacy;
+        }
+      }
+    }
+    return snapshot ?? "";
   } catch {
     return UNAVAILABLE_SNAPSHOT;
   }
@@ -98,9 +115,11 @@ function getServerSnapshot() {
 function subscribe(callback: () => void) {
   window.addEventListener(CHANGE_EVENT, callback);
   window.addEventListener("storage", callback);
+  window.addEventListener("careerbridge-personal-data-ready", callback);
   return () => {
     window.removeEventListener(CHANGE_EVENT, callback);
     window.removeEventListener("storage", callback);
+    window.removeEventListener("careerbridge-personal-data-ready", callback);
   };
 }
 
@@ -190,8 +209,9 @@ export function useCounsellingSession(): SessionRead {
 
 function persist(session: CounsellingSession): SaveResult {
   try {
-    window.localStorage.setItem(COUNSELLING_STORAGE_KEY, JSON.stringify(session));
+    window.sessionStorage.setItem(COUNSELLING_STORAGE_KEY, JSON.stringify(session));
     window.dispatchEvent(new Event(CHANGE_EVENT));
+    enqueueAccountMutation({ type: "progress.counsellingSession", value: session });
     return { ok: true, session };
   } catch {
     return { ok: false, reason: "unavailable" };
@@ -202,8 +222,9 @@ export function removeSavedCounselling():
   | { ok: true }
   | { ok: false; reason: "unavailable" } {
   try {
-    window.localStorage.removeItem(COUNSELLING_STORAGE_KEY);
+    window.sessionStorage.removeItem(COUNSELLING_STORAGE_KEY);
     window.dispatchEvent(new Event(CHANGE_EVENT));
+    enqueueAccountMutation({ type: "progress.counsellingSession", value: null });
     return { ok: true };
   } catch {
     return { ok: false, reason: "unavailable" };
