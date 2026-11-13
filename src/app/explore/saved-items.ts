@@ -1,4 +1,6 @@
 import { useSyncExternalStore } from "react";
+import { enqueueAccountMutation, isPersonalDataReady } from "../account-data-sync";
+import { SAVED_ITEMS_STORAGE_KEY } from "../personal-data-storage-keys";
 
 export type SavedItemType =
   | "field"
@@ -28,7 +30,7 @@ type Snapshot =
   | { status: "unavailable" | "invalid" }
   | { status: "saved"; items: SavedItem[] };
 
-const storageKey = "careerbridge:saved-items:v1";
+const storageKey = SAVED_ITEMS_STORAGE_KEY;
 const changeEvent = "careerbridge-saved-items-change";
 const serverSnapshot: Snapshot = { status: "loading" };
 let cachedRaw: string | null | undefined;
@@ -101,8 +103,22 @@ function parseItems(raw: string | null): Snapshot {
 }
 
 function getSnapshot(): Snapshot {
+  if (!isPersonalDataReady()) return serverSnapshot;
   try {
-    const raw = window.localStorage.getItem(storageKey);
+    let raw = window.sessionStorage.getItem(storageKey);
+    if (raw === null) {
+      const legacy = window.localStorage.getItem(storageKey);
+      if (legacy !== null) {
+        const migrated = parseItems(legacy);
+        if (migrated.status === "saved") {
+          window.sessionStorage.setItem(storageKey, legacy);
+          window.localStorage.removeItem(storageKey);
+          raw = legacy;
+        } else {
+          return migrated;
+        }
+      }
+    }
     if (raw !== cachedRaw) {
       cachedRaw = raw;
       cachedSnapshot = parseItems(raw);
@@ -118,9 +134,11 @@ function getSnapshot(): Snapshot {
 function subscribe(callback: () => void) {
   window.addEventListener(changeEvent, callback);
   window.addEventListener("storage", callback);
+  window.addEventListener("careerbridge-personal-data-ready", callback);
   return () => {
     window.removeEventListener(changeEvent, callback);
     window.removeEventListener("storage", callback);
+    window.removeEventListener("careerbridge-personal-data-ready", callback);
   };
 }
 
@@ -140,7 +158,7 @@ function updateSavedItems(update: (items: SavedItem[]) => SavedItem[]) {
   try {
     const items = update(snapshot.items);
     const raw = JSON.stringify({ version: 1, items });
-    window.localStorage.setItem(storageKey, raw);
+    window.sessionStorage.setItem(storageKey, raw);
     cachedRaw = raw;
     cachedSnapshot = { status: "saved", items };
     window.dispatchEvent(new Event(changeEvent));
@@ -155,17 +173,21 @@ function updateSavedItems(update: (items: SavedItem[]) => SavedItem[]) {
 
 export function addSavedItem(item: Omit<SavedItem, "savedAt"> & { savedAt?: number }) {
   const nextItem: SavedItem = { ...item, savedAt: item.savedAt ?? Date.now() };
-  return updateSavedItems((items) => {
+  const updated = updateSavedItems((items) => {
     const key = savedItemKey(nextItem);
     return items.some((saved) => savedItemKey(saved) === key)
       ? items
       : [...items, nextItem];
   });
+  if (updated) enqueueAccountMutation({ type: "saved.add", item: nextItem });
+  return updated;
 }
 
 export function removeSavedItem(item: Pick<SavedItem, "type" | "id" | "context">) {
   const key = savedItemKey(item);
-  return updateSavedItems((items) =>
+  const updated = updateSavedItems((items) =>
     items.filter((saved) => savedItemKey(saved) !== key),
   );
+  if (updated) enqueueAccountMutation({ type: "saved.remove", item });
+  return updated;
 }

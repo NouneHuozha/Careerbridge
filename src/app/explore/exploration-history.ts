@@ -1,4 +1,6 @@
 import { useSyncExternalStore } from "react";
+import { enqueueAccountMutation, isPersonalDataReady } from "../account-data-sync";
+import { EXPLORATION_HISTORY_STORAGE_KEY } from "../personal-data-storage-keys";
 import type { SavedItemContext, SavedItemType } from "./saved-items";
 
 export type ExplorationHistoryItem = {
@@ -14,7 +16,7 @@ type Snapshot =
   | { status: "unavailable" | "invalid" }
   | { status: "saved"; items: ExplorationHistoryItem[] };
 
-const storageKey = "careerbridge:exploration-history:v1";
+const storageKey = EXPLORATION_HISTORY_STORAGE_KEY;
 const changeEvent = "careerbridge-exploration-history-change";
 const serverSnapshot: Snapshot = { status: "loading" };
 let cachedRaw: string | null | undefined;
@@ -92,8 +94,22 @@ function parseHistory(raw: string | null): Snapshot {
 }
 
 function getSnapshot(): Snapshot {
+  if (!isPersonalDataReady()) return serverSnapshot;
   try {
-    const raw = window.localStorage.getItem(storageKey);
+    let raw = window.sessionStorage.getItem(storageKey);
+    if (raw === null) {
+      const legacy = window.localStorage.getItem(storageKey);
+      if (legacy !== null) {
+        const migrated = parseHistory(legacy);
+        if (migrated.status === "saved") {
+          window.sessionStorage.setItem(storageKey, legacy);
+          window.localStorage.removeItem(storageKey);
+          raw = legacy;
+        } else {
+          return migrated;
+        }
+      }
+    }
     if (raw !== cachedRaw) {
       cachedRaw = raw;
       cachedSnapshot = parseHistory(raw);
@@ -109,9 +125,11 @@ function getSnapshot(): Snapshot {
 function subscribe(callback: () => void) {
   window.addEventListener(changeEvent, callback);
   window.addEventListener("storage", callback);
+  window.addEventListener("careerbridge-personal-data-ready", callback);
   return () => {
     window.removeEventListener(changeEvent, callback);
     window.removeEventListener("storage", callback);
+    window.removeEventListener("careerbridge-personal-data-ready", callback);
   };
 }
 
@@ -133,7 +151,7 @@ function updateHistory(update: (items: ExplorationHistoryItem[]) => ExplorationH
   try {
     const items = update(snapshot.items);
     const raw = JSON.stringify({ version: 1, items });
-    window.localStorage.setItem(storageKey, raw);
+    window.sessionStorage.setItem(storageKey, raw);
     cachedRaw = raw;
     cachedSnapshot = { status: "saved", items };
     window.dispatchEvent(new Event(changeEvent));
@@ -151,40 +169,58 @@ export function recordHistoryVisit(
     lastVisitedAt?: number;
   },
 ) {
-  const visitedAt = item.lastVisitedAt ?? Date.now();
-  return updateHistory((items) => {
+  let recorded: ExplorationHistoryItem | undefined;
+  const updated = updateHistory((items) => {
     const key = explorationHistoryKey(item);
     const existing = items.find((entry) => explorationHistoryKey(entry) === key);
+    const visitedAt = Math.max(
+      item.lastVisitedAt ?? Date.now(),
+      (existing?.lastVisitedAt ?? 0) + 1,
+    );
     const nextItem: ExplorationHistoryItem = {
       ...item,
       lastVisitedAt: visitedAt,
       visitCount: existing ? existing.visitCount + 1 : 1,
     };
+    recorded = nextItem;
     return [
       ...items.filter((entry) => explorationHistoryKey(entry) !== key),
       nextItem,
     ];
   });
+  if (updated && recorded) {
+    enqueueAccountMutation({
+      type: "history.record",
+      item: { type: recorded.type, id: recorded.id, context: recorded.context, lastVisitedAt: recorded.lastVisitedAt },
+    });
+  }
+  return updated;
 }
 
 export function removeHistoryItem(
   item: Pick<ExplorationHistoryItem, "type" | "id" | "context">,
 ) {
   const key = explorationHistoryKey(item);
-  return updateHistory((items) =>
+  const updated = updateHistory((items) =>
     items.filter((entry) => explorationHistoryKey(entry) !== key),
   );
+  if (updated) enqueueAccountMutation({ type: "history.remove", item });
+  return updated;
 }
 
 export function restoreHistoryItem(item: ExplorationHistoryItem) {
   const key = explorationHistoryKey(item);
-  return updateHistory((items) =>
+  const updated = updateHistory((items) =>
     items.some((entry) => explorationHistoryKey(entry) === key)
       ? items
       : [...items, item],
   );
+  if (updated) enqueueAccountMutation({ type: "history.restore", item });
+  return updated;
 }
 
 export function clearExplorationHistory() {
-  return updateHistory(() => []);
+  const updated = updateHistory(() => []);
+  if (updated) enqueueAccountMutation({ type: "history.clear" });
+  return updated;
 }

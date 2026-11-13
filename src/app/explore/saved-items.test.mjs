@@ -21,17 +21,26 @@ loadModule.extensions[".ts"] = (module, filename) => {
 
 const storageKey = "careerbridge:saved-items:v1";
 const values = new Map();
+const sessionValues = new Map();
 const localStorage = {
   getItem: (key) => values.get(key) ?? null,
   setItem: (key, value) => values.set(key, String(value)),
+  removeItem: (key) => values.delete(key),
+};
+const sessionStorage = {
+  getItem: (key) => sessionValues.get(key) ?? null,
+  setItem: (key, value) => sessionValues.set(key, String(value)),
+  removeItem: (key) => sessionValues.delete(key),
 };
 
 globalThis.window = {
   localStorage,
+  sessionStorage,
   addEventListener() {},
   removeEventListener() {},
   dispatchEvent() {},
 };
+loadModule("../account-data-sync.ts").setAccountMode(false);
 
 const {
   addSavedItem,
@@ -72,6 +81,8 @@ test("saved items deduplicate, keep course offerings distinct, and support undo"
 
   assert.equal(removeSavedItem(field), true);
   assert.equal(addSavedItem(field), true);
+  assert.notEqual(sessionStorage.getItem(storageKey), null);
+  assert.equal(localStorage.getItem(storageKey), null);
   assert.deepEqual(
     useSavedItems().items.find((item) => item.type === "field"),
     field,
@@ -80,6 +91,7 @@ test("saved items deduplicate, keep course offerings distinct, and support undo"
 
 test("invalid saved data is preserved and cannot be overwritten", () => {
   const invalid = "{not valid saved data";
+  sessionStorage.removeItem(storageKey);
   localStorage.setItem(storageKey, invalid);
 
   assert.deepEqual(useSavedItems(), { status: "invalid" });
@@ -87,13 +99,13 @@ test("invalid saved data is preserved and cannot be overwritten", () => {
   assert.equal(localStorage.getItem(storageKey), invalid);
 });
 
-test("inaccessible local storage is reported as unavailable", () => {
-  window.localStorage = {
+test("inaccessible session storage is reported as unavailable", () => {
+  window.sessionStorage = {
     getItem() {
       throw new Error("storage blocked");
     },
     setItem() {},
   };
   assert.deepEqual(useSavedItems(), { status: "unavailable" });
-  window.localStorage = localStorage;
+  window.sessionStorage = sessionStorage;
 });

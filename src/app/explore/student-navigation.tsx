@@ -3,14 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, Check, ChevronDown, ChevronRight, CircleHelp, Compass, GraduationCap, ListChecks, LogOut, Mail, Menu, Pencil, UserRound, X, type LucideIcon } from "lucide-react";
+import { Bookmark, Check, ChevronDown, ChevronRight, CircleHelp, Compass, GraduationCap, ListChecks, LogOut, Mail, Menu, Pencil, Trash2, UserRound, X, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useAccount } from "../account-provider";
 import {
   saveEducationStage,
   useEducationStage,
   type EducationStage,
 } from "../education-stage";
-import type { AuthUser } from "../auth-types";
 
 const navigationItems: {
   label: string;
@@ -28,76 +28,86 @@ type ProfilePreview = {
   email: string;
 };
 
-const defaultProfile: ProfilePreview = {
-  name: "Student Name",
-  email: "student@example.com",
-};
-
 export function StudentNavigation() {
   const pathname = usePathname();
+  const account = useAccount();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [profilePreview, setProfilePreview] = useState<ProfilePreview>(defaultProfile);
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [authStatus, setAuthStatus] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [guestModeHelpOpen, setGuestModeHelpOpen] = useState(false);
+  const profile: ProfilePreview = account.user
+    ? { name: account.user.name ?? "Student", email: account.user.email }
+    : { name: "Guest session", email: "" };
+  const authUnavailable = account.status === "unavailable";
   const headerRef = useRef<HTMLElement>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const guestModeHelpRef = useRef<HTMLDivElement>(null);
+  const guestModeHelpButtonRef = useRef<HTMLButtonElement>(null);
+  const guestModePopoverRef = useRef<HTMLDivElement>(null);
   const currentSection = pathname === "/explore"
     ? "guidance"
     : pathname.startsWith("/explore/saved") || pathname.startsWith("/explore/history") || pathname.startsWith("/counselling/summary")
       ? "explorations"
       : "library";
 
-  useEffect(() => {
-    let active = true;
-    async function syncProfile() {
-      try {
-        const response = await fetch("/api/auth/session", { cache: "no-store" });
-        if (!response.ok) throw new Error("Account service is unavailable.");
-        const result = await response.json() as { user: AuthUser | null };
-        if (!active) return;
-        setAuthUser(result.user);
-        if (result.user) {
-          setProfilePreview({ name: result.user.name ?? "Student", email: result.user.email });
-        } else {
-          setProfilePreview(defaultProfile);
-        }
-        setAuthStatus("ready");
-      } catch {
-        if (active) setAuthStatus("unavailable");
-      }
-    }
-
-    void syncProfile();
-    window.addEventListener("focus", syncProfile);
-    return () => {
-      active = false;
-      window.removeEventListener("focus", syncProfile);
-    };
-  }, []);
-
   async function signOutAccount() {
+    return account.signOut();
+  }
+
+  async function deleteAccount(password: string, confirmation: string) {
+    if (!(await account.flushChanges())) {
+      return {
+        ok: false,
+        error: "Some changes still need to sync. Retry them before deleting your account.",
+      };
+    }
     try {
-      const response = await fetch("/api/auth/sign-out", { method: "POST" });
-      if (!response.ok) return false;
-      setAuthUser(null);
-      setProfilePreview(defaultProfile);
-      setAuthStatus("ready");
-      return true;
+      const response = await fetch("/api/account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, confirmation }),
+      });
+      if (!response.ok) {
+        let result: unknown = null;
+        try {
+          result = await response.json();
+        } catch {
+          result = null;
+        }
+        return {
+          ok: false,
+          error:
+            typeof result === "object" &&
+            result !== null &&
+            "error" in result &&
+            typeof result.error === "string"
+              ? result.error
+              : "We couldn't delete your account. Please try again.",
+        };
+      }
+      await account.refresh();
+      return { ok: true, error: "" };
     } catch {
-      return false;
+      return { ok: false, error: "We couldn't delete your account. Please try again." };
     }
   }
   useEffect(() => {
-    if (!mobileOpen && !profileOpen && !helpOpen) return;
+    if (!mobileOpen && !profileOpen && !helpOpen && !guestModeHelpOpen) return;
 
     function closeOutside(event: PointerEvent) {
-      if (!headerRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !guestModeHelpRef.current?.contains(target) &&
+        !guestModePopoverRef.current?.contains(target)
+      ) {
+        setGuestModeHelpOpen(false);
+      }
+      if (!headerRef.current?.contains(target)) {
         setMobileOpen(false);
         setProfileOpen(false);
         setHelpOpen(false);
+        setGuestModeHelpOpen(false);
       }
     }
 
@@ -106,7 +116,10 @@ export function StudentNavigation() {
         setMobileOpen(false);
         setProfileOpen(false);
         setHelpOpen(false);
-        (mobileOpen ? menuButtonRef : profileButtonRef).current?.focus();
+        setGuestModeHelpOpen(false);
+        if (guestModeHelpOpen) guestModeHelpButtonRef.current?.focus();
+        else if (mobileOpen) menuButtonRef.current?.focus();
+        else if (profileOpen) profileButtonRef.current?.focus();
       }
     }
 
@@ -116,12 +129,13 @@ export function StudentNavigation() {
       document.removeEventListener("pointerdown", closeOutside);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [helpOpen, mobileOpen, profileOpen]);
+  }, [guestModeHelpOpen, helpOpen, mobileOpen, profileOpen]);
 
   function closeMenus() {
     setMobileOpen(false);
     setProfileOpen(false);
     setHelpOpen(false);
+    setGuestModeHelpOpen(false);
   }
 
   function renderNavigationItems(mobile = false) {
@@ -246,11 +260,11 @@ export function StudentNavigation() {
           {profileOpen && (
             <ProfileMenu
               id="student-profile-menu"
-              profile={profilePreview}
-              onProfileChange={setProfilePreview}
-              isAuthenticated={authUser !== null}
-              authUnavailable={authStatus === "unavailable"}
+              profile={profile}
+              isAuthenticated={account.status === "authenticated"}
+              authUnavailable={authUnavailable}
               onSignOut={signOutAccount}
+              onDeleteAccount={deleteAccount}
             />
           )}
         </div>
@@ -315,17 +329,87 @@ export function StudentNavigation() {
               {profileOpen && (
                 <ProfileMenu
                   id="student-mobile-profile-menu"
-                  profile={profilePreview}
-                  onProfileChange={setProfilePreview}
-                  isAuthenticated={authUser !== null}
-                  authUnavailable={authStatus === "unavailable"}
+                  profile={profile}
+                  isAuthenticated={account.status === "authenticated"}
+                  authUnavailable={authUnavailable}
                   onSignOut={signOutAccount}
+                  onDeleteAccount={deleteAccount}
                   mobile
                 />
               )}
             </div>
           </div>
         </nav>
+      )}
+      {account.status === "guest" && (
+        <div className="border-t border-[#eee5cd] bg-[#fffcf4]">
+          <div className="mx-auto flex min-h-11 max-w-7xl items-center justify-center px-3 text-[11px] sm:px-5 sm:text-xs">
+            <div className="relative flex items-center justify-center gap-1">
+              <p className="flex items-center gap-1.5 whitespace-nowrap text-[#315345]">
+                <span className="rounded-full bg-[#fff1c8] px-2 py-1 font-bold text-[#806018]">
+                  Guest mode
+                </span>
+                <span className="font-medium">Your progress is temporary.</span>
+              </p>
+              <div ref={guestModeHelpRef} className="relative">
+                <button
+                  ref={guestModeHelpButtonRef}
+                  type="button"
+                  aria-label="What is Guest mode?"
+                  aria-expanded={guestModeHelpOpen}
+                  aria-controls="guest-mode-help"
+                  onClick={() => {
+                    setGuestModeHelpOpen((open) => !open);
+                    setMobileOpen(false);
+                    setProfileOpen(false);
+                    setHelpOpen(false);
+                  }}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full text-[#806018] transition-colors hover:bg-[#fff1c8] hover:text-[#674c12] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#3d8b72]"
+                >
+                  <CircleHelp aria-hidden="true" className="h-[18px] w-[18px]" />
+                </button>
+              </div>
+              <Link
+                href={`/sign-in?next=${encodeURIComponent(pathname)}`}
+                className="shrink-0 font-bold text-[#145543] underline underline-offset-2 hover:text-[#0f4537] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3d8b72]"
+              >
+                Sign in
+              </Link>
+              {guestModeHelpOpen && (
+                <div
+                  ref={guestModePopoverRef}
+                  id="guest-mode-help"
+                  role="region"
+                  aria-labelledby="guest-mode-help-title"
+                  className="absolute left-1/2 top-full z-[60] mt-2 w-72 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-2xl border border-[#dce7df] bg-white p-4 text-[#254638] shadow-[0_14px_36px_rgba(27,65,52,0.16)]"
+                >
+                  <h2 id="guest-mode-help-title" className="text-sm font-semibold">
+                    What is Guest mode?
+                  </h2>
+                  <p className="mt-1.5 text-xs leading-5 text-[#59675f]">
+                    You&apos;re using CareerBridge without an account. Your exploration and progress stay available while this tab is open. They&apos;ll be cleared when you close it.
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-[#59675f]">
+                    <Link
+                      href={`/sign-in?next=${encodeURIComponent(pathname)}`}
+                      className="font-semibold text-[#145543] underline underline-offset-2 hover:text-[#0f4537] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3d8b72]"
+                    >
+                      Sign in
+                    </Link>
+                    {" or "}
+                    <Link
+                      href={`/sign-up?next=${encodeURIComponent(pathname)}`}
+                      className="font-semibold text-[#145543] underline underline-offset-2 hover:text-[#0f4537] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3d8b72]"
+                    >
+                      create an account
+                    </Link>
+                    {" to keep them for future visits."}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </header>
   );
@@ -356,30 +440,34 @@ function HelpMenu({ id, mobile = false }: { id: string; mobile?: boolean }) {
 function ProfileMenu({
   id,
   profile,
-  onProfileChange,
   isAuthenticated,
   authUnavailable,
   onSignOut,
+  onDeleteAccount,
   mobile = false,
 }: {
   id: string;
   profile: ProfilePreview;
-  onProfileChange: (profile: ProfilePreview) => void;
   isAuthenticated: boolean;
   authUnavailable: boolean;
   onSignOut: () => Promise<boolean>;
+  onDeleteAccount: (
+    password: string,
+    confirmation: string,
+  ) => Promise<{ ok: boolean; error: string }>;
   mobile?: boolean;
 }) {
   const education = useEducationStage();
-  const [nameDraft, setNameDraft] = useState(profile.name);
-  const [emailDraft, setEmailDraft] = useState(profile.email);
-  const [editingPersonal, setEditingPersonal] = useState(false);
   const [editingStage, setEditingStage] = useState(false);
   const [stageDraft, setStageDraft] = useState<EducationStage | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [signingOut, setSigningOut] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const signOutDialogRef = useRef<HTMLDialogElement>(null);
+  const deleteDialogRef = useRef<HTMLDialogElement>(null);
   const stageLabel =
     education.status === "saved"
       ? education.stage === "class-10" ? "Class 10" : "Class 12"
@@ -391,28 +479,31 @@ function ProfileMenu({
             ? "Couldn’t read stage"
             : "Unavailable";
 
-  function openPersonalEditor() {
-    setNameDraft(profile.name);
-    setEmailDraft(profile.email);
-    setError("");
-    setMessage("");
-    setEditingPersonal(true);
-    setEditingStage(false);
-  }
-
   function openStageEditor() {
     setStageDraft(education.status === "saved" ? education.stage : null);
     setError("");
     setMessage("");
-    setEditingPersonal(false);
     setEditingStage(true);
   }
 
-  function savePersonalPreview(event: FormEvent<HTMLFormElement>) {
+  async function submitAccountDeletion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onProfileChange({ name: nameDraft.trim(), email: emailDraft.trim() });
-    setEditingPersonal(false);
-    setMessage("Preview updated for this visit only; it isn’t saved to an account.");
+    if (deletingAccount) return;
+    setDeletingAccount(true);
+    setError("");
+    try {
+      const result = await onDeleteAccount(deletePassword, deleteConfirmation);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      deleteDialogRef.current?.close();
+      setDeletePassword("");
+      setDeleteConfirmation("");
+      setError("");
+    } finally {
+      setDeletingAccount(false);
+    }
   }
 
   function saveStage(event: FormEvent<HTMLFormElement>) {
@@ -447,60 +538,17 @@ function ProfileMenu({
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{profile.name}</p>
-            <p className="mt-0.5 flex min-w-0 items-center gap-1.5 truncate text-xs text-[#59675f]">
-              <Mail aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{profile.email}</span>
-            </p>
+            {profile.email && (
+              <p className="mt-0.5 flex min-w-0 items-center gap-1.5 truncate text-xs text-[#59675f]">
+                <Mail aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{profile.email}</span>
+              </p>
+            )}
           </div>
         </div>
         <p className="mt-2 text-[11px] font-medium text-[#735b23]">
-          {isAuthenticated ? "CareerBridge account" : "Sample details · Not connected to an account"}
+          {isAuthenticated ? "CareerBridge account" : "Explore freely without an account"}
         </p>
-        {!isAuthenticated && <button
-          type="button"
-          onClick={openPersonalEditor}
-          className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-[#315345] transition-colors hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3d8b72]"
-        >
-          <Pencil aria-hidden="true" className="h-3.5 w-3.5" />
-          Edit details
-        </button>}
-        {!isAuthenticated && editingPersonal && (
-          <form onSubmit={savePersonalPreview} className="mt-3 space-y-3 border-t border-[#dce7df] pt-3">
-            <label className="block text-xs font-semibold">
-              Name
-              <input
-                type="text"
-                required
-                maxLength={100}
-                value={nameDraft}
-                onChange={(event) => setNameDraft(event.target.value)}
-                className="mt-1.5 min-h-10 w-full rounded-lg border border-[#cbd9cf] bg-white px-3 text-sm font-normal outline-none focus:border-[#145543] focus:ring-2 focus:ring-[#b8e3c9]"
-              />
-            </label>
-            <label className="block text-xs font-semibold">
-              Email address
-              <input
-                type="email"
-                autoComplete="email"
-                required
-                maxLength={254}
-                value={emailDraft}
-                onChange={(event) => setEmailDraft(event.target.value)}
-                className="mt-1.5 min-h-10 w-full rounded-lg border border-[#cbd9cf] bg-white px-3 text-sm font-normal outline-none focus:border-[#145543] focus:ring-2 focus:ring-[#b8e3c9]"
-              />
-            </label>
-            <p className="text-xs leading-5 text-[#735b23]">Preview only. These details won’t be saved.</p>
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setEditingPersonal(false)} className="min-h-9 rounded-lg px-3 text-xs font-semibold text-[#59675f] hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3d8b72]">
-                Cancel
-              </button>
-              <button type="submit" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#145543] px-3 text-xs font-semibold text-white hover:bg-[#0f4537] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3d8b72]">
-                <Check aria-hidden="true" className="h-3.5 w-3.5" />
-                Save preview
-              </button>
-            </div>
-          </form>
-        )}
       </div>
 
       <div className="mt-2 rounded-lg border border-[#e7ece8] px-3 py-3">
@@ -581,17 +629,32 @@ function ProfileMenu({
       </div>
       <div className="mt-1 border-t border-[#e7ece8] pt-1">
         {isAuthenticated ? (
-          <button
-            type="button"
-            onClick={() => {
-              setError("");
-              signOutDialogRef.current?.showModal();
-            }}
-            className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold text-[#9b3f36] transition-colors hover:bg-[#fff1ef] hover:text-[#84352f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9b5148]"
-          >
-            <LogOut aria-hidden="true" className="h-4 w-4" />
-            Sign out
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                signOutDialogRef.current?.showModal();
+              }}
+              className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold text-[#9b3f36] transition-colors hover:bg-[#fff1ef] hover:text-[#84352f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9b5148]"
+            >
+              <LogOut aria-hidden="true" className="h-4 w-4" />
+              Sign out
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                setDeletePassword("");
+                setDeleteConfirmation("");
+                deleteDialogRef.current?.showModal();
+              }}
+              className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold text-[#9b3f36] transition-colors hover:bg-[#fff1ef] hover:text-[#84352f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9b5148]"
+            >
+              <Trash2 aria-hidden="true" className="h-4 w-4" />
+              Delete account
+            </button>
+          </>
         ) : (
           <ProfileMenuItem label="Sign in" href="/sign-in" />
         )}
@@ -615,7 +678,7 @@ function ProfileMenu({
             Sign out of CareerBridge?
           </h2>
           <p id={`${id}-signout-description`} className="mt-2 text-sm leading-relaxed text-[#59665e]">
-            You’ll need to sign in again to access your account. Your saved explorations on this device will remain.
+            Signing out clears account data cached in this tab. Your saved items and progress remain in your account for your next sign-in.
           </p>
           {error && (
             <p role="alert" className="mt-4 rounded-xl bg-[#fff0ed] p-3 text-sm text-[#8b3529]">
@@ -655,6 +718,70 @@ function ProfileMenu({
             </button>
           </div>
         </div>
+      </dialog>
+      <dialog
+        ref={deleteDialogRef}
+        aria-labelledby={`${id}-delete-title`}
+        aria-describedby={`${id}-delete-description`}
+        onCancel={(event) => {
+          if (deletingAccount) event.preventDefault();
+          else setError("");
+        }}
+        className="fixed inset-0 m-auto max-h-[calc(100%-2rem)] w-[calc(100%-2rem)] max-w-md rounded-3xl border border-[#eadbd8] bg-white p-0 text-[#18352d] shadow-[0_24px_80px_rgba(16,45,36,0.3)] backdrop:bg-[#102d26]/50 backdrop:backdrop-blur-sm"
+      >
+        <form onSubmit={submitAccountDeletion} className="p-6 sm:p-7">
+          <span className="grid h-12 w-12 place-items-center rounded-full bg-[#fff0ed] text-[#9b5148]">
+            <Trash2 aria-hidden="true" className="h-5 w-5" />
+          </span>
+          <h2 id={`${id}-delete-title`} className="mt-5 font-serif text-2xl font-semibold">
+            Delete your account?
+          </h2>
+          <p id={`${id}-delete-description`} className="mt-2 text-sm leading-relaxed text-[#59665e]">
+            This permanently deletes your account, saved items, exploration history and account progress. This cannot be undone.
+          </p>
+          <label className="mt-4 block text-sm font-semibold">
+            Password
+            <input
+              type="password"
+              autoComplete="current-password"
+              required
+              maxLength={128}
+              value={deletePassword}
+              onChange={(event) => setDeletePassword(event.target.value)}
+              className="mt-1.5 min-h-11 w-full rounded-xl border border-[#dce7df] px-3 text-base outline-none focus:border-[#145543] focus:ring-2 focus:ring-[#dceee2]"
+            />
+          </label>
+          <label className="mt-3 block text-sm font-semibold">
+            Type DELETE to confirm
+            <input
+              type="text"
+              autoComplete="off"
+              required
+              value={deleteConfirmation}
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              className="mt-1.5 min-h-11 w-full rounded-xl border border-[#dce7df] px-3 text-base outline-none focus:border-[#145543] focus:ring-2 focus:ring-[#dceee2]"
+            />
+          </label>
+          {error && <p role="alert" className="mt-3 text-sm text-[#8b3529]">{error}</p>}
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              disabled={deletingAccount}
+              onClick={() => deleteDialogRef.current?.close()}
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#dce7df] px-5 text-sm font-semibold text-[#52645a] hover:bg-[#f4f7f3] disabled:opacity-60"
+            >
+              Keep account
+            </button>
+            <button
+              type="submit"
+              disabled={deletingAccount}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#9b5148] px-5 text-sm font-semibold text-white hover:bg-[#843d35] disabled:opacity-60"
+            >
+              <Trash2 aria-hidden="true" className="h-4 w-4" />
+              {deletingAccount ? "Deleting…" : "Delete account"}
+            </button>
+          </div>
+        </form>
       </dialog>
     </div>
   );

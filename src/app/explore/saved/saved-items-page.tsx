@@ -1,8 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Bookmark, Trash2 } from "lucide-react";
+import {
+  ArrowRight,
+  Bookmark,
+  Compass,
+  GraduationCap,
+  Landmark,
+  ListChecks,
+  Map,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
+import { useAccount } from "../../account-provider";
 import { Breadcrumbs } from "../../breadcrumbs";
 import { PageLoadingSkeleton } from "../../page-loading-skeleton";
 import {
@@ -32,6 +44,15 @@ const categories: { id: SavedCategory | "all"; label: string }[] = [
   { id: "pathway", label: "Pathways" },
   { id: "examination", label: "Examinations" },
   { id: "scholarship", label: "Scholarships" },
+];
+
+const guestSaveTypes: { label: string; icon: LucideIcon }[] = [
+  { label: "Fields", icon: Compass },
+  { label: "Courses", icon: GraduationCap },
+  { label: "Institutions", icon: Landmark },
+  { label: "Pathways", icon: Map },
+  { label: "Examinations", icon: ListChecks },
+  { label: "Scholarships", icon: Bookmark },
 ];
 
 type ResolvedSavedItem = {
@@ -183,6 +204,8 @@ function savedDate(timestamp: number) {
 }
 
 export default function SavedItemsPage() {
+  const pathname = usePathname();
+  const account = useAccount();
   const saved = useSavedItems();
   const [category, setCategory] = useState<SavedCategory | "all">("all");
   const [sort, setSort] = useState<SavedSort>("recent");
@@ -249,22 +272,84 @@ export default function SavedItemsPage() {
         className="pt-5 sm:pt-7"
       />
       <div className="cb-container pt-7 sm:pt-10">
-        <header className="max-w-3xl">
+        <header className={account.status === "guest" ? "mx-auto max-w-3xl text-center" : "max-w-3xl"}>
           <p className="text-sm font-semibold uppercase tracking-[.13em] text-[#52715f]">
-            Your collection
+            Saved
           </p>
           <h1 className="mt-2 font-serif text-4xl font-semibold leading-[1.08] tracking-[-.045em] sm:text-5xl">
-            Your saved items
+            Saved items
           </h1>
           <p className="mt-3 text-base leading-7 text-[#59665e] sm:text-lg">
-            Keep track of the fields, courses and opportunities you may want to explore again.
+            Keep the fields, courses and opportunities you want to revisit.
           </p>
-          <p className="mt-3 text-sm text-[#718078]">
-            Saved on this device · Not synced across devices
-          </p>
+          {account.status === "authenticated" && (
+            <p className="mt-3 text-sm text-[#718078]">
+              Saved to your account · Available across devices
+            </p>
+          )}
         </header>
 
-        {unavailable ? (
+        {account.status === "guest" ? (
+          <>
+            <section className="mx-auto mt-8 grid max-w-5xl overflow-hidden rounded-[2rem] border border-[#dce7df] bg-white shadow-[0_18px_48px_rgba(27,65,52,0.07)] lg:grid-cols-[1.08fr_.92fr]">
+              <div className="p-6 sm:p-9 lg:p-10">
+                <span className="grid h-14 w-14 place-items-center rounded-2xl bg-[#eaf2ed] text-[#145543]">
+                  <Bookmark aria-hidden="true" className="h-6 w-6" />
+                </span>
+                <h2 className="mt-5 max-w-lg font-serif text-2xl font-semibold leading-tight tracking-[-.025em] sm:text-3xl">
+                  Save the things you want to come back to.
+                </h2>
+                <p className="mt-3 max-w-lg text-sm leading-6 text-[#59665e] sm:text-base">
+                  You&apos;re browsing as a guest. An account is needed to save items to your collection and access them again on future visits.
+                </p>
+
+                <div className="mt-7 grid gap-2.5 sm:grid-cols-2">
+                  <Link
+                    href={`/sign-up?next=${encodeURIComponent(pathname)}`}
+                    className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[#174b3b] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#103d30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+                  >
+                    Create free account
+                  </Link>
+                  <Link
+                    href={`/sign-in?next=${encodeURIComponent(pathname)}`}
+                    className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[#cbd9cf] bg-white px-5 text-sm font-semibold text-[#315345] transition-colors hover:bg-[#f5f8f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+                  >
+                    Sign in
+                  </Link>
+                </div>
+                <Link
+                  href="/explore"
+                  className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg text-sm font-semibold text-[#52715f] transition-colors hover:text-[#145543] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+                >
+                  Continue exploring <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                </Link>
+              </div>
+
+              <div className="border-t border-[#e4ebe4] bg-[#f2f6f1] p-6 sm:p-9 lg:border-l lg:border-t-0 lg:p-10">
+                <p className="text-xs font-semibold uppercase tracking-[.15em] text-[#66806e]">
+                  Keep your options together
+                </p>
+                <h3 className="mt-2 font-serif text-2xl font-semibold tracking-[-.025em] text-[#29483a]">
+                  You can save
+                </h3>
+                <ul className="mt-5 grid grid-cols-2 gap-3">
+                  {guestSaveTypes.map(({ label, icon: Icon }) => (
+                    <li
+                      key={label}
+                      className="flex min-h-12 items-center gap-2.5 rounded-xl border border-[#e1e9e1] bg-white/80 px-3 text-sm font-medium text-[#52645a]"
+                    >
+                      <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-[#47765e]" />
+                      {label}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+            <p className="mx-auto mt-4 max-w-5xl text-center text-sm leading-6 text-[#718078]">
+              You can leave this page and continue browsing without registering.
+            </p>
+          </>
+        ) : unavailable ? (
           <section role="alert" className="mt-8 rounded-2xl border border-[#e7d6a8] bg-[#fff8e8] p-6 text-[#594c32]">
             <h2 className="font-serif text-xl font-semibold">
               {saved.status === "invalid" ? "Saved items couldn’t be read." : "Saved items are unavailable."}
@@ -272,7 +357,7 @@ export default function SavedItemsPage() {
             <p className="mt-2 text-sm leading-6">
               {saved.status === "invalid"
                 ? "Your saved data hasn’t been changed. Check this browser’s stored data before trying again."
-                : "This browser couldn’t access local storage. Check your browser settings and reload this page."}
+                : "This browser couldn’t access session storage. Check your browser settings and reload this page."}
             </p>
           </section>
         ) : resolved.length === 0 ? (

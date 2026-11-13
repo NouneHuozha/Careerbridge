@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -13,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Breadcrumbs } from "../../breadcrumbs";
+import { useAccount } from "../../account-provider";
 import { PageLoadingSkeleton } from "../../page-loading-skeleton";
 import {
   clearExplorationHistory,
@@ -142,6 +144,8 @@ function HistoryCard({
 }
 
 export default function ExplorationHistoryPage() {
+  const pathname = usePathname();
+  const account = useAccount();
   const history = useExplorationHistory();
   const [category, setCategory] = useState<Category | "all">("all");
   const [search, setSearch] = useState("");
@@ -255,10 +259,12 @@ export default function ExplorationHistoryPage() {
                   Your exploration trail
                 </p>
                 <h1 className="mt-3 max-w-[14ch] font-serif text-4xl font-semibold leading-[0.95] tracking-[-.05em] sm:text-5xl lg:text-[4rem]">
-                  Explore your journey
+                  Exploration History
                 </h1>
                 <p className="mt-4 max-w-2xl text-base leading-7 text-[#dfe9e4] sm:text-lg">
-                  Return to the fields, courses and opportunities you have explored along the way.
+                  {account.status === "guest"
+                    ? "Revisit the things you’ve explored during this visit."
+                    : "Revisit the fields, courses and opportunities you’ve explored."}
                 </p>
               </div>
               <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
@@ -273,12 +279,33 @@ export default function ExplorationHistoryPage() {
                   </button>
                 )}
                 <div className="rounded-full border border-[#d2b778]/30 bg-[#d2b778]/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[.12em] text-[#f4e5b0]">
-                  Local only
+                  {account.status === "authenticated"
+                    ? "Account history"
+                    : account.status === "guest"
+                      ? "Guest · This tab only"
+                      : "Account status unavailable"}
                 </div>
               </div>
             </div>
           </div>
         </header>
+
+        {!unavailable && account.status === "guest" && resolved.length > 0 && (
+          <section className="mt-7 flex flex-col gap-4 rounded-2xl border border-[#e8dcb9] bg-[#fffcf4] p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="max-w-3xl">
+              <h2 className="text-sm font-semibold text-[#715923]">History for this visit</h2>
+              <p className="mt-1 text-sm leading-6 text-[#59665e]">
+                Your recently viewed pages are available while this tab remains open. Sign in to keep your exploration history for future visits.
+              </p>
+            </div>
+            <Link
+              href={`/sign-in?next=${encodeURIComponent(pathname)}`}
+              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full border border-[#e9c66b] bg-[#f2cf78] px-5 text-sm font-semibold text-[#18352d] transition-colors hover:border-[#e1b94f] hover:bg-[#e9c15d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#94752d]"
+            >
+              Sign in to keep your history <ArrowRight aria-hidden="true" className="h-4 w-4" />
+            </Link>
+          </section>
+        )}
 
         {unavailable ? (
           <section role="alert" className="mt-8 rounded-[1.7rem] border border-[#e7d6a8] bg-[#fff8e8] p-6 text-[#594c32] shadow-[0_18px_40px_rgba(89,76,50,0.08)]">
@@ -288,8 +315,51 @@ export default function ExplorationHistoryPage() {
             <p className="mt-2 text-sm leading-6">
               {history.status === "invalid"
                 ? "Your stored history has not been changed. Check this browser’s stored data before trying again."
-                : "This browser couldn’t access local storage. Check your browser settings and reload this page."}
+                : "This browser couldn’t access session storage. Check your browser settings and reload this page."}
             </p>
+          </section>
+        ) : resolved.length === 0 && account.status === "guest" ? (
+          <section className="mt-9 grid overflow-hidden rounded-[2rem] border border-[#dce7df] bg-white shadow-[0_18px_48px_rgba(27,65,52,0.07)] lg:grid-cols-[1.08fr_.92fr]">
+            <div className="p-6 sm:p-9 lg:p-10">
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#eaf2ed] text-[#145543]">
+                <Compass aria-hidden="true" className="h-5 w-5" />
+              </span>
+              <h2 className="mt-5 max-w-xl font-serif text-2xl font-semibold leading-tight sm:text-3xl">
+                Your exploration history will appear here.
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-[#59665e] sm:text-base">
+                As you open fields, courses, institutions and other detail pages, they&apos;ll appear here during your current visit.
+              </p>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-[#59665e] sm:text-base">
+                Sign in to keep your history and revisit it on future visits.
+              </p>
+            </div>
+            <div className="border-t border-[#e4ebe4] bg-[#f2f6f1] p-6 sm:p-9 lg:border-l lg:border-t-0 lg:p-10">
+              <p className="text-sm font-semibold text-[#29483a]">Keep exploring at your own pace.</p>
+              <div className="mt-4 grid gap-2.5">
+                <Link
+                  href={`/sign-up?next=${encodeURIComponent(pathname)}`}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#174b3b] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#103d30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+                >
+                  Create free account
+                </Link>
+                <Link
+                  href={`/sign-in?next=${encodeURIComponent(pathname)}`}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#cbd9cf] bg-white px-5 text-sm font-semibold text-[#315345] transition-colors hover:bg-[#f5f8f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+                >
+                  Sign in
+                </Link>
+                <p className="pt-1 text-center text-sm text-[#718078]">
+                  You don&apos;t need an account to start exploring.
+                </p>
+                <Link
+                  href="/explore"
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl text-sm font-semibold text-[#52715f] transition-colors hover:bg-white hover:text-[#145543] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+                >
+                  Start exploring <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
           </section>
         ) : resolved.length === 0 ? (
           <section className="mt-9 rounded-[2rem] border border-[#dce7df] bg-white p-6 shadow-[0_16px_40px_rgba(24,53,45,0.04)] sm:p-9">
@@ -460,7 +530,7 @@ export default function ExplorationHistoryPage() {
                       </div>
                     </div>
                     <p className="mt-4 text-xs leading-5 text-[#718078]">
-                      Stored on this device. History is not synced across devices.
+                      Guest history stays in this tab. When you sign in, history is saved to your account and available across devices.
                     </p>
                   </section>
                 </aside>
