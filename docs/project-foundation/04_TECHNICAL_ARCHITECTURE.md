@@ -4,9 +4,9 @@
 Support the student web application, governed education-data operations, recommendation services, LLM + RAG, explainability and location-aware discovery. UI pages must not own scraping, recommendation logic or source validation.
 
 ## Repository baseline and confidence
-The latest pushed repository was inspected during preparation. It contains a Next.js/TypeScript application and account-related API/database code, including SQL definitions for users, sessions and JSONB account data. Existing app code includes discovery, Guided Explorer, Explore catalogues and personal-data validation/synchronisation.
+The repository has previously been observed to contain a Next.js/TypeScript application and account-related API/database code, including SQL definitions for users, sessions and JSONB account data. This is a limited repository observation, not a complete code audit, runtime test or production assessment. Re-check current dependencies, routes and services before relying on this snapshot.
 
-This is a limited repository observation, not a complete code audit, runtime test or production assessment. The complete education-data schema, Admin Panel, ingestion scheduler, recommender, RAG pipeline and production AI integrations must be inspected and verified before claiming they exist.
+Do not assume that a planned technology is installed. Verify ORM, identity provider, background scheduler, vector store, embedding model, LLM provider, map provider and deployment configuration from package files and runtime configuration before selecting implementation details.
 
 ## Logical components
 1. Web presentation: Next.js/React pages and accessible components.
@@ -34,16 +34,16 @@ This is a limited repository observation, not a complete code audit, runtime tes
 Register approved source → fetch permitted material → store retrieval metadata → parse candidate facts/documents → validate schema/relationships/duplicates → compare changes → review according to risk → approve/publish → write audit history → refresh dependent search/recommendation/RAG indexes → serve published data with provenance/freshness. Fetch or parse failure must not overwrite published values.
 
 ## Technology direction
-Planning context identifies Next.js, React, TypeScript and Tailwind; PostgreSQL/Neon with Drizzle ORM; and Vercel as a likely deployment target. Existing repository contains account/authentication code. Final production choices for identity provider, job runner, object storage, vector store, embedding model, LLM provider, map provider and monitoring must be confirmed from actual configuration and constraints. Do not describe a considered technology as deployed without evidence.
+Planning context includes Next.js, React, TypeScript and Tailwind; PostgreSQL/Neon; and Vercel as a possible deployment target. Final production choices must be confirmed from actual configuration and constraints. Do not describe a considered technology as deployed without evidence.
 
 ## APIs and services
 Use typed contracts and server-side validation. Separate services for catalogue search/details, student context, saved items/progress, source registry, ingestion/review, publication, recommendations, retrieval/answer generation and location. Use pagination. Run long extraction, embedding and indexing tasks asynchronously and observe their status.
 
 ## Security and privacy
-Enforce authentication/authorization server-side; least-privilege admin roles; server-side secrets; upload/API validation; origin protections; safe logging; documented retention/deletion/consent; audit consequential admin actions.
+Enforce authentication/authorization server-side; least-privilege admin roles; server-side secrets; upload/API validation; safe logging; documented retention/deletion/consent; and audit consequential admin actions.
 
-## Reliability and deployment
+## Reliability
 Use idempotent jobs and retries. Preserve last-known-good published data. Maintain separate development/test/staging/production configuration. Keep demo/test records identifiable and out of verified production content. Version migrations. Select a scheduler compatible with execution limits.
 
 ## Decisions requiring validation
-Identity provider/migration; SQL/Drizzle migration conventions; background scheduler; source-document storage; vector retrieval and embedding model; LLM provider/cost/safety; Maps provider/quotas; backups, monitoring and deployment topology.
+Identity provider/migration; SQL/ORM migration conventions; background scheduler; source-document storage; vector retrieval and embedding model; LLM provider/cost/safety; Maps provider/quotas; backups, monitoring and deployment topology.

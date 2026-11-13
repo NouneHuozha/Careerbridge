@@ -8,7 +8,7 @@ Potential inputs include Class 10/12 stage, subjects/academic context where supp
 
 Use structured field/course/institution metadata and content-based methods to identify options sharing relevant attributes with student context. Collaborative filtering or interaction signals may complement this when sufficient real and representative user interaction data exists. Build interfaces and event capture with this in mind from the beginning, but do not claim real collaborative performance based only on synthetic interactions.
 
-Structured output should include entity identity/type, student evidence references, matching catalogue attributes, missing/uncertain information, explanation codes, and algorithm/model version and timestamp for evaluation.
+A recommendation result should preserve entity identity/type; student-answer/evidence references; relevant catalogue attributes and record versions; explanation reason codes or structured evidence; missing/uncertain information; and algorithm/model version and timestamp for evaluation.
 
 Do not make output a deterministic career prediction. Avoid student-facing best-career claims, forced rankings and fit percentages. Internal diagnostic metrics may be used for engineering but are not a verdict about a student.
 

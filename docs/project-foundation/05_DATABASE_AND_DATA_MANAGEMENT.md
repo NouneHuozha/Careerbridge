@@ -4,37 +4,30 @@
 Use a relational database for canonical structured records. Preserve provenance and verification state. Real sourced data is primary; demo/test data is labelled and separated. Support all eight Northeast states even if initial collection starts in Nagaland. Preserve history and last-known-good data.
 
 ## Core domains
-**Geography:** state, district, locality, address, campus coordinates and optional route metadata.
+- **Geography:** state, district, locality, address, campus coordinates and optional route metadata.
+- **Education catalogue:** institution, campus, affiliation/recognition facts, course/programme, course offering, field, pathway, qualification relationships, examination, eligibility/application information and scholarship/scheme.
+- **Student context:** account, stage, relevant interests/activities/subjects/skills/preferences, Guided Explorer session and answers, consent/privacy metadata. Collect only what is necessary.
+- **Source governance:** source registry, fetch/check run, source document/version, extracted candidate/change, review decision, publication state and audit event.
+- **AI support:** knowledge document/version/chunks/index metadata, retrieval references, recommendation run/evidence and privacy-safe response trace where appropriate.
 
-**Education catalogue:** institution, campus, affiliation/recognition facts, course/programme, course offering, field, pathway, qualification relationships, examination, eligibility/application information, scholarship and scheme. Keep general institution profile separate from institution-course offering.
+## Entity relationship principles
+- Institution has one or more campuses; a campus belongs to one institution.
+- Course/programme is a catalogue entity; a course offering connects a course to a specific campus/institution and may carry its own dates, fees, mode and eligibility.
+- Field-to-course, pathway-to-qualification and examination/scholarship eligibility should use explicit relationships where needed, not duplicated free-text lists.
+- Source records can support multiple entities and individual time-sensitive fields.
+- Student answers and recommendation evidence should reference stable IDs and versions, with privacy-aware retention.
+- RAG documents/chunks are separate from canonical structured catalogue entities.
 
-**Student context:** account, stage, relevant interests/activities/subjects/skills/preferences, Guided Explorer session and answers, consent/privacy metadata. Collect only what is necessary.
-
-**Source governance:** source registry, fetch/check run, source document/version, extracted candidate/change, review decision, publication state and audit event.
-
-**AI support:** knowledge document/version/chunks/index metadata, retrieval references, recommendation run/evidence and privacy-safe response trace where appropriate.
+This is a domain outline, not a final physical schema. Confirm table names, cardinality, constraints and migrations during implementation review.
 
 ## Provenance
-Relevant records should support:
-- Data classification: real, demo or test.
-- Source ID/name/URL and source publication/effective date where known.
-- Last checked and last verified timestamps.
-- Verification state and reviewer.
-- Publication state and timestamp.
-- Created/updated timestamps and actor.
-- Version/change history.
-
-A record may have multiple sources. Time-sensitive fields such as fees, admission dates and scholarship deadlines may need field-level source and checked-date metadata.
+Relevant records should support data classification (real/demo/test); source ID/name/URL; source publication/effective date where known; last checked and last verified timestamps; verification state and reviewer; publication state and timestamp; created/updated timestamps and actor; and version/change history. A record may have multiple sources. Time-sensitive fields such as fees, admission dates and scholarship deadlines may need field-level source and checked-date metadata.
 
 ## Status model
 Verification states may include awaiting review, verified, partially verified, unverified, disputed, unavailable, not collected, expired or superseded. Publication states may include draft, in review, approved, published, archived and rejected. These are separate concepts. Publication must not imply all fields are complete/current.
 
 ## Collection methods
-Priority:
-1. Official APIs and structured government datasets.
-2. Official downloadable CSV/XLSX and public documents.
-3. Automated monitoring/extraction from permitted official pages.
-4. Admin-assisted manual entry/import from prospectuses, circulars and notices.
+Priority: official APIs and structured government datasets; official downloadable CSV/XLSX and public documents; automated monitoring/extraction from permitted official pages; and admin-assisted manual entry/import from prospectuses, circulars and notices.
 
 Do not rely on search snippets as authoritative data. Do not bypass logins, access controls, anti-bot protections or website terms. Retain source URLs and retrieval metadata. Store source copies only where legally and technically appropriate.
 
@@ -54,7 +47,7 @@ Schedules are configurable per source and category. Suggested starting defaults:
 | Knowledge-base source updates | Weekly | Event-triggered where possible |
 | General field descriptions | Every 6–12 months | On substantive change |
 
-These are operational starting points, not claims about how often sources publish. Tune for observed source behaviour, urgency, rate limits and cost. Use feeds/notifications where available.
+These are operational starting points, not claims about how often sources publish. Tune for observed source behaviour, urgency, rate limits and cost.
 
 ## Update pipeline
 1. Register source, authority, allowed method, categories and schedule.
@@ -73,7 +66,7 @@ These are operational starting points, not claims about how often sources publis
 A failed request, empty parse or changed page layout must never delete or replace valid published data.
 
 ## Import workflow
-CSV/XLSX imports need templates, upload restrictions, preview, column mapping, row-level errors, required-field and relationship checks, duplicate detection, source/classification requirements, dry-run, import summary and audit record. Imports enter draft/review, not automatic publication.
+CSV/XLSX imports need templates, preview, column mapping, row-level errors, required-field and relationship checks, duplicate detection, source/classification requirements, dry-run, import summary and audit record. Imports enter draft/review, not automatic publication.
 
 ## RAG document lifecycle
 Preserve title, source organisation/URL, document type/topic, publication date, retrieval date, version/content hash, superseded relationship and extraction/indexing status. When an approved source changes, create a new version, reprocess and update retrieval indexes. Keep enough history to explain which version supported an answer. Do not retrieve superseded material as current guidance.

@@ -1,22 +1,31 @@
-<!-- BEGIN:nextjs-agent-rules -->
+# CareerBridge — Agent Instructions
 
-## This is NOT the Next.js you know
+## Source of truth
+Read `docs/project-foundation/README.md` and the relevant foundation documents before product, architecture, data, AI or navigation changes. The agreed project plan is the source of truth. Preserve compatible code and realign conflicting implementation after inspection; do not change the vision merely to fit accidental implementation.
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+## Product rules
+- **Guide, don't decide:** no deterministic career predictions, “best career” verdicts, forced paths or student-facing fit percentages.
+- Current stage scope is Class 10 and Class 12. Capture stage at the appropriate discovery/onboarding point and reuse it.
+- Institution discovery targets all eight Northeast states. Initial real collection may begin in Nagaland.
+- Independent browsing and Guided Explorer lead to the shared Explore experience.
+- Guided Explorer is self-guided reflection, not human counselling.
+- Personalised explanations must use traceable student-answer and catalogue evidence.
+- Real sourced data is primary; label and separate demo/test records.
+- Never invent institutions, courses, fees, eligibility, deadlines, sources or implementation status.
+- Admin/data governance, hybrid recommendation, LLM + RAG, explainability and location data are core architecture responsibilities.
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+## Privacy and security
+Students may be minors. Minimise personal data, define purpose and retention, protect private student records, enforce server-side authorization, keep secrets server-side and treat retrieved documents as untrusted input.
 
-<!-- END:nextjs-agent-rules -->
+## Engineering workflow
+- Inspect relevant routes, components, dependencies, APIs, data contracts and tests before editing.
+- Read the installed Next.js guidance before changing Next.js conventions; the installed version may differ from older examples.
+- Keep UI separate from scraping, recommendation logic, source validation and AI orchestration.
+- Imports and scraped changes must be validated/reviewed before publication.
+- Preserve last-known-good published data when ingestion fails.
+- Build end-to-end vertical slices across Admin, publication and student consumption.
+- Test relevant success, empty, loading, error, recovery, permission, keyboard and responsive states.
+- Report exactly which checks were run; never claim unrun tests passed.
 
-## CareerBridge product rules
-
-- Preserve the mission: help Class 10 and Class 12 students, initially in Nagaland, explore career and education possibilities; guide, do not decide.
-- Keep independent browsing available without counselling or account creation.
-- Treat product flows, navigation, persistence, catalogue coverage, and technical choices as provisional until approved or supported by evidence.
-- Do not invent catalogue facts, current requirements, sources, student outcomes, or persistence behavior. Unknown data stays unknown.
-- Keep self-guided reflection distinct from any human counselling service. Do not promise human support or AI until operational and privacy decisions are approved.
-- Minimize student data, especially because users may be minors. Do not add collection, accounts, or persistence before the relevant privacy and retention decisions.
-- Build complete, accessible vertical slices; test mobile, keyboard, error, empty, and recovery states.
-- Keep page layouts full-width on large screens with responsive gutters; constrain long text for readability rather than narrowing the whole page.
-- The legacy project is reference-only and must not be modified as part of this rebuild.
-- Use [docs/UI_UX_IMPROVEMENT_GUIDE.md](docs/UI_UX_IMPROVEMENT_GUIDE.md) as an ongoing, non-rigid reference for relevant UX guidance and usability improvements; keep changes within the user's scope and follow the privacy rules above.
+## UX reference
+Use `docs/UI_UX_IMPROVEMENT_GUIDE.md` as a flexible reference. Apply only what fits the page and task. Do not invent requirements or unrelated features.

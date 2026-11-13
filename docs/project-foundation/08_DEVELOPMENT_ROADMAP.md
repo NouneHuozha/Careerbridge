@@ -6,7 +6,7 @@ Build the complete core system from the beginning. Milestones manage complexity 
 ## Stage 0 — Documentation and repository audit
 Inventory routes, components, data sources, APIs, tables, dependencies and tests. Compare them with target flows/requirements. Classify each area as keep, adjust, rebuild, missing or needs verification. Identify stale docs and contradictory instructions. Confirm environment/deployment constraints.
 
-**Exit:** agreed requirements and traceable implementation-gap list. Do not claim a feature works without evidence.
+**Exit:** agreed requirements and traceable implementation-gap list.
 
 ## Stage 1 — Core foundation
 Confirm database/migration strategy; define domain entities and relationships; establish student/admin identity and server-side authorization; define API/service conventions; source provenance, verification and publication states; audit events and background-job interfaces; and contracts for recommender, LLM, RAG, XAI and location.
@@ -39,9 +39,6 @@ Realign Discover/results, Guided Explorer/completion, shared Explore, fields, co
 
 ## Stage 8 — Testing and evaluation
 Unit tests for domain/validation; integration tests for APIs, permissions, ingestion and publication; end-to-end student/admin journeys; data-quality/source-change tests; RAG retrieval/citation and unsupported-answer tests; recommender/explanation evaluation; accessibility, performance and security checks; student usability evaluation with consent.
-
-## Sequencing
-Do not repair the entire frontend as a preliminary project and do not build Admin in isolation. Audit and design first, establish backend foundations, then complete vertical slices in which Admin entry, verification, publication and student consumption work together. AI architecture and contracts are foundational and AI implementation proceeds alongside data foundations.
 
 ## Definition of done
 A module is complete only when requirements, data model, permissions, validation, source/freshness behaviour, empty/error states, integration and tests are addressed. A visually complete page backed by unverified hardcoded records is not a completed data feature.

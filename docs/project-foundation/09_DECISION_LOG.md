@@ -18,13 +18,13 @@ Durable decisions from project planning. Append new decisions with date, context
 **Decision:** Student-facing name is Guided Explorer; optional self-guided experience, not human counselling. Completion leads to shared Explore with answer evidence.
 
 ## D-006 — Shared Explore
-**Decision:** Independent browsing and Guided Explorer both lead to /explore. Guided context enriches the shared experience; it does not create a separate dead end.
+**Decision:** Independent browsing and Guided Explorer both lead to `/explore`. Guided context enriches the shared experience; it does not create a separate dead end.
 
 ## D-007 — Simplified field exploration
 **Decision:** Broad field selection leads to an understandable overview and next actions (Courses, Institutions, Pathways), not an overwhelming narrow-subfield grid. Reuse shared field data.
 
 ## D-008 — Course catalogue
-**Decision:** /explore/courses/catalog is the canonical shared catalogue direction, with optional field and stage context. Avoid duplicate catalogue experiences.
+**Decision:** `/explore/courses/catalog` is the canonical shared catalogue direction, with optional field and stage context. Avoid duplicate catalogue experiences.
 
 ## D-009 — Institution profile versus offering
 **Decision:** General institution profile and course-specific offering are distinct. Model institution/campus separately from course offering.
@@ -55,6 +55,9 @@ Durable decisions from project planning. Append new decisions with date, context
 
 ## D-018 — Honest implementation status
 **Decision:** Target requirements, observed code and tested behaviour are distinct. Do not claim implementation or test success without evidence.
+
+## D-019 — Documentation authority
+**Decision:** This project-foundation folder is the current product/engineering baseline. The UX guide is a supporting reference. Older conflicting planning documents are retired.
 
 ## Adding a decision
 ### D-XXX — Short title
