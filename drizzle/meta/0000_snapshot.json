@@ -1,5 +1,5 @@
 {
-  "id": "219c6693-16ee-4424-af62-eb732ad4fe63",
+  "id": "72816bef-137d-4c95-8dac-57c86a5334ee",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -545,6 +545,19 @@
           "primaryKey": false,
           "notNull": true
         },
+        "claim_key": {
+          "name": "claim_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
         "checked_at": {
           "name": "checked_at",
           "type": "timestamp with time zone",
@@ -614,13 +627,18 @@
           "name": "catalog_revision_sources_pk",
           "columns": [
             "revision_id",
-            "source_id"
+            "source_id",
+            "claim_key"
           ]
         }
       },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
+        "catalog_revision_sources_claim_key_check": {
+          "name": "catalog_revision_sources_claim_key_check",
+          "value": "\"catalog_revision_sources\".\"claim_key\" <> ''"
+        },
         "catalog_revision_sources_verification_check": {
           "name": "catalog_revision_sources_verification_check",
           "value": "\"catalog_revision_sources\".\"verification_status\" IS NULL OR \"catalog_revision_sources\".\"verification_status\" IN ('not_collected', 'unverified', 'pending_review', 'verified', 'partially_verified', 'disputed', 'unavailable', 'stale', 'expired', 'superseded')"
@@ -662,8 +680,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "offering_content": {
-          "name": "offering_content",
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "offering_details": {
+          "name": "offering_details",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
@@ -763,9 +787,13 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "course_offering_revisions_content_object_check": {
-          "name": "course_offering_revisions_content_object_check",
-          "value": "jsonb_typeof(\"course_offering_revisions\".\"offering_content\") = 'object'"
+        "course_offering_revisions_slug_check": {
+          "name": "course_offering_revisions_slug_check",
+          "value": "\"course_offering_revisions\".\"slug\" <> ''"
+        },
+        "course_offering_revisions_details_object_check": {
+          "name": "course_offering_revisions_details_object_check",
+          "value": "jsonb_typeof(\"course_offering_revisions\".\"offering_details\") = 'object'"
         }
       },
       "isRLSEnabled": false
@@ -798,12 +826,33 @@
           "primaryKey": false,
           "notNull": true
         },
-        "study_stages": {
-          "name": "study_stages",
-          "type": "jsonb",
+        "stages": {
+          "name": "stages",
+          "type": "text[]",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "ARRAY[]::text[]"
+        },
+        "entry_after_class10": {
+          "name": "entry_after_class10",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "entry_after_class12": {
+          "name": "entry_after_class12",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "is_exploration_category": {
+          "name": "is_exploration_category",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "course_content": {
           "name": "course_content",
@@ -883,9 +932,9 @@
           "name": "course_revisions_qualification_check",
           "value": "\"course_revisions\".\"qualification\" IN ('Higher secondary', 'Degree', 'Diploma', 'Certificate', 'Vocational', 'Professional', 'Skill training')"
         },
-        "course_revisions_stages_array_check": {
-          "name": "course_revisions_stages_array_check",
-          "value": "jsonb_typeof(\"course_revisions\".\"study_stages\") = 'array'"
+        "course_revisions_stages_check": {
+          "name": "course_revisions_stages_check",
+          "value": "\"course_revisions\".\"stages\" <@ ARRAY['class-10', 'class-12']::text[]"
         },
         "course_revisions_content_object_check": {
           "name": "course_revisions_content_object_check",
@@ -912,17 +961,49 @@
         },
         "stages": {
           "name": "stages",
-          "type": "jsonb",
+          "type": "text[]",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "ARRAY[]::text[]"
         },
-        "examination_content": {
-          "name": "examination_content",
-          "type": "jsonb",
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "programmes": {
+          "name": "programmes",
+          "type": "text[]",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{}'::jsonb"
+          "default": "ARRAY[]::text[]"
+        },
+        "authority": {
+          "name": "authority",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "regions": {
+          "name": "regions",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "ARRAY[]::text[]"
+        },
+        "fields": {
+          "name": "fields",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "ARRAY[]::text[]"
+        },
+        "official_url": {
+          "name": "official_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -949,13 +1030,9 @@
           "name": "examination_revisions_level_check",
           "value": "\"examination_revisions\".\"level\" IN ('national', 'state', 'institution')"
         },
-        "examination_revisions_stages_array_check": {
-          "name": "examination_revisions_stages_array_check",
-          "value": "jsonb_typeof(\"examination_revisions\".\"stages\") = 'array'"
-        },
-        "examination_revisions_content_object_check": {
-          "name": "examination_revisions_content_object_check",
-          "value": "jsonb_typeof(\"examination_revisions\".\"examination_content\") = 'object'"
+        "examination_revisions_stages_check": {
+          "name": "examination_revisions_stages_check",
+          "value": "\"examination_revisions\".\"stages\" <@ ARRAY['class-10', 'class-12']::text[]"
         }
       },
       "isRLSEnabled": false
@@ -1015,6 +1092,18 @@
           "primaryKey": true,
           "notNull": true
         },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "initials": {
+          "name": "initials",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "institution_type": {
           "name": "institution_type",
           "type": "text",
@@ -1035,7 +1124,23 @@
           "default": "'{}'::jsonb"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "institution_revisions_slug_idx": {
+          "name": "institution_revisions_slug_idx",
+          "columns": [
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "institution_revisions_revision_id_catalog_item_revisions_id_fk": {
           "name": "institution_revisions_revision_id_catalog_item_revisions_id_fk",
@@ -1055,6 +1160,14 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
+        "institution_revisions_slug_check": {
+          "name": "institution_revisions_slug_check",
+          "value": "\"institution_revisions\".\"slug\" <> ''"
+        },
+        "institution_revisions_initials_check": {
+          "name": "institution_revisions_initials_check",
+          "value": "\"institution_revisions\".\"initials\" <> ''"
+        },
         "institution_revisions_type_check": {
           "name": "institution_revisions_type_check",
           "value": "\"institution_revisions\".\"institution_type\" IN ('College', 'University', 'Institute', 'School', 'Training centre')"
@@ -1092,8 +1205,20 @@
           "primaryKey": false,
           "notNull": true
         },
-        "pathway_content": {
-          "name": "pathway_content",
+        "catalogue_group": {
+          "name": "catalogue_group",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "route_content": {
+          "name": "route_content",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
@@ -1128,9 +1253,17 @@
           "name": "pathway_revisions_course_stage_check",
           "value": "\"pathway_revisions\".\"course_stage\" IN ('class-10', 'class-12')"
         },
-        "pathway_revisions_content_object_check": {
-          "name": "pathway_revisions_content_object_check",
-          "value": "jsonb_typeof(\"pathway_revisions\".\"pathway_content\") = 'object'"
+        "pathway_revisions_catalogue_group_check": {
+          "name": "pathway_revisions_catalogue_group_check",
+          "value": "\"pathway_revisions\".\"catalogue_group\" <> ''"
+        },
+        "pathway_revisions_category_check": {
+          "name": "pathway_revisions_category_check",
+          "value": "\"pathway_revisions\".\"category\" <> ''"
+        },
+        "pathway_revisions_route_content_object_check": {
+          "name": "pathway_revisions_route_content_object_check",
+          "value": "jsonb_typeof(\"pathway_revisions\".\"route_content\") = 'object'"
         }
       },
       "isRLSEnabled": false
@@ -1145,11 +1278,36 @@
           "primaryKey": true,
           "notNull": true
         },
-        "status": {
-          "name": "status",
+        "category": {
+          "name": "category",
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "support": {
+          "name": "support",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "study_levels": {
+          "name": "study_levels",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "ARRAY[]::text[]"
         },
         "eligibility_regions": {
           "name": "eligibility_regions",
@@ -1157,8 +1315,20 @@
           "primaryKey": false,
           "notNull": true
         },
-        "scholarship_content": {
-          "name": "scholarship_content",
+        "scholarship_status": {
+          "name": "scholarship_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "official_url": {
+          "name": "official_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "detail": {
+          "name": "detail",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
@@ -1185,17 +1355,25 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
+        "scholarship_revisions_category_check": {
+          "name": "scholarship_revisions_category_check",
+          "value": "\"scholarship_revisions\".\"category\" <> ''"
+        },
+        "scholarship_revisions_study_levels_check": {
+          "name": "scholarship_revisions_study_levels_check",
+          "value": "\"scholarship_revisions\".\"study_levels\" <@ ARRAY['school', 'higher-secondary', 'diploma-iti', 'undergraduate', 'postgraduate', 'research-other']::text[]"
+        },
         "scholarship_revisions_status_check": {
           "name": "scholarship_revisions_status_check",
-          "value": "\"scholarship_revisions\".\"status\" IN ('open', 'upcoming', 'closed', 'unknown')"
+          "value": "\"scholarship_revisions\".\"scholarship_status\" IN ('open', 'upcoming', 'closed', 'unknown')"
         },
         "scholarship_revisions_eligibility_regions_check": {
           "name": "scholarship_revisions_eligibility_regions_check",
           "value": "(\"scholarship_revisions\".\"eligibility_regions\" = '\"all\"'::jsonb) OR jsonb_typeof(\"scholarship_revisions\".\"eligibility_regions\") = 'array'"
         },
-        "scholarship_revisions_content_object_check": {
-          "name": "scholarship_revisions_content_object_check",
-          "value": "jsonb_typeof(\"scholarship_revisions\".\"scholarship_content\") = 'object'"
+        "scholarship_revisions_detail_object_check": {
+          "name": "scholarship_revisions_detail_object_check",
+          "value": "jsonb_typeof(\"scholarship_revisions\".\"detail\") = 'object'"
         }
       },
       "isRLSEnabled": false
@@ -1211,8 +1389,26 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "name": {
-          "name": "name",
+        "source_name": {
+          "name": "source_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "authority": {
+          "name": "authority",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "canonical_url": {
+          "name": "canonical_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "category": {
+          "name": "category",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -1223,18 +1419,31 @@
           "primaryKey": false,
           "notNull": true
         },
+        "data_types": {
+          "name": "data_types",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "ARRAY[]::text[]"
+        },
+        "terms_notes": {
+          "name": "terms_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expected_update_behavior": {
+          "name": "expected_update_behavior",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "default": "'active'"
-        },
-        "canonical_url": {
-          "name": "canonical_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "normalized_url": {
           "name": "normalized_url",
@@ -1297,6 +1506,18 @@
           "name": "source_registry_type_check",
           "value": "\"source_registry\".\"source_type\" IN ('official_api', 'structured_government_dataset', 'official_download', 'official_public_web_page', 'admin_manual_entry')"
         },
+        "source_registry_name_check": {
+          "name": "source_registry_name_check",
+          "value": "\"source_registry\".\"source_name\" <> ''"
+        },
+        "source_registry_category_check": {
+          "name": "source_registry_category_check",
+          "value": "\"source_registry\".\"category\" <> ''"
+        },
+        "source_registry_authority_check": {
+          "name": "source_registry_authority_check",
+          "value": "\"source_registry\".\"authority\" IS NULL OR \"source_registry\".\"authority\" <> ''"
+        },
         "source_registry_status_check": {
           "name": "source_registry_status_check",
           "value": "\"source_registry\".\"status\" IN ('active', 'paused', 'retired')"
@@ -1319,6 +1540,12 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "country_code": {
           "name": "country_code",
           "type": "text",
@@ -1336,6 +1563,13 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
+        "states_code_unique": {
+          "name": "states_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code"
+          ]
+        },
         "states_country_name_unique": {
           "name": "states_country_name_unique",
           "nullsNotDistinct": false,
@@ -1393,11 +1627,11 @@
       "checkConstraints": {
         "discover_answers_schema_version_check": {
           "name": "discover_answers_schema_version_check",
-          "value": "\"discover_answers\".\"schema_version\" = 1"
+          "value": "\"discover_answers\".\"schema_version\" >= 1"
         },
         "discover_answers_shape_check": {
           "name": "discover_answers_shape_check",
-          "value": "jsonb_typeof(\"discover_answers\".\"answers\") = 'object'\n          AND \"discover_answers\".\"answers\" ? 'activityIds'\n          AND \"discover_answers\".\"answers\" - 'activityIds' = '{}'::jsonb\n          AND jsonb_typeof(\"discover_answers\".\"answers\"->'activityIds') = 'array'\n          AND jsonb_array_length(\"discover_answers\".\"answers\"->'activityIds') <= 3"
+          "value": "jsonb_typeof(\"discover_answers\".\"answers\") = 'object'\n          AND \"discover_answers\".\"answers\" ? 'activityIds'\n          AND jsonb_typeof(\"discover_answers\".\"answers\"->'activityIds') = 'array'\n          AND jsonb_array_length(\"discover_answers\".\"answers\"->'activityIds') <= 3"
         }
       },
       "isRLSEnabled": false
@@ -1417,12 +1651,6 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
-        },
-        "context_key": {
-          "name": "context_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "context": {
           "name": "context",
@@ -1501,11 +1729,10 @@
       "uniqueConstraints": {
         "exploration_history_identity_unique": {
           "name": "exploration_history_identity_unique",
-          "nullsNotDistinct": true,
+          "nullsNotDistinct": false,
           "columns": [
             "user_id",
-            "catalog_item_id",
-            "context_key"
+            "catalog_item_id"
           ]
         }
       },
@@ -1546,10 +1773,10 @@
         },
         "option_ids": {
           "name": "option_ids",
-          "type": "jsonb",
+          "type": "text[]",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "ARRAY[]::text[]"
         },
         "original_text": {
           "name": "original_text",
@@ -1623,7 +1850,7 @@
         },
         "guided_explorer_answers_option_ids_check": {
           "name": "guided_explorer_answers_option_ids_check",
-          "value": "jsonb_typeof(\"guided_explorer_answers\".\"option_ids\") = 'array' AND jsonb_array_length(\"guided_explorer_answers\".\"option_ids\") <= 20"
+          "value": "cardinality(\"guided_explorer_answers\".\"option_ids\") <= 20"
         },
         "guided_explorer_answers_interpretation_check": {
           "name": "guided_explorer_answers_interpretation_check",
@@ -1631,7 +1858,7 @@
         },
         "guided_explorer_answers_response_state_check": {
           "name": "guided_explorer_answers_response_state_check",
-          "value": "\"guided_explorer_answers\".\"response_state\" IN ('answered', 'unsure', 'none', 'skip')"
+          "value": "\"guided_explorer_answers\".\"response_state\" IN ('answered', 'unsure', 'none', 'declined')"
         }
       },
       "isRLSEnabled": false
@@ -1923,12 +2150,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "context_key": {
-          "name": "context_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "context": {
           "name": "context",
           "type": "jsonb",
@@ -1978,11 +2199,10 @@
       "uniqueConstraints": {
         "saved_items_identity_unique": {
           "name": "saved_items_identity_unique",
-          "nullsNotDistinct": true,
+          "nullsNotDistinct": false,
           "columns": [
             "user_id",
-            "catalog_item_id",
-            "context_key"
+            "catalog_item_id"
           ]
         }
       },

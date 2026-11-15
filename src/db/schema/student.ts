@@ -34,17 +34,18 @@ export const discoverAnswers = pgTable(
   "discover_answers",
   {
     userId: integer("user_id").primaryKey(),
-    answers: jsonb("answers").$type<{ activityIds: string[] }>().notNull(),
+    answers: jsonb("answers")
+      .$type<Record<string, unknown> & { activityIds: string[] }>()
+      .notNull(),
     schemaVersion: integer("schema_version").notNull().default(1),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    check("discover_answers_schema_version_check", sql`${table.schemaVersion} = 1`),
+    check("discover_answers_schema_version_check", sql`${table.schemaVersion} >= 1`),
     check(
       "discover_answers_shape_check",
       sql`jsonb_typeof(${table.answers}) = 'object'
           AND ${table.answers} ? 'activityIds'
-          AND ${table.answers} - 'activityIds' = '{}'::jsonb
           AND jsonb_typeof(${table.answers}->'activityIds') = 'array'
           AND jsonb_array_length(${table.answers}->'activityIds') <= 3`,
     ),
@@ -148,7 +149,7 @@ export const guidedExplorerAnswers = pgTable(
     id: text("id").primaryKey(),
     sessionId: text("session_id").notNull(),
     questionId: text("question_id").notNull(),
-    optionIds: jsonb("option_ids").$type<string[]>().notNull().default([]),
+    optionIds: text("option_ids").array().notNull().default(sql`ARRAY[]::text[]`),
     originalText: text("original_text").notNull().default(""),
     interpretationStatus: text("interpretation_status").notNull(),
     responseState: text("response_state").notNull(),
@@ -161,7 +162,7 @@ export const guidedExplorerAnswers = pgTable(
     check("guided_explorer_answers_id_check", sql`${table.id} <> ''`),
     check(
       "guided_explorer_answers_option_ids_check",
-      sql`jsonb_typeof(${table.optionIds}) = 'array' AND jsonb_array_length(${table.optionIds}) <= 20`,
+      sql`cardinality(${table.optionIds}) <= 20`,
     ),
     check(
       "guided_explorer_answers_interpretation_check",
@@ -169,7 +170,7 @@ export const guidedExplorerAnswers = pgTable(
     ),
     check(
       "guided_explorer_answers_response_state_check",
-      sql`${table.responseState} IN ('answered', 'unsure', 'none', 'skip')`,
+      sql`${table.responseState} IN ('answered', 'unsure', 'none', 'declined')`,
     ),
   ],
 );
@@ -181,14 +182,11 @@ export const savedItems = pgTable(
     catalogItemId: uuid("catalog_item_id")
       .notNull()
       .references(() => catalogItems.id, { onDelete: "restrict" }),
-    contextKey: text("context_key"),
     context: jsonb("context").$type<Record<string, string> | null>(),
     savedAt: timestamp("saved_at", { withTimezone: true }).notNull(),
   },
   (table) => [
-    unique("saved_items_identity_unique")
-      .on(table.userId, table.catalogItemId, table.contextKey)
-      .nullsNotDistinct(),
+    unique("saved_items_identity_unique").on(table.userId, table.catalogItemId),
     index("saved_items_catalog_item_idx").on(table.catalogItemId),
     check(
       "saved_items_context_object_check",
@@ -204,15 +202,12 @@ export const explorationHistory = pgTable(
     catalogItemId: uuid("catalog_item_id")
       .notNull()
       .references(() => catalogItems.id, { onDelete: "restrict" }),
-    contextKey: text("context_key"),
     context: jsonb("context").$type<Record<string, string> | null>(),
     lastVisitedAt: timestamp("last_visited_at", { withTimezone: true }).notNull(),
     visitCount: integer("visit_count").notNull().default(1),
   },
   (table) => [
-    unique("exploration_history_identity_unique")
-      .on(table.userId, table.catalogItemId, table.contextKey)
-      .nullsNotDistinct(),
+    unique("exploration_history_identity_unique").on(table.userId, table.catalogItemId),
     index("exploration_history_catalog_item_idx").on(table.catalogItemId),
     index("exploration_history_last_visited_idx").on(table.userId, table.lastVisitedAt),
     check("exploration_history_visit_count_check", sql`${table.visitCount} >= 1`),

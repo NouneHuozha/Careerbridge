@@ -81,10 +81,13 @@ CREATE TABLE "catalog_items" (
 CREATE TABLE "catalog_revision_sources" (
 	"revision_id" uuid NOT NULL,
 	"source_id" uuid NOT NULL,
+	"claim_key" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"checked_at" timestamp with time zone,
 	"verified_at" timestamp with time zone,
 	"verification_status" text,
-	CONSTRAINT "catalog_revision_sources_pk" PRIMARY KEY("revision_id","source_id"),
+	CONSTRAINT "catalog_revision_sources_pk" PRIMARY KEY("revision_id","source_id","claim_key"),
+	CONSTRAINT "catalog_revision_sources_claim_key_check" CHECK ("catalog_revision_sources"."claim_key" <> ''),
 	CONSTRAINT "catalog_revision_sources_verification_check" CHECK ("catalog_revision_sources"."verification_status" IS NULL OR "catalog_revision_sources"."verification_status" IN ('not_collected', 'unverified', 'pending_review', 'verified', 'partially_verified', 'disputed', 'unavailable', 'stale', 'expired', 'superseded'))
 );
 --> statement-breakpoint
@@ -94,8 +97,10 @@ CREATE TABLE "course_offering_revisions" (
 	"course_revision_id" uuid NOT NULL,
 	"campus_item_id" uuid NOT NULL,
 	"campus_revision_id" uuid NOT NULL,
-	"offering_content" jsonb DEFAULT '{}'::jsonb NOT NULL,
-	CONSTRAINT "course_offering_revisions_content_object_check" CHECK (jsonb_typeof("course_offering_revisions"."offering_content") = 'object')
+	"slug" text NOT NULL,
+	"offering_details" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	CONSTRAINT "course_offering_revisions_slug_check" CHECK ("course_offering_revisions"."slug" <> ''),
+	CONSTRAINT "course_offering_revisions_details_object_check" CHECK (jsonb_typeof("course_offering_revisions"."offering_details") = 'object')
 );
 --> statement-breakpoint
 CREATE TABLE "course_revisions" (
@@ -103,21 +108,28 @@ CREATE TABLE "course_revisions" (
 	"field_item_id" uuid NOT NULL,
 	"field_revision_id" uuid NOT NULL,
 	"qualification" text NOT NULL,
-	"study_stages" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"stages" text[] DEFAULT ARRAY[]::text[] NOT NULL,
+	"entry_after_class10" text DEFAULT '' NOT NULL,
+	"entry_after_class12" text DEFAULT '' NOT NULL,
+	"is_exploration_category" boolean DEFAULT false NOT NULL,
 	"course_content" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	CONSTRAINT "course_revisions_qualification_check" CHECK ("course_revisions"."qualification" IN ('Higher secondary', 'Degree', 'Diploma', 'Certificate', 'Vocational', 'Professional', 'Skill training')),
-	CONSTRAINT "course_revisions_stages_array_check" CHECK (jsonb_typeof("course_revisions"."study_stages") = 'array'),
+	CONSTRAINT "course_revisions_stages_check" CHECK ("course_revisions"."stages" <@ ARRAY['class-10', 'class-12']::text[]),
 	CONSTRAINT "course_revisions_content_object_check" CHECK (jsonb_typeof("course_revisions"."course_content") = 'object')
 );
 --> statement-breakpoint
 CREATE TABLE "examination_revisions" (
 	"revision_id" uuid PRIMARY KEY NOT NULL,
 	"level" text NOT NULL,
-	"stages" jsonb DEFAULT '[]'::jsonb NOT NULL,
-	"examination_content" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"stages" text[] DEFAULT ARRAY[]::text[] NOT NULL,
+	"purpose" text NOT NULL,
+	"programmes" text[] DEFAULT ARRAY[]::text[] NOT NULL,
+	"authority" text NOT NULL,
+	"regions" text[] DEFAULT ARRAY[]::text[] NOT NULL,
+	"fields" text[] DEFAULT ARRAY[]::text[] NOT NULL,
+	"official_url" text,
 	CONSTRAINT "examination_revisions_level_check" CHECK ("examination_revisions"."level" IN ('national', 'state', 'institution')),
-	CONSTRAINT "examination_revisions_stages_array_check" CHECK (jsonb_typeof("examination_revisions"."stages") = 'array'),
-	CONSTRAINT "examination_revisions_content_object_check" CHECK (jsonb_typeof("examination_revisions"."examination_content") = 'object')
+	CONSTRAINT "examination_revisions_stages_check" CHECK ("examination_revisions"."stages" <@ ARRAY['class-10', 'class-12']::text[])
 );
 --> statement-breakpoint
 CREATE TABLE "field_revisions" (
@@ -128,9 +140,13 @@ CREATE TABLE "field_revisions" (
 --> statement-breakpoint
 CREATE TABLE "institution_revisions" (
 	"revision_id" uuid PRIMARY KEY NOT NULL,
+	"slug" text NOT NULL,
+	"initials" text NOT NULL,
 	"institution_type" text NOT NULL,
 	"ownership" text,
 	"institution_content" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	CONSTRAINT "institution_revisions_slug_check" CHECK ("institution_revisions"."slug" <> ''),
+	CONSTRAINT "institution_revisions_initials_check" CHECK ("institution_revisions"."initials" <> ''),
 	CONSTRAINT "institution_revisions_type_check" CHECK ("institution_revisions"."institution_type" IN ('College', 'University', 'Institute', 'School', 'Training centre')),
 	CONSTRAINT "institution_revisions_ownership_check" CHECK ("institution_revisions"."ownership" IS NULL OR "institution_revisions"."ownership" IN ('Government', 'Private', 'Public')),
 	CONSTRAINT "institution_revisions_content_object_check" CHECK (jsonb_typeof("institution_revisions"."institution_content") = 'object')
@@ -140,41 +156,63 @@ CREATE TABLE "pathway_revisions" (
 	"revision_id" uuid PRIMARY KEY NOT NULL,
 	"stage" text NOT NULL,
 	"course_stage" text NOT NULL,
-	"pathway_content" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"catalogue_group" text NOT NULL,
+	"category" text NOT NULL,
+	"route_content" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	CONSTRAINT "pathway_revisions_stage_check" CHECK ("pathway_revisions"."stage" IN ('class-10', 'class-12')),
 	CONSTRAINT "pathway_revisions_course_stage_check" CHECK ("pathway_revisions"."course_stage" IN ('class-10', 'class-12')),
-	CONSTRAINT "pathway_revisions_content_object_check" CHECK (jsonb_typeof("pathway_revisions"."pathway_content") = 'object')
+	CONSTRAINT "pathway_revisions_catalogue_group_check" CHECK ("pathway_revisions"."catalogue_group" <> ''),
+	CONSTRAINT "pathway_revisions_category_check" CHECK ("pathway_revisions"."category" <> ''),
+	CONSTRAINT "pathway_revisions_route_content_object_check" CHECK (jsonb_typeof("pathway_revisions"."route_content") = 'object')
 );
 --> statement-breakpoint
 CREATE TABLE "scholarship_revisions" (
 	"revision_id" uuid PRIMARY KEY NOT NULL,
-	"status" text NOT NULL,
+	"category" text NOT NULL,
+	"provider" text NOT NULL,
+	"purpose" text NOT NULL,
+	"support" text NOT NULL,
+	"study_levels" text[] DEFAULT ARRAY[]::text[] NOT NULL,
 	"eligibility_regions" jsonb NOT NULL,
-	"scholarship_content" jsonb DEFAULT '{}'::jsonb NOT NULL,
-	CONSTRAINT "scholarship_revisions_status_check" CHECK ("scholarship_revisions"."status" IN ('open', 'upcoming', 'closed', 'unknown')),
+	"scholarship_status" text NOT NULL,
+	"official_url" text NOT NULL,
+	"detail" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	CONSTRAINT "scholarship_revisions_category_check" CHECK ("scholarship_revisions"."category" <> ''),
+	CONSTRAINT "scholarship_revisions_study_levels_check" CHECK ("scholarship_revisions"."study_levels" <@ ARRAY['school', 'higher-secondary', 'diploma-iti', 'undergraduate', 'postgraduate', 'research-other']::text[]),
+	CONSTRAINT "scholarship_revisions_status_check" CHECK ("scholarship_revisions"."scholarship_status" IN ('open', 'upcoming', 'closed', 'unknown')),
 	CONSTRAINT "scholarship_revisions_eligibility_regions_check" CHECK (("scholarship_revisions"."eligibility_regions" = '"all"'::jsonb) OR jsonb_typeof("scholarship_revisions"."eligibility_regions") = 'array'),
-	CONSTRAINT "scholarship_revisions_content_object_check" CHECK (jsonb_typeof("scholarship_revisions"."scholarship_content") = 'object')
+	CONSTRAINT "scholarship_revisions_detail_object_check" CHECK (jsonb_typeof("scholarship_revisions"."detail") = 'object')
 );
 --> statement-breakpoint
 CREATE TABLE "source_registry" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"name" text NOT NULL,
-	"source_type" text NOT NULL,
-	"status" text DEFAULT 'active' NOT NULL,
+	"source_name" text NOT NULL,
+	"authority" text,
 	"canonical_url" text,
+	"category" text NOT NULL,
+	"source_type" text NOT NULL,
+	"data_types" text[] DEFAULT ARRAY[]::text[] NOT NULL,
+	"terms_notes" text,
+	"expected_update_behavior" text,
+	"status" text DEFAULT 'active' NOT NULL,
 	"normalized_url" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "source_registry_normalized_url_unique" UNIQUE("normalized_url"),
 	CONSTRAINT "source_registry_type_check" CHECK ("source_registry"."source_type" IN ('official_api', 'structured_government_dataset', 'official_download', 'official_public_web_page', 'admin_manual_entry')),
+	CONSTRAINT "source_registry_name_check" CHECK ("source_registry"."source_name" <> ''),
+	CONSTRAINT "source_registry_category_check" CHECK ("source_registry"."category" <> ''),
+	CONSTRAINT "source_registry_authority_check" CHECK ("source_registry"."authority" IS NULL OR "source_registry"."authority" <> ''),
 	CONSTRAINT "source_registry_status_check" CHECK ("source_registry"."status" IN ('active', 'paused', 'retired')),
 	CONSTRAINT "source_registry_url_pair_check" CHECK (("source_registry"."canonical_url" IS NULL) = ("source_registry"."normalized_url" IS NULL))
 );
 --> statement-breakpoint
 CREATE TABLE "states" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"code" text NOT NULL,
 	"country_code" text NOT NULL,
 	"name" text NOT NULL,
+	CONSTRAINT "states_code_unique" UNIQUE("code"),
 	CONSTRAINT "states_country_name_unique" UNIQUE("country_code","name"),
 	CONSTRAINT "states_country_code_check" CHECK ("states"."country_code" = 'IN')
 );
@@ -184,25 +222,20 @@ CREATE TABLE "discover_answers" (
 	"answers" jsonb NOT NULL,
 	"schema_version" integer DEFAULT 1 NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "discover_answers_schema_version_check" CHECK ("discover_answers"."schema_version" = 1),
-	CONSTRAINT "discover_answers_shape_check" CHECK (CASE
-          WHEN jsonb_typeof("discover_answers"."answers") = 'object'
-            AND "discover_answers"."answers" ? 'activityIds'
-            AND jsonb_typeof("discover_answers"."answers"->'activityIds') = 'array'
-          THEN "discover_answers"."answers" - 'activityIds' = '{}'::jsonb
-            AND jsonb_array_length("discover_answers"."answers"->'activityIds') <= 3
-          ELSE false
-        END)
+	CONSTRAINT "discover_answers_schema_version_check" CHECK ("discover_answers"."schema_version" >= 1),
+	CONSTRAINT "discover_answers_shape_check" CHECK (jsonb_typeof("discover_answers"."answers") = 'object'
+          AND "discover_answers"."answers" ? 'activityIds'
+          AND jsonb_typeof("discover_answers"."answers"->'activityIds') = 'array'
+          AND jsonb_array_length("discover_answers"."answers"->'activityIds') <= 3)
 );
 --> statement-breakpoint
 CREATE TABLE "exploration_history" (
 	"user_id" integer NOT NULL,
 	"catalog_item_id" uuid NOT NULL,
-	"context_key" text,
 	"context" jsonb,
 	"last_visited_at" timestamp with time zone NOT NULL,
 	"visit_count" integer DEFAULT 1 NOT NULL,
-	CONSTRAINT "exploration_history_identity_unique" UNIQUE NULLS NOT DISTINCT("user_id","catalog_item_id","context_key"),
+	CONSTRAINT "exploration_history_identity_unique" UNIQUE("user_id","catalog_item_id"),
 	CONSTRAINT "exploration_history_visit_count_check" CHECK ("exploration_history"."visit_count" >= 1),
 	CONSTRAINT "exploration_history_context_object_check" CHECK ("exploration_history"."context" IS NULL OR jsonb_typeof("exploration_history"."context") = 'object')
 );
@@ -211,7 +244,7 @@ CREATE TABLE "guided_explorer_answers" (
 	"id" text PRIMARY KEY NOT NULL,
 	"session_id" text NOT NULL,
 	"question_id" text NOT NULL,
-	"option_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"option_ids" text[] DEFAULT ARRAY[]::text[] NOT NULL,
 	"original_text" text DEFAULT '' NOT NULL,
 	"interpretation_status" text NOT NULL,
 	"response_state" text NOT NULL,
@@ -219,13 +252,9 @@ CREATE TABLE "guided_explorer_answers" (
 	"created_at" timestamp with time zone NOT NULL,
 	"edited_at" timestamp with time zone,
 	CONSTRAINT "guided_explorer_answers_id_check" CHECK ("guided_explorer_answers"."id" <> ''),
-	CONSTRAINT "guided_explorer_answers_option_ids_check" CHECK (CASE
-          WHEN jsonb_typeof("guided_explorer_answers"."option_ids") = 'array'
-          THEN jsonb_array_length("guided_explorer_answers"."option_ids") <= 20
-          ELSE false
-        END),
+	CONSTRAINT "guided_explorer_answers_option_ids_check" CHECK (cardinality("guided_explorer_answers"."option_ids") <= 20),
 	CONSTRAINT "guided_explorer_answers_interpretation_check" CHECK ("guided_explorer_answers"."interpretation_status" IN ('clear', 'probable', 'ambiguous', 'unrecognised')),
-	CONSTRAINT "guided_explorer_answers_response_state_check" CHECK ("guided_explorer_answers"."response_state" IN ('answered', 'unsure', 'none', 'skip'))
+	CONSTRAINT "guided_explorer_answers_response_state_check" CHECK ("guided_explorer_answers"."response_state" IN ('answered', 'unsure', 'none', 'declined'))
 );
 --> statement-breakpoint
 CREATE TABLE "guided_explorer_session_questions" (
@@ -276,10 +305,9 @@ CREATE TABLE "guided_explorer_sessions" (
 CREATE TABLE "saved_items" (
 	"user_id" integer NOT NULL,
 	"catalog_item_id" uuid NOT NULL,
-	"context_key" text,
 	"context" jsonb,
 	"saved_at" timestamp with time zone NOT NULL,
-	CONSTRAINT "saved_items_identity_unique" UNIQUE NULLS NOT DISTINCT("user_id","catalog_item_id","context_key"),
+	CONSTRAINT "saved_items_identity_unique" UNIQUE("user_id","catalog_item_id"),
 	CONSTRAINT "saved_items_context_object_check" CHECK ("saved_items"."context" IS NULL OR jsonb_typeof("saved_items"."context") = 'object')
 );
 --> statement-breakpoint
@@ -325,6 +353,7 @@ CREATE INDEX "course_offering_revisions_course_idx" ON "course_offering_revision
 CREATE INDEX "course_offering_revisions_campus_idx" ON "course_offering_revisions" USING btree ("campus_item_id","campus_revision_id");--> statement-breakpoint
 CREATE INDEX "course_revisions_field_item_idx" ON "course_revisions" USING btree ("field_item_id");--> statement-breakpoint
 CREATE INDEX "course_revisions_field_revision_idx" ON "course_revisions" USING btree ("field_revision_id");--> statement-breakpoint
+CREATE INDEX "institution_revisions_slug_idx" ON "institution_revisions" USING btree ("slug");--> statement-breakpoint
 CREATE INDEX "source_registry_type_status_idx" ON "source_registry" USING btree ("source_type","status");--> statement-breakpoint
 CREATE INDEX "exploration_history_catalog_item_idx" ON "exploration_history" USING btree ("catalog_item_id");--> statement-breakpoint
 CREATE INDEX "exploration_history_last_visited_idx" ON "exploration_history" USING btree ("user_id","last_visited_at");--> statement-breakpoint
@@ -333,18 +362,18 @@ CREATE INDEX "guided_explorer_session_questions_position_idx" ON "guided_explore
 CREATE INDEX "guided_explorer_sessions_user_idx" ON "guided_explorer_sessions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "guided_explorer_sessions_status_idx" ON "guided_explorer_sessions" USING btree ("status");--> statement-breakpoint
 CREATE UNIQUE INDEX "guided_explorer_sessions_one_current_per_user" ON "guided_explorer_sessions" USING btree ("user_id") WHERE "guided_explorer_sessions"."status" IN ('active', 'paused');--> statement-breakpoint
-CREATE INDEX "saved_items_catalog_item_idx" ON "saved_items" USING btree ("catalog_item_id");--> statement-breakpoint
+CREATE INDEX "saved_items_catalog_item_idx" ON "saved_items" USING btree ("catalog_item_id");
+--> statement-breakpoint
 -- Seed the required Northeast state identities with deterministic UUIDs.
-INSERT INTO "states" ("id", "country_code", "name") VALUES
-	('3c1a56d8-f31b-5768-b99e-79b2688a8962', 'IN', 'Arunachal Pradesh'),
-	('f9311950-b8c5-59dd-a644-9f33eb7c0249', 'IN', 'Assam'),
-	('3f2a2dc5-b111-54ab-b009-338c8bb6d047', 'IN', 'Manipur'),
-	('da0c2d15-40f1-5822-a522-4e487882766b', 'IN', 'Meghalaya'),
-	('294f5c15-2797-5a0b-804a-80967bdcfb56', 'IN', 'Mizoram'),
-	('fb7633bf-c826-53bc-88c0-961680911c80', 'IN', 'Nagaland'),
-	('c4d828f1-2d85-50e1-ba40-ff793325373b', 'IN', 'Sikkim'),
-	('d57f709b-2817-5f9c-b3e4-3086e7c9e596', 'IN', 'Tripura')
-ON CONFLICT ("country_code", "name") DO NOTHING;
+INSERT INTO "states" ("id", "code", "country_code", "name") VALUES
+	('3c1a56d8-f31b-5768-b99e-79b2688a8962', 'IN-AR', 'IN', 'Arunachal Pradesh'),
+	('f9311950-b8c5-59dd-a644-9f33eb7c0249', 'IN-AS', 'IN', 'Assam'),
+	('3f2a2dc5-b111-54ab-b009-338c8bb6d047', 'IN-MN', 'IN', 'Manipur'),
+	('da0c2d15-40f1-5822-a522-4e487882766b', 'IN-ML', 'IN', 'Meghalaya'),
+	('294f5c15-2797-5a0b-804a-80967bdcfb56', 'IN-MZ', 'IN', 'Mizoram'),
+	('fb7633bf-c826-53bc-88c0-961680911c80', 'IN-NL', 'IN', 'Nagaland'),
+	('c4d828f1-2d85-50e1-ba40-ff793325373b', 'IN-SK', 'IN', 'Sikkim'),
+	('d57f709b-2817-5f9c-b3e4-3086e7c9e596', 'IN-TR', 'IN', 'Tripura');
 --> statement-breakpoint
 -- New account-owned tables reference the existing SERIAL/INTEGER users.id.
 ALTER TABLE "student_profiles"
@@ -708,8 +737,11 @@ BEGIN
 		WHERE provenance.source_id = OLD.id
 			AND revision.publication_status = 'published'
 	) AND (
-		OLD.name IS DISTINCT FROM NEW.name
+		OLD.source_name IS DISTINCT FROM NEW.source_name
+		OR OLD.authority IS DISTINCT FROM NEW.authority
+		OR OLD.category IS DISTINCT FROM NEW.category
 		OR OLD.source_type IS DISTINCT FROM NEW.source_type
+		OR OLD.data_types IS DISTINCT FROM NEW.data_types
 		OR OLD.canonical_url IS DISTINCT FROM NEW.canonical_url
 	) THEN
 		RAISE EXCEPTION 'Source identity used by published provenance is immutable';
@@ -816,8 +848,13 @@ DECLARE
 	url_parts text[];
 	url_scheme text;
 	url_authority text;
-	url_tail text;
-	query_position integer;
+	url_host text;
+	url_port text;
+	url_path text;
+	url_query text;
+	host_parts text[];
+	port_number_text text;
+	port_number integer;
 BEGIN
 	IF raw_url IS NULL THEN
 		RETURN NULL;
@@ -825,29 +862,56 @@ BEGIN
 	IF raw_url <> btrim(raw_url) OR raw_url ~ '[[:space:]]' THEN
 		RAISE EXCEPTION 'Source URLs must not contain surrounding or embedded whitespace';
 	END IF;
+	IF position(chr(92) IN raw_url) > 0 THEN
+		RAISE EXCEPTION 'Source URLs must not contain backslashes';
+	END IF;
 
-	url_parts := regexp_match(raw_url, '^(https?)://([^/?#]+)(.*)$', 'i');
-	IF url_parts IS NULL OR url_parts[2] = '' OR url_parts[2] ~ '@' THEN
+	url_parts := regexp_match(raw_url, '^(https?)://([^/?#]+)([^?#]*)(\?[^#]*)?(#.*)?$', 'i');
+	IF url_parts IS NULL OR url_parts[2] = ''
+		OR position('@' IN url_parts[2]) > 0 THEN
 		RAISE EXCEPTION 'Source URLs must be absolute HTTP or HTTPS URLs without user information';
 	END IF;
 
 	url_scheme := lower(url_parts[1]);
-	url_authority := lower(url_parts[2]);
-	url_tail := regexp_replace(url_parts[3], '#.*$', '');
-	IF url_scheme = 'http' THEN
-		url_authority := regexp_replace(url_authority, ':80$', '');
+	url_authority := url_parts[2];
+	url_path := COALESCE(NULLIF(url_parts[3], ''), '/');
+	url_query := COALESCE(url_parts[4], '');
+
+	IF url_authority LIKE '[%' THEN
+		host_parts := regexp_match(url_authority, '^\[([0-9A-Fa-f:.]+)\](:([0-9]+))?$');
+		IF host_parts IS NULL THEN
+			RAISE EXCEPTION 'Source URL has an invalid IPv6 host or port';
+		END IF;
+		url_host := '[' || lower(host_parts[1]) || ']';
+		url_port := host_parts[3];
 	ELSE
-		url_authority := regexp_replace(url_authority, ':443$', '');
-	END IF;
-	query_position := strpos(url_tail, '?');
-	IF query_position > 0 THEN
-		url_tail := regexp_replace(left(url_tail, query_position - 1), '/+$', '')
-			|| substring(url_tail FROM query_position);
-	ELSE
-		url_tail := regexp_replace(url_tail, '/+$', '');
+		host_parts := regexp_match(url_authority, '^([A-Za-z0-9.-]+)(:([0-9]+))?$');
+		IF host_parts IS NULL OR host_parts[1] = '' THEN
+			RAISE EXCEPTION 'Source URL has an invalid hostname or port';
+		END IF;
+		url_host := lower(host_parts[1]);
+		url_port := host_parts[3];
 	END IF;
 
-	RETURN url_scheme || '://' || url_authority || url_tail;
+	IF url_port IS NOT NULL THEN
+		port_number_text := COALESCE(NULLIF(ltrim(url_port, '0'), ''), '0');
+		IF length(port_number_text) > 5 THEN
+			RAISE EXCEPTION 'Source URL port must be between 0 and 65535';
+		END IF;
+		port_number := port_number_text::integer;
+		IF port_number > 65535 THEN
+			RAISE EXCEPTION 'Source URL port must be between 0 and 65535';
+		END IF;
+		url_port := port_number::text;
+		IF (url_scheme = 'http' AND port_number = 80)
+			OR (url_scheme = 'https' AND port_number = 443) THEN
+			url_port := NULL;
+		END IF;
+	END IF;
+
+	RETURN url_scheme || '://' || url_host
+		|| CASE WHEN url_port IS NULL THEN '' ELSE ':' || url_port END
+		|| url_path || url_query;
 END;
 $$;
 --> statement-breakpoint
@@ -900,42 +964,6 @@ ALTER TABLE public.saved_items
 ALTER TABLE public.exploration_history
 	ADD CONSTRAINT exploration_history_context_shape_check
 	CHECK (public.is_valid_student_context(context));
---> statement-breakpoint
-CREATE FUNCTION public.check_student_catalog_context_key()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $$
-DECLARE
-	item_type text;
-	expected_context_key text;
-BEGIN
-	SELECT item.item_type
-	INTO item_type
-	FROM public.catalog_items AS item
-	WHERE item.id = NEW.catalog_item_id;
-
-	IF item_type IS NULL THEN
-		RAISE EXCEPTION 'Saved/history row references an unknown catalogue item %', NEW.catalog_item_id;
-	END IF;
-	IF item_type = 'course_offering' THEN
-		expected_context_key := COALESCE(NEW.context->>'courseId', '');
-		IF NEW.context_key IS DISTINCT FROM expected_context_key THEN
-			RAISE EXCEPTION 'Course-offering context_key must equal context.courseId or the empty string';
-		END IF;
-	ELSIF NEW.context_key IS NOT NULL THEN
-		RAISE EXCEPTION 'Non-offering catalogue items must use a NULL context_key';
-	END IF;
-	RETURN NEW;
-END;
-$$;
---> statement-breakpoint
-CREATE TRIGGER saved_items_context_key_check
-BEFORE INSERT OR UPDATE OF catalog_item_id, context_key, context ON public.saved_items
-FOR EACH ROW EXECUTE FUNCTION public.check_student_catalog_context_key();
---> statement-breakpoint
-CREATE TRIGGER exploration_history_context_key_check
-BEFORE INSERT OR UPDATE OF catalog_item_id, context_key, context ON public.exploration_history
-FOR EACH ROW EXECUTE FUNCTION public.check_student_catalog_context_key();
 --> statement-breakpoint
 CREATE FUNCTION public.check_catalog_alias_item_type()
 RETURNS trigger
@@ -1091,8 +1119,7 @@ resolved_aliases AS (
 )
 INSERT INTO public.catalog_items (id, item_type)
 SELECT DISTINCT catalog_item_id, item_type
-FROM resolved_aliases
-ON CONFLICT (id) DO NOTHING;
+FROM resolved_aliases;
 --> statement-breakpoint
 WITH legacy_aliases AS (
 	SELECT 'field'::text AS item_type, 'field'::text AS external_type, legacy_id AS external_key, ''::text AS external_context_key

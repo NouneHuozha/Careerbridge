@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  boolean,
   foreignKey,
   index,
   integer,
@@ -29,10 +30,12 @@ export const states = pgTable(
   "states",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    code: text("code").notNull(),
     countryCode: text("country_code").notNull(),
     name: text("name").notNull(),
   },
   (table) => [
+    unique("states_code_unique").on(table.code),
     unique("states_country_name_unique").on(table.countryCode, table.name),
     check("states_country_code_check", sql`${table.countryCode} = 'IN'`),
   ],
@@ -167,11 +170,16 @@ export const institutionRevisions = pgTable(
     revisionId: uuid("revision_id")
       .primaryKey()
       .references(() => catalogItemRevisions.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    initials: text("initials").notNull(),
     institutionType: text("institution_type").notNull(),
     ownership: text("ownership"),
     institutionContent: jsonb("institution_content").$type<JsonObject>().notNull().default({}),
   },
   (table) => [
+    index("institution_revisions_slug_idx").on(table.slug),
+    check("institution_revisions_slug_check", sql`${table.slug} <> ''`),
+    check("institution_revisions_initials_check", sql`${table.initials} <> ''`),
     check(
       "institution_revisions_type_check",
       sql`${table.institutionType} IN ('College', 'University', 'Institute', 'School', 'Training centre')`,
@@ -218,7 +226,10 @@ export const courseRevisions = pgTable(
     fieldItemId: uuid("field_item_id").notNull(),
     fieldRevisionId: uuid("field_revision_id").notNull(),
     qualification: text("qualification").notNull(),
-    studyStages: jsonb("study_stages").$type<string[]>().notNull().default([]),
+    stages: text("stages").array().notNull().default(sql`ARRAY[]::text[]`),
+    entryAfterClass10: text("entry_after_class10").notNull().default(""),
+    entryAfterClass12: text("entry_after_class12").notNull().default(""),
+    isExplorationCategory: boolean("is_exploration_category").notNull().default(false),
     courseContent: jsonb("course_content").$type<JsonObject>().notNull().default({}),
   },
   (table) => [
@@ -234,8 +245,8 @@ export const courseRevisions = pgTable(
       sql`${table.qualification} IN ('Higher secondary', 'Degree', 'Diploma', 'Certificate', 'Vocational', 'Professional', 'Skill training')`,
     ),
     check(
-      "course_revisions_stages_array_check",
-      sql`jsonb_typeof(${table.studyStages}) = 'array'`,
+      "course_revisions_stages_check",
+      sql`${table.stages} <@ ARRAY['class-10', 'class-12']::text[]`,
     ),
     check(
       "course_revisions_content_object_check",
@@ -254,7 +265,8 @@ export const courseOfferingRevisions = pgTable(
     courseRevisionId: uuid("course_revision_id").notNull(),
     campusItemId: uuid("campus_item_id").notNull(),
     campusRevisionId: uuid("campus_revision_id").notNull(),
-    offeringContent: jsonb("offering_content").$type<JsonObject>().notNull().default({}),
+    slug: text("slug").notNull(),
+    offeringDetails: jsonb("offering_details").$type<JsonObject>().notNull().default({}),
   },
   (table) => [
     foreignKey({
@@ -269,9 +281,10 @@ export const courseOfferingRevisions = pgTable(
     }).onDelete("restrict"),
     index("course_offering_revisions_course_idx").on(table.courseItemId, table.courseRevisionId),
     index("course_offering_revisions_campus_idx").on(table.campusItemId, table.campusRevisionId),
+    check("course_offering_revisions_slug_check", sql`${table.slug} <> ''`),
     check(
-      "course_offering_revisions_content_object_check",
-      sql`jsonb_typeof(${table.offeringContent}) = 'object'`,
+      "course_offering_revisions_details_object_check",
+      sql`jsonb_typeof(${table.offeringDetails}) = 'object'`,
     ),
   ],
 );
@@ -284,7 +297,9 @@ export const pathwayRevisions = pgTable(
       .references(() => catalogItemRevisions.id, { onDelete: "cascade" }),
     stage: text("stage").notNull(),
     courseStage: text("course_stage").notNull(),
-    pathwayContent: jsonb("pathway_content").$type<JsonObject>().notNull().default({}),
+    catalogueGroup: text("catalogue_group").notNull(),
+    category: text("category").notNull(),
+    routeContent: jsonb("route_content").$type<JsonObject>().notNull().default({}),
   },
   (table) => [
     check(
@@ -295,9 +310,11 @@ export const pathwayRevisions = pgTable(
       "pathway_revisions_course_stage_check",
       sql`${table.courseStage} IN ('class-10', 'class-12')`,
     ),
+    check("pathway_revisions_catalogue_group_check", sql`${table.catalogueGroup} <> ''`),
+    check("pathway_revisions_category_check", sql`${table.category} <> ''`),
     check(
-      "pathway_revisions_content_object_check",
-      sql`jsonb_typeof(${table.pathwayContent}) = 'object'`,
+      "pathway_revisions_route_content_object_check",
+      sql`jsonb_typeof(${table.routeContent}) = 'object'`,
     ),
   ],
 );
@@ -309,8 +326,13 @@ export const examinationRevisions = pgTable(
       .primaryKey()
       .references(() => catalogItemRevisions.id, { onDelete: "cascade" }),
     level: text("level").notNull(),
-    stages: jsonb("stages").$type<string[]>().notNull().default([]),
-    examinationContent: jsonb("examination_content").$type<JsonObject>().notNull().default({}),
+    stages: text("stages").array().notNull().default(sql`ARRAY[]::text[]`),
+    purpose: text("purpose").notNull(),
+    programmes: text("programmes").array().notNull().default(sql`ARRAY[]::text[]`),
+    authority: text("authority").notNull(),
+    regions: text("regions").array().notNull().default(sql`ARRAY[]::text[]`),
+    fields: text("fields").array().notNull().default(sql`ARRAY[]::text[]`),
+    officialUrl: text("official_url"),
   },
   (table) => [
     check(
@@ -318,12 +340,8 @@ export const examinationRevisions = pgTable(
       sql`${table.level} IN ('national', 'state', 'institution')`,
     ),
     check(
-      "examination_revisions_stages_array_check",
-      sql`jsonb_typeof(${table.stages}) = 'array'`,
-    ),
-    check(
-      "examination_revisions_content_object_check",
-      sql`jsonb_typeof(${table.examinationContent}) = 'object'`,
+      "examination_revisions_stages_check",
+      sql`${table.stages} <@ ARRAY['class-10', 'class-12']::text[]`,
     ),
   ],
 );
@@ -334,22 +352,36 @@ export const scholarshipRevisions = pgTable(
     revisionId: uuid("revision_id")
       .primaryKey()
       .references(() => catalogItemRevisions.id, { onDelete: "cascade" }),
-    status: text("status").notNull(),
+    category: text("category").notNull(),
+    provider: text("provider").notNull(),
+    purpose: text("purpose").notNull(),
+    support: text("support").notNull(),
+    studyLevels: text("study_levels").array().notNull().default(sql`ARRAY[]::text[]`),
     eligibilityRegions: jsonb("eligibility_regions").$type<"all" | string[]>().notNull(),
-    scholarshipContent: jsonb("scholarship_content").$type<JsonObject>().notNull().default({}),
+    scholarshipStatus: text("scholarship_status").notNull(),
+    officialUrl: text("official_url").notNull(),
+    detail: jsonb("detail").$type<JsonObject>().notNull().default({}),
   },
   (table) => [
     check(
+      "scholarship_revisions_category_check",
+      sql`${table.category} <> ''`,
+    ),
+    check(
+      "scholarship_revisions_study_levels_check",
+      sql`${table.studyLevels} <@ ARRAY['school', 'higher-secondary', 'diploma-iti', 'undergraduate', 'postgraduate', 'research-other']::text[]`,
+    ),
+    check(
       "scholarship_revisions_status_check",
-      sql`${table.status} IN ('open', 'upcoming', 'closed', 'unknown')`,
+      sql`${table.scholarshipStatus} IN ('open', 'upcoming', 'closed', 'unknown')`,
     ),
     check(
       "scholarship_revisions_eligibility_regions_check",
       sql`(${table.eligibilityRegions} = '"all"'::jsonb) OR jsonb_typeof(${table.eligibilityRegions}) = 'array'`,
     ),
     check(
-      "scholarship_revisions_content_object_check",
-      sql`jsonb_typeof(${table.scholarshipContent}) = 'object'`,
+      "scholarship_revisions_detail_object_check",
+      sql`jsonb_typeof(${table.detail}) = 'object'`,
     ),
   ],
 );
@@ -358,10 +390,15 @@ export const sourceRegistry = pgTable(
   "source_registry",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    name: text("name").notNull(),
-    sourceType: text("source_type").notNull(),
-    status: text("status").notNull().default("active"),
+    sourceName: text("source_name").notNull(),
+    authority: text("authority"),
     canonicalUrl: text("canonical_url"),
+    category: text("category").notNull(),
+    sourceType: text("source_type").notNull(),
+    dataTypes: text("data_types").array().notNull().default(sql`ARRAY[]::text[]`),
+    termsNotes: text("terms_notes"),
+    expectedUpdateBehavior: text("expected_update_behavior"),
+    status: text("status").notNull().default("active"),
     normalizedUrl: text("normalized_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -372,6 +409,12 @@ export const sourceRegistry = pgTable(
     check(
       "source_registry_type_check",
       sql`${table.sourceType} IN ('official_api', 'structured_government_dataset', 'official_download', 'official_public_web_page', 'admin_manual_entry')`,
+    ),
+    check("source_registry_name_check", sql`${table.sourceName} <> ''`),
+    check("source_registry_category_check", sql`${table.category} <> ''`),
+    check(
+      "source_registry_authority_check",
+      sql`${table.authority} IS NULL OR ${table.authority} <> ''`,
     ),
     check(
       "source_registry_status_check",
@@ -393,6 +436,8 @@ export const catalogRevisionSources = pgTable(
     sourceId: uuid("source_id")
       .notNull()
       .references(() => sourceRegistry.id, { onDelete: "restrict" }),
+    claimKey: text("claim_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     checkedAt: timestamp("checked_at", { withTimezone: true }),
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
     verificationStatus: text("verification_status"),
@@ -400,9 +445,10 @@ export const catalogRevisionSources = pgTable(
   (table) => [
     primaryKey({
       name: "catalog_revision_sources_pk",
-      columns: [table.revisionId, table.sourceId],
+      columns: [table.revisionId, table.sourceId, table.claimKey],
     }),
     index("catalog_revision_sources_source_idx").on(table.sourceId),
+    check("catalog_revision_sources_claim_key_check", sql`${table.claimKey} <> ''`),
     check(
       "catalog_revision_sources_verification_check",
       sql`${table.verificationStatus} IS NULL OR ${table.verificationStatus} IN ('not_collected', 'unverified', 'pending_review', 'verified', 'partially_verified', 'disputed', 'unavailable', 'stale', 'expired', 'superseded')`,
