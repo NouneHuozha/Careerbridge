@@ -1,5 +1,5 @@
 {
-  "id": "72816bef-137d-4c95-8dac-57c86a5334ee",
+  "id": "c4382d50-2d61-40f7-86e7-c5890a46e27d",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -549,7 +549,8 @@
           "name": "claim_key",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "''"
         },
         "created_at": {
           "name": "created_at",
@@ -635,10 +636,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "catalog_revision_sources_claim_key_check": {
-          "name": "catalog_revision_sources_claim_key_check",
-          "value": "\"catalog_revision_sources\".\"claim_key\" <> ''"
-        },
         "catalog_revision_sources_verification_check": {
           "name": "catalog_revision_sources_verification_check",
           "value": "\"catalog_revision_sources\".\"verification_status\" IS NULL OR \"catalog_revision_sources\".\"verification_status\" IN ('not_collected', 'unverified', 'pending_review', 'verified', 'partially_verified', 'disputed', 'unavailable', 'stale', 'expired', 'superseded')"
@@ -1290,12 +1287,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "purpose": {
-          "name": "purpose",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "support": {
           "name": "support",
           "type": "text",
@@ -1325,7 +1316,7 @@
           "name": "official_url",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "detail": {
           "name": "detail",
@@ -1548,7 +1539,7 @@
         },
         "country_code": {
           "name": "country_code",
-          "type": "text",
+          "type": "char(2)",
           "primaryKey": false,
           "notNull": true
         },

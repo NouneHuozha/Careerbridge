@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   boolean,
+  char,
   foreignKey,
   index,
   integer,
@@ -31,7 +32,7 @@ export const states = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     code: text("code").notNull(),
-    countryCode: text("country_code").notNull(),
+    countryCode: char("country_code", { length: 2 }).notNull(),
     name: text("name").notNull(),
   },
   (table) => [
@@ -354,12 +355,11 @@ export const scholarshipRevisions = pgTable(
       .references(() => catalogItemRevisions.id, { onDelete: "cascade" }),
     category: text("category").notNull(),
     provider: text("provider").notNull(),
-    purpose: text("purpose").notNull(),
     support: text("support").notNull(),
     studyLevels: text("study_levels").array().notNull().default(sql`ARRAY[]::text[]`),
     eligibilityRegions: jsonb("eligibility_regions").$type<"all" | string[]>().notNull(),
     scholarshipStatus: text("scholarship_status").notNull(),
-    officialUrl: text("official_url").notNull(),
+    officialUrl: text("official_url"),
     detail: jsonb("detail").$type<JsonObject>().notNull().default({}),
   },
   (table) => [
@@ -436,7 +436,7 @@ export const catalogRevisionSources = pgTable(
     sourceId: uuid("source_id")
       .notNull()
       .references(() => sourceRegistry.id, { onDelete: "restrict" }),
-    claimKey: text("claim_key").notNull(),
+    claimKey: text("claim_key").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     checkedAt: timestamp("checked_at", { withTimezone: true }),
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
@@ -448,7 +448,6 @@ export const catalogRevisionSources = pgTable(
       columns: [table.revisionId, table.sourceId, table.claimKey],
     }),
     index("catalog_revision_sources_source_idx").on(table.sourceId),
-    check("catalog_revision_sources_claim_key_check", sql`${table.claimKey} <> ''`),
     check(
       "catalog_revision_sources_verification_check",
       sql`${table.verificationStatus} IS NULL OR ${table.verificationStatus} IN ('not_collected', 'unverified', 'pending_review', 'verified', 'partially_verified', 'disputed', 'unavailable', 'stale', 'expired', 'superseded')`,

@@ -81,13 +81,12 @@ CREATE TABLE "catalog_items" (
 CREATE TABLE "catalog_revision_sources" (
 	"revision_id" uuid NOT NULL,
 	"source_id" uuid NOT NULL,
-	"claim_key" text NOT NULL,
+	"claim_key" text DEFAULT '' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"checked_at" timestamp with time zone,
 	"verified_at" timestamp with time zone,
 	"verification_status" text,
 	CONSTRAINT "catalog_revision_sources_pk" PRIMARY KEY("revision_id","source_id","claim_key"),
-	CONSTRAINT "catalog_revision_sources_claim_key_check" CHECK ("catalog_revision_sources"."claim_key" <> ''),
 	CONSTRAINT "catalog_revision_sources_verification_check" CHECK ("catalog_revision_sources"."verification_status" IS NULL OR "catalog_revision_sources"."verification_status" IN ('not_collected', 'unverified', 'pending_review', 'verified', 'partially_verified', 'disputed', 'unavailable', 'stale', 'expired', 'superseded'))
 );
 --> statement-breakpoint
@@ -170,12 +169,11 @@ CREATE TABLE "scholarship_revisions" (
 	"revision_id" uuid PRIMARY KEY NOT NULL,
 	"category" text NOT NULL,
 	"provider" text NOT NULL,
-	"purpose" text NOT NULL,
 	"support" text NOT NULL,
 	"study_levels" text[] DEFAULT ARRAY[]::text[] NOT NULL,
 	"eligibility_regions" jsonb NOT NULL,
 	"scholarship_status" text NOT NULL,
-	"official_url" text NOT NULL,
+	"official_url" text,
 	"detail" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	CONSTRAINT "scholarship_revisions_category_check" CHECK ("scholarship_revisions"."category" <> ''),
 	CONSTRAINT "scholarship_revisions_study_levels_check" CHECK ("scholarship_revisions"."study_levels" <@ ARRAY['school', 'higher-secondary', 'diploma-iti', 'undergraduate', 'postgraduate', 'research-other']::text[]),
@@ -210,7 +208,7 @@ CREATE TABLE "source_registry" (
 CREATE TABLE "states" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"code" text NOT NULL,
-	"country_code" text NOT NULL,
+	"country_code" char(2) NOT NULL,
 	"name" text NOT NULL,
 	CONSTRAINT "states_code_unique" UNIQUE("code"),
 	CONSTRAINT "states_country_name_unique" UNIQUE("country_code","name"),
@@ -362,8 +360,7 @@ CREATE INDEX "guided_explorer_session_questions_position_idx" ON "guided_explore
 CREATE INDEX "guided_explorer_sessions_user_idx" ON "guided_explorer_sessions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "guided_explorer_sessions_status_idx" ON "guided_explorer_sessions" USING btree ("status");--> statement-breakpoint
 CREATE UNIQUE INDEX "guided_explorer_sessions_one_current_per_user" ON "guided_explorer_sessions" USING btree ("user_id") WHERE "guided_explorer_sessions"."status" IN ('active', 'paused');--> statement-breakpoint
-CREATE INDEX "saved_items_catalog_item_idx" ON "saved_items" USING btree ("catalog_item_id");
---> statement-breakpoint
+CREATE INDEX "saved_items_catalog_item_idx" ON "saved_items" USING btree ("catalog_item_id");--> statement-breakpoint
 -- Seed the required Northeast state identities with deterministic UUIDs.
 INSERT INTO "states" ("id", "code", "country_code", "name") VALUES
 	('3c1a56d8-f31b-5768-b99e-79b2688a8962', 'IN-AR', 'IN', 'Arunachal Pradesh'),
