@@ -3,6 +3,8 @@
 ## Source of truth
 Read `docs/project-foundation/README.md` and the relevant foundation documents before product, architecture, data, AI or navigation changes. The agreed project plan is the source of truth. Preserve compatible code and realign conflicting implementation after inspection; do not change the vision merely to fit accidental implementation.
 
+Use `docs/implementation/README.md` and the relevant implementation specifications for technical contracts. A documented target is not evidence that a feature is implemented or verified.
+
 ## Product rules
 - **Guide, don't decide:** no deterministic career predictions, “best career” verdicts, forced paths or student-facing fit percentages.
 - Current stage scope is Class 10 and Class 12. Capture stage at the appropriate discovery/onboarding point and reuse it.

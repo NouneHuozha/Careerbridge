@@ -1,68 +1,39 @@
 # 9. Decision Log
 
-Durable decisions from project planning. Append new decisions with date, context, decision and impact. Record replacements rather than silently rewriting history.
+This log records material decisions. New decisions must include date, status, rationale, impact and superseded decision where relevant. Do not convert an open technical choice into a confirmed decision by implication.
 
-## D-001 — Project plan is the source of truth
-**Decision:** Agreed product plan, not accidental current implementation, defines the target. Preserve compatible code; adjust/rebuild conflicting parts after audit.
+| ID | Decision | Status | Notes |
+|---|---|---|---|
+| D-001 | The approved project plan is the source of truth; code must be aligned to it. | Confirmed | Existing implementation does not redefine product scope. |
+| D-002 | Product principle is GUIDE, DON'T DECIDE. | Confirmed | No career verdicts, forced paths or unexplained match authority. |
+| D-003 | Current student stage scope is Class 10 and Class 12. | Confirmed | Do not add result-status variants without approval. |
+| D-004 | Current active student flow is User 1, the unsure student. | Confirmed | User 2/3 are outside current active scope. |
+| D-005 | Guided Explorer is optional, self-guided and rule-based. | Confirmed | Not human counselling or paid AI counselling. |
+| D-006 | Independent and guided journeys share `/explore`. | Confirmed | Context differs; homepage remains shared. |
+| D-007 | Institution discovery supports all eight Northeast states. | Confirmed | Initial real collection may begin in Nagaland. |
+| D-008 | Real sourced data is primary; demo/test data is labelled and separate. | Confirmed | No fabricated records or facts. |
+| D-009 | Admin/data governance is a core system capability. | Confirmed | Not a later optional add-on. |
+| D-010 | Hybrid ML, LLM+RAG and XAI are distinct cooperating components. | Confirmed | Guided Explorer remains rule-based. |
+| D-011 | Student-facing recommendation language remains exploratory. | Confirmed | Reasons must be evidence-grounded. |
+| D-012 | Current course catalogue direction is `/explore/courses/catalog`. | Confirmed | Preserve field/stage query context. |
+| D-013 | General institution profiles and course-specific offerings are separate journeys/data relationships. | Confirmed | Institution, campus and offering are distinct. |
+| D-014 | Planned platform languages are English, Hindi and Manipuri. | Confirmed | Quality must be evaluated; do not overclaim coverage. |
+| D-015 | Database direction is Neon PostgreSQL. | Confirmed target | Actual current connection endpoint must be checked locally; never expose secrets. |
+| D-016 | ORM direction is Drizzle ORM. | Confirmed target | Not installed in the inspected package manifest. |
+| D-017 | Authentication direction is Clerk. | Confirmed target | Current repo has custom auth; migrate without data loss. |
+| D-018 | Frontend direction is Next.js, React, TypeScript and Tailwind CSS. | Confirmed | Present in current repository. |
+| D-019 | Google Maps Platform is the location integration direction. | Confirmed target | Verify API/product selection and billing/security configuration before use. |
+| D-020 | Vercel is the deployment direction. | Confirmed target | Validate runtime, jobs, DB and storage compatibility. |
+| D-021 | LLM provider is not yet selected. | Open | Compare quality, language support, privacy, cost and API stability. |
+| D-022 | Embedding provider/model is not yet selected. | Open | Evaluate multilingual retrieval and versioning. |
+| D-023 | Vector retrieval implementation is not yet selected. | Open | Compare PostgreSQL extension and managed alternatives; do not assume pgvector. |
+| D-024 | Background-job provider is not yet selected. | Open | Must support scheduling, retries, idempotency and deployment compatibility. |
+| D-025 | File/object storage provider is not yet selected. | Open | Evaluate document size, access control, retention and cost. |
+| D-026 | Monitoring/error-reporting provider is not yet selected. | Open | Evaluate privacy, alerting, retention and cost. |
+| D-027 | Collaborative filtering architecture is planned, but performance claims require real interaction data. | Confirmed | Synthetic data only validates implementation. |
+| D-028 | Student home address is not required for general institution discovery. | Confirmed | Use minimum necessary location precision. |
+| D-029 | Current implementation status must be reported honestly. | Confirmed | A plan is not proof of implementation or testing. |
 
-## D-002 — Guide, don't decide
-**Decision:** Support exploration, not career prediction or decision. No deterministic verdicts, “best career” claims, forced paths or student-facing match/fit percentages. Explanations must be evidence-based.
+## Decision change process
 
-## D-003 — Student stage
-**Decision:** Current scope is Class 10 and Class 12. Capture stage at the appropriate discovery/onboarding point and reuse it. Do not add completed/waiting-result variants without approval.
-
-## D-004 — Northeast-wide institution architecture
-**Decision:** Institution discovery targets all eight Northeast states, not Nagaland alone. Initial real institution collection may begin in Nagaland; architecture supports all eight.
-
-## D-005 — Guided Explorer
-**Decision:** Student-facing name is Guided Explorer; optional self-guided experience, not human counselling. Completion leads to shared Explore with answer evidence.
-
-## D-006 — Shared Explore
-**Decision:** Independent browsing and Guided Explorer both lead to `/explore`. Guided context enriches the shared experience; it does not create a separate dead end.
-
-## D-007 — Simplified field exploration
-**Decision:** Broad field selection leads to an understandable overview and next actions (Courses, Institutions, Pathways), not an overwhelming narrow-subfield grid. Reuse shared field data.
-
-## D-008 — Course catalogue
-**Decision:** `/explore/courses/catalog` is the canonical shared catalogue direction, with optional field and stage context. Avoid duplicate catalogue experiences.
-
-## D-009 — Institution profile versus offering
-**Decision:** General institution profile and course-specific offering are distinct. Model institution/campus separately from course offering.
-
-## D-010 — Real data primary
-**Decision:** Use real, sourced information as primary student-facing data. Demo/test records must be labelled and separated. Do not invent data to fill pages.
-
-## D-011 — Admin is core
-**Decision:** Admin and data management are required platform capabilities, not optional future extras. Include sources, imports, validation, review, publication, audit and knowledge-base operations.
-
-## D-012 — Controlled publication
-**Decision:** Scraped/imported changes do not automatically overwrite published information without validation and appropriate review. Preserve provenance, change detection and last-known-good values.
-
-## D-013 — Source-specific update schedules
-**Decision:** Refresh frequency varies by source/category. Stable identity data checks less often; admission notices and deadlines more often. Schedules are configurable and tuned to actual source behaviour.
-
-## D-014 — Hybrid AI core
-**Decision:** Structured recommendation, LLM + RAG and XAI are core and architected from the beginning. Structured records remain canonical; LLM answers use retrieved evidence; explanations cite actual evidence.
-
-## D-015 — Collaborative filtering evidence
-**Decision:** Build architecture for collaborative signals, but real performance claims require sufficient real user interactions. Synthetic interactions test software, not real-world effectiveness.
-
-## D-016 — Location data before map UI
-**Decision:** Institution/campus location data belongs in foundational schema. Map/route UI integration may be sequenced later.
-
-## D-017 — Phased implementation, complete core design
-**Decision:** Phases manage complexity; they must not omit or indefinitely postpone core requirements. Build end-to-end vertical slices. AI architecture is included from the beginning.
-
-## D-018 — Honest implementation status
-**Decision:** Target requirements, observed code and tested behaviour are distinct. Do not claim implementation or test success without evidence.
-
-## D-019 — Documentation authority
-**Decision:** This project-foundation folder is the current product/engineering baseline. The UX guide is a supporting reference. Older conflicting planning documents are retired.
-
-## Adding a decision
-### D-XXX — Short title
-- Date: YYYY-MM-DD
-- Context: why a decision was needed.
-- Decision: what was agreed.
-- Impact: affected documents, architecture or implementation.
-- Status: proposed / agreed / superseded.
+Propose change → explain reason and alternatives → assess product/data/security/operational impact → obtain owner approval → add a new decision entry → update affected foundation and implementation documents → update traceability → implement and test. Do not silently rewrite an earlier decision.

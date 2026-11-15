@@ -1,52 +1,55 @@
 # 6. AI and Recommendation Design
 
-## Principle
-Structured recommendation, retrieval-grounded language generation and explainability have different responsibilities. The LLM must not replace the catalogue or fabricate recommendations.
+## 6.1 Components
 
-## Hybrid recommender
-Potential inputs include Class 10/12 stage, subjects/academic context where supplied, interests, activity responses, stated skills/strengths, learning/future preferences and explicitly supplied constraints such as budget/location/relocation preferences. Represent missing, uncertain and skipped answers explicitly.
+CareerBridge has distinct components: (1) ML recommender, (2) LLM assistant, (3) RAG retrieval, (4) XAI, and (5) location intelligence. Guided Explorer is rule-based and separate.
 
-Use structured field/course/institution metadata and content-based methods to identify options sharing relevant attributes with student context. Collaborative filtering or interaction signals may complement this when sufficient real and representative user interaction data exists. Build interfaces and event capture with this in mind from the beginning, but do not claim real collaborative performance based only on synthetic interactions.
+## 6.2 Recommender scope
 
-A recommendation result should preserve entity identity/type; student-answer/evidence references; relevant catalogue attributes and record versions; explanation reason codes or structured evidence; missing/uncertain information; and algorithm/model version and timestamp for evaluation.
+Identify potentially relevant fields, courses and institutions using structured student context and catalogue attributes. Possible inputs include Class 10/12 stage, subjects/academic context where supplied, interests, activities, stated strengths/skills, learning preferences, future preferences and explicit constraints such as location or budget when voluntarily provided.
 
-Do not make output a deterministic career prediction. Avoid student-facing best-career claims, forced rankings and fit percentages. Internal diagnostic metrics may be used for engineering but are not a verdict about a student.
+Distinguish known, skipped, uncertain, missing and not-applicable answers. Missing must not become a negative preference.
 
-## Explainability
-Explain which student answer or preference is relevant, which verified option attribute relates to it, why it may be worth exploring, and what is missing/uncertain. Maintain links to source answer IDs and catalogue record/version IDs. If no defensible reason exists, do not show a personalised explanation. Never ask an LLM to invent a plausible rationale after the fact.
+## 6.3 Content-based and collaborative methods
 
-## LLM assistant
-The LLM can explain concepts, interpret retrieved official information, summarise source material, explain structured recommendation evidence and help students identify useful questions/next steps.
+Content-based recommendation is the initial foundation: compare student context with structured field/course/offering attributes and preserve candidate evidence.
 
-It must not invent institutions, courses, dates, fees, eligibility or scholarships; use model memory as current official information; override database publication/eligibility; claim a student is destined for a career; or hide uncertainty.
+Design data contracts to support collaborative signals from the beginning, such as views, saves, exploration and explicit usefulness feedback. Collect only appropriate interactions. Collaborative filtering requires sufficient real representative interactions. Synthetic data can test code but cannot prove real-world quality.
 
-## RAG pipeline
-1. Ingest approved source documents.
-2. Extract text and structure.
-3. Preserve source, publication date, retrieval date and version.
-4. Chunk content with stable document/chunk references.
-5. Generate embeddings using a versioned model.
-6. Store vectors and metadata in the selected retrieval store.
-7. Retrieve relevant chunks with query and metadata filters.
-8. Optionally rerank.
-9. Supply evidence and structured catalogue results to the LLM.
-10. Generate an answer with source references.
-11. Validate citations and unsupported factual claims where feasible.
-12. Keep privacy-safe traces for evaluation/debugging.
+## 6.4 Recommendation record
 
-Filter or clearly mark superseded documents. Current admission/fee information should prefer current approved structured records and official documents.
+Preserve candidate ID/type, student-context version/reference, answer references, catalogue attributes, explanation evidence, missing/uncertain evidence, method/model version and timestamp. Support audit and evaluation.
 
-## Structured records versus documents
-Use the relational database for canonical facts such as institution identity, offerings and approved deadlines. Use RAG for evidence in official documents, policy explanations and detailed source text. The assistant may combine them but must preserve the origin of each claim. Indexing a document does not automatically verify every extracted statement as a structured fact.
+## 6.5 Guide, Don't Decide
 
-## Answer behaviour
-Identify retrieved sources, include relevant dates, distinguish official statements from interpretation, report conflicts/incompleteness, say when evidence is insufficient, and never fabricate citations or URLs.
+No definite career prediction, “best career” verdict, forced path or unexplained student-facing match percentage. Internal diagnostics may be used during development but must not be presented as proof of suitability.
 
-## Safety and privacy
-Treat retrieved web/document content as untrusted data, not instructions. Defend against prompt injection. Do not expose one student's private profile to another. Apply access control before retrieval/tool calls. Minimise retention of sensitive free text. Keep provider credentials server-side. Apply rate limits and cost controls. Distinguish generated content from official source material.
+## 6.6 XAI
 
-## Evaluation
-Evaluate candidate relevance/coverage, explanation faithfulness, retrieval precision/recall and freshness, citation correctness, answer factuality/uncertainty, deterministic/harmful career language, student comprehension/trust, latency, reliability and cost. Synthetic data tests software but cannot prove real-world quality. Real student evaluation requires consent and privacy safeguards.
+Connect an actual student answer to an actual catalogue attribute and explain the relationship carefully. Example: student says they enjoy organising group activities; a field includes planning/coordination work; explanation: “You mentioned enjoying group activities. This field includes opportunities to explore planning and coordination.” Do not claim the student is naturally suited. If evidence is insufficient, do not show a personalised reason. Never ask an LLM to invent a post-hoc explanation.
 
-## Implementation
-Design interfaces for recommender, LLM, RAG and XAI from the beginning. Implement and connect them incrementally to real catalogue data and student experience. Do not postpone their architectural design until after frontend completion.
+## 6.7 LLM assistant
+
+Understand natural-language questions and explain fields, qualifications, courses, official notices, admission requirements and scholarship information. Use current structured facts and retrieved documents. It must not invent catalogue records or time-sensitive facts.
+
+## 6.8 RAG lifecycle
+
+Register approved source → retrieve/upload permitted document → extract text/structure → preserve metadata/version → chunk → embed with versioned model → store retrieval metadata → retrieve relevant chunks → apply filters/reranking if selected → provide evidence to LLM → validate references → generate answer → record evaluation metadata.
+
+Embedding provider/model and vector retrieval implementation remain open. Do not assume pgvector or a separate vector database without a recorded decision.
+
+## 6.9 Structured facts versus documents
+
+Use PostgreSQL records for canonical institution, campus, course, offering, fees, eligibility and dates. Use RAG for prospectuses, notices, policy explanations and supporting source text. Indexing a document does not automatically make every extracted statement a verified structured fact.
+
+## 6.10 Answer rules
+
+Prefer current approved structured records for current catalogue facts. Identify sources and dates, distinguish official statements from generated explanation, acknowledge conflicts and insufficient evidence, and never fabricate citations or URLs. Model memory is not a source for current official facts.
+
+## 6.11 Multilingual AI
+
+Planned languages: English, Hindi and Manipuri. Evaluate query understanding, retrieval across languages, source-language preservation, translation correctness, terminology, citation consistency and uncertainty. Do not assume equal quality across languages.
+
+## 6.12 Safety and evaluation
+
+Treat retrieved documents as untrusted input; defend against prompt injection; enforce user-level access to private data; keep API keys server-side; apply rate/cost controls; minimise personal data in logs. Evaluate recommender relevance, coverage, faithfulness, diversity and missing-answer behaviour. Evaluate RAG retrieval, citations, factuality, conflict handling, prompt-injection resistance, multilingual performance, latency and cost. Synthetic tests do not replace real-user evaluation.

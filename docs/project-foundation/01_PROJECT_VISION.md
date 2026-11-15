@@ -1,58 +1,84 @@
 # 1. Project Vision
 
-## Overview
-CareerBridge is a career and education exploration platform intended to help students understand possible academic and career directions and the practical steps, courses, institutions and opportunities connected to them.
+## 1.1 Overview
 
-It combines structured student context and education data with hybrid recommendations, an LLM assistant grounded through retrieval-augmented generation (RAG), explainable evidence and location-aware institution discovery. Its regional institution focus is Northeast India, alongside relevant national education opportunities.
+CareerBridge is an AI-powered career and education guidance and exploration platform for students, with a focus on Northeast India. It helps students discover fields, courses, institutions, pathways, examinations and scholarships; understand why an option may be worth exploring; and identify useful next steps.
 
-CareerBridge is an exploration and information aid. It does not make a student's career decision for them.
+The platform combines structured education data, a hybrid Machine Learning recommender, an LLM assistant grounded through Retrieval-Augmented Generation (RAG), Explainable AI (XAI), and location intelligence. An Admin Panel governs the information on which the student experience depends.
 
-## Problem
-Students may reach important education transition points without knowing what options exist, what different fields involve, which courses lead to which opportunities, what eligibility rules apply, or where relevant institutions are located. Information is scattered across institution websites, government portals, prospectuses and notices. Students may rely on informal advice because reliable information is difficult to discover and compare.
+**Core principle: GUIDE, DON'T DECIDE.** CareerBridge helps students explore. It does not choose their future.
 
-This can be amplified in Northeast India, where geography, travel time, transport access and institution distribution affect whether an option is practical. CareerBridge aims to make information easier to discover, understand and verify while being honest about coverage gaps.
+## 1.2 Problem
 
-## Aim and objectives
-Provide understandable, evidence-based ways for students to explore education and career possibilities, investigate relevant courses and institutions, and identify useful next steps.
+Students may reach Class 10 or Class 12 without knowing what options exist, what they can study next, which institutions offer relevant programmes, what eligibility applies, or where to find reliable and current information. They may depend on friends or incomplete advice, overlook alternatives, or be unaware of examinations and scholarships.
+
+In Northeast India, geography adds practical constraints. Institutions may be spread across states, districts and towns; travel time, transport access, distance and relocation can affect whether an option is practical. Information is fragmented across official websites, notices, prospectuses and government portals.
+
+## 1.3 Aim and objectives
+
+Provide understandable, personalised and evidence-based exploration of education and career possibilities. Objectives:
 
 1. Organise reliable information about fields, courses, institutions, pathways, examinations and scholarships.
-2. Use structured student context—education stage, interests, activities, subjects, skills and stated preferences—to surface potentially relevant options.
-3. Develop a hybrid recommendation approach combining content-based methods and collaborative signals when sufficient real interaction data exists.
-4. Provide a natural-language assistant powered by an LLM and RAG, grounded in approved knowledge sources.
-5. Explain why an option was surfaced using traceable student answers and catalogue evidence.
-6. Support institution discovery with geographic information and map/route guidance.
-7. Provide an Admin Panel and governed data workflows to maintain, review and publish information.
-8. Evaluate usefulness, clarity, trust and recommendation quality through technical tests and student feedback.
+2. Help students explore using education stage and optional interests, activities, subjects, skills and stated preferences.
+3. Build a hybrid ML recommender for potentially relevant fields, courses and institutions.
+4. Provide an LLM assistant grounded in approved, traceable information through RAG.
+5. Explain surfaced options using actual student answers and catalogue evidence.
+6. Support institution location, maps, distance, travel-time and route guidance.
+7. Provide Admin workflows for collection, imports, review, verification, publication and knowledge-base maintenance.
+8. Support student accounts, saved items, history and student-controlled next steps.
+9. Plan for English, Hindi and Manipuri.
+10. Evaluate quality and usefulness with real students and technical evaluation methods.
 
-## Students and geography
-Current student-stage scope is Class 10 and Class 12. Education stage is collected at the appropriate discovery/onboarding point and reused; do not repeatedly ask students for it on unrelated pages.
+## 1.4 Current student scope
 
-Institution discovery targets all eight Northeast Indian states: Arunachal Pradesh, Assam, Manipur, Meghalaya, Mizoram, Nagaland, Sikkim and Tripura. Initial real institution-data collection may start with Nagaland, but database design, source management and product architecture must support all eight from the beginning. Relevant national courses, examinations and scholarships are included where useful.
+Current education stages: **Class 10 and Class 12 only**. The active product focus is **User 1: the unsure student**, who may have no idea what career or field to pursue. Do not introduce User 2/3 flows or completed-result/waiting-result variants into current scope without explicit approval.
 
-## Core system
-The intended system includes student discovery/profile context; Explore for fields, courses, institutions, pathways, examinations and scholarships; hybrid recommendation; LLM + RAG assistant; explainability; education database and source governance; Admin Panel; location-aware institution data and map integration; and account, saved-item and progress capabilities as defined by product requirements.
+Capture education stage at the agreed Discover/onboarding step and reuse it. Do not repeatedly ask for it on unrelated pages.
 
-These are core architectural responsibilities. Delivery may be sequenced into testable modules, but they must not be silently omitted or indefinitely deferred.
+## 1.5 Geography
 
-## Guide, don't decide
-CareerBridge helps students explore; it does not choose a career or education path for them. Do not predict a definitive career, label one career as the student's best future, show unexplained match/fit percentages as authority, force a fixed path, or turn uncertain answers into confident claims. Prefer wording such as “Explore this field”, “Potentially relevant” and “Reasons to explore”. Present alternatives and acknowledge uncertainty.
+Institution discovery must support all eight Northeast states: Arunachal Pradesh, Assam, Manipur, Meghalaya, Mizoram, Nagaland, Sikkim and Tripura. Initial real-data collection may begin with Nagaland; this is a collection sequence, not a Nagaland-only product scope. Database, Admin, source registry and filters must support all eight states from the beginning. Include relevant national opportunities.
 
-Any personalised explanation must be grounded in actual student-provided evidence and/or reliable catalogue evidence. Do not invent reasons.
+Do not claim full regional coverage until records have actually been collected and verified.
 
-## Experience principles
-- Reassuring: students may be unsure and should not feel behind.
-- Exploratory: browsing without a fixed goal is valid.
-- Clear: explain unfamiliar terms and practical requirements.
-- Transparent: show sources, dates and verification status where relevant.
-- Respectful: allow skipping, revisiting and changing answers.
-- Region-aware: make geography useful without assuming students can or must relocate.
-- Honest about gaps: distinguish unavailable, uncollected and unverified information.
+## 1.6 Product capabilities
 
-## Data integrity
-Real, sourced data is primary. Synthetic/demo/test records may support development and controlled testing but must be labelled and separated from verified information. Relevant records retain source name/URL, publication or effective date where known, last-checked and last-verified timestamps, verification and publication states, data classification and change history. Time-sensitive details need their own freshness checks. Missing information must not be fabricated.
+- **Discover:** capture Class 10/12 and optional activities/interests; reassure students who are unsure.
+- **Discover Results:** show possibilities with reasons grounded in submitted answers.
+- **Guided Explorer:** optional, self-guided, rule-based reflection; not human counselling and not paid AI counselling.
+- **Explore:** shared destination for independent and guided students; Fields, Courses, Institutions, Pathways, Examinations and Scholarships.
+- **ML recommender:** surface potentially relevant options from structured context and catalogue data.
+- **LLM + RAG assistant:** answer natural-language questions using approved sources and structured facts.
+- **XAI:** explain why an option was surfaced using real evidence.
+- **Location intelligence:** support institution/campus location and Google Maps Platform features.
+- **Admin:** govern records, sources, imports, verification, publication and knowledge documents.
 
-## Technology direction
-Planning context includes Next.js, React, TypeScript and Tailwind CSS; PostgreSQL/Neon with Drizzle ORM; and Vercel as a likely deployment target. The current repository must be inspected before treating any technology as installed or final. Confirm identity provider, hosting, job scheduler, storage, vector retrieval, AI provider and map provider from actual configuration.
+## 1.7 GUIDE, DON'T DECIDE
 
-## Evaluation
-Evaluate information correctness and traceability; student understanding and trust; answer grounding and citation quality; recommendation usefulness without coercion; data-update reliability; and usability. A proposed study size is not a completed study or a statistically representative claim. Obtain appropriate consent and protect participant data.
+The platform must present possibilities, explain evidence, show alternatives, acknowledge uncertainty and keep the student in control. It must not predict a definite career, declare a “best career”, force a fixed sequence, display unexplained match percentages as authority, or invent explanations.
+
+Preferred language: “Explore this field”, “Potentially relevant”, “Reasons to explore”, “Based on what you shared”. Avoid “Your career”, “Your perfect career”, “Your best match”, or claims that CareerBridge has selected the student's future.
+
+## 1.8 Data reliability
+
+Real, sourced information is primary. Demo/test data may support development but must be classified and separated. Relevant facts retain source name/URL, authority, publication/effective date where available, last-checked and last-verified timestamps, verification and publication states, data classification and change history. Time-sensitive facts such as fees, admission dates, eligibility and deadlines need freshness tracking. Missing information remains missing; never fabricate it.
+
+## 1.9 AI responsibilities
+
+- ML identifies potentially relevant options using structured student context and catalogue attributes.
+- LLM understands questions and generates natural-language responses.
+- RAG retrieves traceable approved knowledge to ground factual answers.
+- XAI explains surfaced options from actual evidence.
+- Location intelligence supplies geographic context and provider-backed route information.
+
+These components are distinct and must not be collapsed into one opaque “AI recommendation”. Guided Explorer remains rule-based and separate from the LLM assistant.
+
+## 1.10 Languages and evaluation
+
+Planned languages: English, Hindi and Manipuri. Plan for UI translation, search, source-language metadata, AI input/output and translation provenance. Do not claim complete translation until tested.
+
+The project intends to evaluate with real students, with approximately 30–50 participants as a feasible target, subject to consent, privacy and appropriate research procedures. This is a target, not a completed study or a claim of statistical representativeness.
+
+## 1.11 Agreed technology direction
+
+Next.js, React, TypeScript, Tailwind CSS, Neon PostgreSQL, Drizzle ORM, Clerk, Google Maps Platform and Vercel deployment direction. The current repository does not yet contain every integration. LLM provider, embedding model/provider, vector retrieval implementation, background-job provider, object storage and monitoring provider remain open until documented evaluation.

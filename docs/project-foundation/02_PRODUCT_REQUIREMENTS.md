@@ -1,72 +1,82 @@
 # 2. Product Requirements
 
-This document defines target behaviour, not a claim that each requirement is already implemented.
+## 2.1 Scope and terminology
 
-## Student discovery
-- Explain that students do not need to have a career decision already.
-- Capture Class 10 or Class 12 stage at the appropriate initial step.
-- Allow optional activities/interests where defined by the discovery flow.
-- Present possible fields with clear reasons grounded in actual responses.
-- Offer independent exploration and Guided Explorer.
-- Reuse known stage/context instead of repeatedly asking for it.
+Current student scope is Class 10 and Class 12, with active focus on User 1 (unsure student). Stage is captured once in Discover/onboarding and reused. These are target requirements, not claims about implementation status.
 
-## Guided Explorer
-- Student-facing name: Guided Explorer. It is an optional self-guided question experience, not a human counselling service.
-- Ask one question at a time; allow appropriate back, skip, edit and exit actions.
-- Save progress according to the persistence design and explain where it is saved.
-- Explore interests, curiosity, learning/subjects, strengths and future preferences.
-- Treat uncertainty, skipped and ambiguous answers as valid.
-- Completion leads to the shared Explore experience with relevant evidence retained.
-- Do not show numeric counselling progress or claim a conclusive career assessment.
+## 2.2 Discover and results
 
-## Explore
-The shared Explore area supports Fields, Courses, Institutions, Pathways, Examinations and Scholarships. It should provide useful starting points and general browsing. Guided-derived possibilities may appear alongside general content; do not create a separate dead-end guided homepage.
+`/discover` reassures students, captures Class 10/12 and accepts optional activities/interests. It explains why information is requested and avoids unnecessary personal data.
 
-## Fields
-- Explain fields in accessible language.
-- Avoid overwhelming students with long grids of narrow subfields immediately after a broad-field selection.
-- Provide next actions such as Courses, Institutions and Pathways.
-- Reuse one shared field-content source across directory, dialog and detail experiences.
-- Guided possibility details may include a concise “based on what you shared” evidence section without rewriting factual field content.
+`/discover/results` presents possible fields, “Your choices”, field cards and a Learn more interaction, Browse all fields, and two equally weighted choices: “Explore on my own” and “Explore with guidance”/Guided Explorer. Each personalised possibility must explain why it appears using actual answers. A generic field list is not a personalised result.
 
-## Courses
-- Shared catalogue direction: /explore/courses/catalog, with optional field and stage context.
-- Support Class 10/Class 12 relevance, search and useful filters.
-- Course details explain qualification/eligibility and duration where verified.
-- Link courses to institutions and actual course offerings.
-- Never invent eligibility or imply every institution offers a course.
+## 2.3 Guided Explorer
 
-## Institutions
-Keep two distinct use cases: general institution directory/profile, and course-specific institutions/offering details. Support all eight Northeast states, campuses, addresses and geographic coordinates. Sparse information should be shown honestly, not padded. Maps are useful on institution/location details, not mandatory on every listing card.
+Guided Explorer is optional, self-guided and rule-based. It is not human counselling, paid AI counselling, a career prediction or a definitive assessment. It asks one question at a time and may adapt follow-ups across Interests, Curiosity, Learning/subjects, Strengths and Future preferences. Support Back, Skip, Continue, Edit, Exit and Save/Finish for now. Not every question is mandatory. No numeric progress percentage or definitive career verdict.
 
-## Pathways, examinations and scholarships
-Provide listings and meaningful detail experiences. Explain eligibility, qualifications, application steps and deadlines only where supported by sources. Show source and checked date for time-sensitive information. Distinguish upcoming, open, expired, unknown and unverified states using reliable dates. Avoid oversized filters that distract from discovery.
+Support no-session, active, paused, completed and early-exit states. If stored in local storage, tell students it is saved on their device and not synchronised to their account. Never claim account sync until implemented and approved.
 
-## Saved items and progress
-Support saving and revisiting defined catalogue items where implemented. Preserve item identity and relevant context. Protect account data with authenticated access and server-side validation. Do not imply folders, sharing, notes or other unapproved capabilities.
+## 2.4 Shared Explore
 
-## Recommendations
-Use structured student context and catalogue attributes to identify options worth exploring. Provide explanations grounded in actual answers and verified option attributes. Present alternatives and uncertainty. Do not expose a score as a definitive measure of suitability. The LLM must not invent catalogue records, eligibility, fees, deadlines or rationale.
+`/explore` is the common destination for independent browsing and students returning from Guided Explorer. It must work with full, partial or absent personalisation context. It includes Fields, Courses, Institutions, Pathways, Examinations and Scholarships. General browsing remains available; do not show an “unknown answers” warning or require Guided Explorer.
 
-## AI assistant
-- Accept natural-language education/career questions.
-- Retrieve approved knowledge before answering factual or time-sensitive questions.
-- Identify source documents used.
-- State when reliable evidence is insufficient.
-- Distinguish general explanation from current institution-specific information.
-- Respect known student context without asking for it again.
+## 2.5 Fields
 
-## Admin and data operations
-Admin is a core platform capability. It must support role-controlled access; dashboard; catalogue management; source registry; manual entry; CSV/XLSX import with preview and validation; duplicate and relationship checks; draft/review/approval/publication/archive; detected-change review; document ingestion and RAG indexing; audit history and job-error reporting.
+Use one canonical field-content source across directory dialogs and detail pages. Explain broad fields simply and provide Courses, Institutions and Pathways as next actions. Do not overwhelm students with large narrow-subfield grids immediately after selecting a broad field. Guided field details may show a concise “Based on what you shared” evidence section without rewriting factual field content.
 
-## Data quality
-Relevant records must represent real/demo/test classification, source identity and URL, source publication/effective date where available, last checked and verified timestamps, verification and publication states, and change history. Distinguish verified, awaiting verification, unavailable, not collected, demo/test, expired and superseded as appropriate.
+## 2.6 Courses
 
-## Non-functional requirements
-Security and server-side authorization; privacy and data minimisation; reliable ingestion that preserves last-known-good data; traceable AI claims; accessibility; maintainable shared schemas; pagination/search; asynchronous long-running jobs; and operational monitoring.
+Canonical direction: `/explore/courses/catalog`, with optional `field` and `stage` query context. Support search, useful filters, Class 10/12 context, qualification, duration where verified, details and actual institution offerings. A course definition is distinct from an institution/campus offering. Never invent eligibility, duration, fees or availability.
 
-## Out of scope unless separately approved
-Human counselling appointments, job-placement guarantees, paid counselling/paid AI advice, social networking, public user reviews, custom saved folders/sharing/notes and native mobile apps are not assumed to be current scope.
+## 2.7 Institutions
 
-## Acceptance principle
-A page rendering is not sufficient. Requirements include data correctness, permissions, validation, source/freshness behaviour, empty/error states, integration and appropriate tests or recorded manual verification.
+Support all eight Northeast states. Separate general institution discovery from course-specific offering discovery:
+
+- General: `/explore/institution-directory` and `/explore/institution-directory/[slug]`.
+- Course-specific: `/explore/institutions?course=...` and `/explore/institutions/[slug]?course=...`.
+
+Institution, campus and course offering are separate entities. Listing cards should support comparison; maps belong primarily on relevant detail/location pages. Sparse profiles must remain honest. Do not invent facilities, history or promotional claims.
+
+## 2.8 Pathways, examinations and scholarships
+
+Each has listing and detail experiences. Pathways explain possible qualification progressions without implying one mandatory route. Examination details include authority, purpose, eligibility, application process, dates and official sources where verified. Scholarship details include provider, purpose, eligibility, benefits, documents, application steps, deadline and official source where verified. Time-sensitive claims show freshness. Never infer eligibility without adequate evidence.
+
+## 2.9 Saved, History and My Next Steps
+
+Saved allows private revisiting of supported catalogue items, stable item identity, duplicate prevention and handling unavailable/expired records. Do not imply folders, sharing or notes unless approved.
+
+History is private to the student and supports revisit/removal according to account controls.
+
+My Next Steps tracks actions selected by the student. It must not prescribe a career sequence or automatically decide what the student should do.
+
+## 2.10 ML recommender and XAI
+
+Surface potentially relevant fields, courses and institutions using structured student context and catalogue attributes. Treat skipped, uncertain and missing answers distinctly. Do not interpret missing as a negative preference. Preserve evidence and provide careful explanations tied to actual answers and attributes. No deterministic career verdict or unexplained student-facing match score.
+
+## 2.11 LLM and RAG
+
+Support natural-language questions and source-grounded answers. Prefer current approved structured records for current facts and RAG for official document detail. Cite sources, preserve dates, acknowledge missing/conflicting evidence and avoid fabricated URLs, eligibility, fees and deadlines. Model memory alone is not a source of current official facts.
+
+## 2.12 Location
+
+Support institution/campus address and coordinates, map display, distance and provider-backed travel time/routes. Do not require exact home address for general discovery. Use only location precision necessary for a requested feature and explain its use. Never invent route metrics.
+
+## 2.13 Admin Panel
+
+Core requirement. Support Dashboard, Institutions, Campuses, Courses/Offerings, Fields, Pathways, Examinations, Scholarships, Sources/Checks, Imports/Exports, Review/Publication, Knowledge Base, Jobs/Errors, Audit History and Users/Roles. Every consequential action is permission-controlled and audited. Admin data is not published directly from an unreviewed import.
+
+## 2.14 Data governance
+
+Every relevant record supports real/demo/test classification, provenance, checked/verified dates, verification state, publication state and change metadata. Time-sensitive fields may require field-level provenance. Imported/scraped changes enter review according to risk. Failed collection preserves last-known-good data.
+
+## 2.15 Non-functional requirements
+
+Privacy, secure authentication, server-side authorization, accessibility, responsive UI, reliable ingestion, traceability, freshness, typed/validated APIs, background processing, monitoring, backups, recovery, testable business logic and clear loading/empty/error states.
+
+## 2.16 Out of scope unless separately approved
+
+Human counselling appointments, paid AI counselling, career/job-placement guarantees, social networking, public student profiles, public reviews, saved folders, sharing saved lists, personal notes and native mobile apps.
+
+## 2.17 Acceptance rule
+
+A page rendering is insufficient. Verify data correctness, relationships, validation, permissions, provenance/freshness, loading/empty/error/recovery states, accessibility, responsive interaction, integration and relevant tests.

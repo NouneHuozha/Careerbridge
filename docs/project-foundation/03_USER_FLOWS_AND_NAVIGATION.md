@@ -1,57 +1,79 @@
 # 3. User Flows and Navigation
 
-## Principles
-Navigation supports discovery without forcing a fixed sequence. Explore is the shared destination. Reuse known education stage and answer context.
+## 3.1 Main journey
 
-## Primary student journey
-1. Student enters Discover.
-2. Student selects Class 10 or Class 12, unless already supplied by onboarding.
-3. Student may optionally share activities/interests.
-4. Discover Results presents possible fields with reasons based on actual responses.
-5. Student chooses Explore on my own or Explore with guidance / Guided Explorer.
-6. Both routes lead to the shared Explore home. Guided context carries relevant evidence; independent browsing remains open-ended.
+```text
+Discover → Class 10 / Class 12 → Optional activities/interests → Discover Results
+                                                               |
+                                    +--------------------------+-------------------------+
+                                    |                                                    |
+                              Explore on my own                                Explore with guidance
+                                    |                                                    |
+                                    |                                            Guided Explorer
+                                    |                                                    |
+                                    +---------------------------+------------------------+
+                                                                |
+                                                        Shared /explore
+```
 
-## Guided Explorer
-Target route concepts:
-- /counselling — introduction and start/resume state.
-- /counselling/conversation — one question at a time with supporting notes/context.
-- /counselling/complete — completion and next action.
-- /counselling/summary — optional answer review if retained in final design.
-- /explore — shared exploration home.
+Both choices lead to the same Explore homepage. Independent exploration uses general browsing and available context. Guided Explorer adds optional reflection evidence; it does not create a separate guided-only homepage.
 
-“Guided Explorer” is the student-facing name. “Counselling” may remain an internal route/legacy code term, but copy must not imply a human counsellor is present.
+## 3.2 Discover
 
-Conversation supports Back, Skip, Continue, Edit and Exit/save/finish for now as applicable. No numeric progress percentage. Questions may adapt across interests, curiosity, learning/subjects, strengths and future preferences. Uncertainty is valid.
+`/discover` reassures unsure students, captures Class 10 or Class 12, and optionally collects activities/interests. Reuse known stage; do not re-ask it on unrelated pages. Do not add completed-result or waiting-result variants without approval.
 
-Completion primary action: Start exploring → /explore. Secondary action: Review my answers. Preserve evidence for explanations. Do not display a definitive career verdict.
+## 3.3 Discover Results
 
-## Explore information architecture
-Shared categories: Fields, Courses, Institutions, Pathways, Examinations and Scholarships. Guided-derived possibilities can appear alongside general starting points without creating a separate guided-only homepage.
+`/discover/results` contains “Discover what’s possible”, “Your choices”, possibility cards with evidence-based reasons, Learn more field overview, Browse all fields and two equal entry cards: “Explore on my own” and “Explore with guidance”/“Try Guided Explorer”.
 
-## Field flow
-Directory browsing may open a concise overview/dialog. A guided possibility may open a useful field detail with a small evidence section. Provide next actions such as Courses, Institutions and Pathways. Avoid a long narrow-subfield grid as the immediate next step. Reuse shared field content.
+## 3.4 Guided Explorer routes
 
-## Course flow
-Canonical catalogue direction: /explore/courses/catalog with optional field and stage query context. Course detail explains verified information. Course-specific institution listing shows actual providers and preserves course context into offering detail.
+Student-facing name: Guided Explorer. Existing `/counselling` route prefix may remain for compatibility, but UI copy must not imply a human counsellor.
 
-## Institution flows
-Two distinct flows:
-1. General directory → general institution profile.
-2. Course catalogue/detail → institutions offering that course → course-specific offering detail.
+- `/counselling`: introduction and start/resume state.
+- `/counselling/conversation`: one-question-at-a-time reflection.
+- `/counselling/complete`: completion.
+- `/counselling/summary`: optional answer review.
+- `/explore`: shared destination.
 
-Previously agreed route concepts:
-- /explore/institution-directory
-- /explore/institution-directory/[slug]
-- /explore/institutions?course=...
-- /explore/institutions/[slug]?course=...
+Support Back, Skip, Continue, Edit, Exit and Save/Finish for now. Themes: Interests, Curiosity, Learning/subjects, Strengths and Future preferences. Questions may adapt; not all are mandatory. Do not show numeric progress or a career verdict.
 
-Verify these against actual repository routes before implementation. Institution profiles should be modular and show only supported information. A map is useful on institution/location detail, not required on every listing.
+Session states: no saved session, active, paused, completed and early exit. Device-local storage must be described honestly; do not claim account synchronisation unless implemented.
 
-## Other discovery flows
-Pathways, examinations and scholarships each need a listing and meaningful detail experience. Eligibility, dates and application information must be source-supported.
+Completion primary action: Start exploring → `/explore`. Secondary: Review my answers.
 
-## Navigation shell
-Previously discussed desktop navigation: Explore, Saved, My Next Steps. Verify exact labels and responsive behaviour against the current design. Do not add navigation items solely to fill space. My Next Steps should track actions students choose, not prescribe a career sequence; final content must be confirmed before implementation.
+## 3.5 Shared Explore
 
-## Route reconciliation
-Audit actual routes and entry points; map each to this target; identify duplicate/legacy routes; preserve routes with distinct use; consolidate duplicates; check links and saved references before removing any route.
+`/explore` serves independent browsing, Guided Explorer completion, partial answers and no-answer users. Sections: Fields, Courses, Institutions, Pathways, Examinations and Scholarships. Personalised starting points may show answer evidence, while general browsing remains available.
+
+## 3.6 Field experience
+
+The normal Fields directory may use a concise overview dialog. Guided possibility cards may open a full detail page. Both use one shared data source. A broad field overview should lead to Courses, Institutions and Pathways, not a large narrow-subfield grid.
+
+## 3.7 Course experience
+
+Canonical direction: `/explore/courses/catalog`; optional `field` and `stage` context. Keep one shared catalogue. Detail pages link to actual campus offerings.
+
+## 3.8 Institution experiences
+
+General directory: `/explore/institution-directory` and `/explore/institution-directory/[slug]`.
+
+Course-specific discovery: `/explore/institutions?course=...` and `/explore/institutions/[slug]?course=...`.
+
+Preserve selected course context. General profile, campus and specific offering facts remain distinct. Map belongs on relevant detail pages, not every list row.
+
+## 3.9 Other catalogue journeys
+
+Pathways, examinations and scholarships each have listing/detail pairs. Detail pages show official evidence, freshness and unavailable states where applicable.
+
+## 3.10 Account journeys
+
+Saved revisits saved items. History revisits prior supported items. My Next Steps tracks student-selected actions and never prescribes a career route.
+
+## 3.11 Navigation
+
+Previously agreed desktop navigation: Explore, Saved and My Next Steps. Do not add items solely to fill space. Preserve current visual structure unless a reviewed requirement calls for a change.
+
+## 3.12 Route migration rules
+
+Inventory routes and inbound links before changing them. Map each route to a distinct purpose, preserve query context, inspect saved references, keep routes that serve distinct flows, redirect obsolete routes safely, and test direct navigation, refresh, back/forward and deep links.

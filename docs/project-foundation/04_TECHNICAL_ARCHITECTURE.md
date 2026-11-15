@@ -1,49 +1,56 @@
 # 4. Technical Architecture
 
-## Architecture goals
-Support the student web application, governed education-data operations, recommendation services, LLM + RAG, explainability and location-aware discovery. UI pages must not own scraping, recommendation logic or source validation.
+## 4.1 Agreed direction
 
-## Repository baseline and confidence
-The repository has previously been observed to contain a Next.js/TypeScript application and account-related API/database code, including SQL definitions for users, sessions and JSONB account data. This is a limited repository observation, not a complete code audit, runtime test or production assessment. Re-check current dependencies, routes and services before relying on this snapshot.
+Next.js, React, TypeScript, Tailwind CSS, Neon PostgreSQL, Drizzle ORM, Clerk, Google Maps Platform and Vercel deployment direction. Current code does not yet contain all integrations. Open provider choices must be evaluated and logged: LLM, embeddings, vector retrieval, background jobs, object storage and monitoring.
 
-Do not assume that a planned technology is installed. Verify ORM, identity provider, background scheduler, vector store, embedding model, LLM provider, map provider and deployment configuration from package files and runtime configuration before selecting implementation details.
+## 4.2 Architecture style
 
-## Logical components
-1. Web presentation: Next.js/React pages and accessible components.
-2. Application/API layer: authenticated endpoints, validation and business rules.
-3. Identity/access: student sessions and role-controlled admin access.
-4. Relational data: canonical education records, profiles, sources, provenance, review and audit.
-5. Ingestion workers: source checks, downloads, parsing, validation, change detection and retries.
-6. Recommendation service: structured candidate generation consistent with Guide, Don't Decide.
-7. Knowledge ingestion/retrieval: parsing, chunking, metadata, embeddings and retrieval.
-8. LLM orchestration: context assembly, generation and citation validation.
-9. Explainability: evidence objects derived from student answers and catalogue attributes.
-10. Location service: normalized addresses/coordinates and map/route integration.
-11. Admin interface: source, record, import, review, publication and operational controls.
+Begin with a modular application, not unnecessary microservices. Keep domain logic, application services, data access, external adapters and background jobs separated so components can be extracted later if operational evidence requires it.
 
-## Boundaries
-- Relational database is canonical for published structured records.
-- Source documents and metadata are evidence for RAG; generated answers are not canonical records.
-- Recommender generates candidates from structured data and student context, not LLM invention.
-- LLM answers using retrieved evidence and structured results.
-- Explainability references traceable evidence, not fabricated post-hoc reasons.
-- Ingestion creates proposed changes; publication follows validation/review.
-- Browser never holds privileged credentials or authorization logic.
+## 4.3 Layers
 
-## Data flow
-Register approved source → fetch permitted material → store retrieval metadata → parse candidate facts/documents → validate schema/relationships/duplicates → compare changes → review according to risk → approve/publish → write audit history → refresh dependent search/recommendation/RAG indexes → serve published data with provenance/freshness. Fetch or parse failure must not overwrite published values.
+- **Presentation:** student and Admin pages, forms, navigation, accessible UI.
+- **Application/API:** request handling, validation, auth context, authorization, orchestration and response contracts.
+- **Domain:** discovery, Guided Explorer, catalogue, source governance, publication, recommendations and student-account rules.
+- **Data access:** Drizzle schema, typed queries, transactions and migrations.
+- **Integrations:** Clerk, Neon connection, Maps, LLM, embeddings, storage and job provider.
+- **Background processing:** source refresh, imports, parsing, document extraction, embeddings, indexing and maintenance.
 
-## Technology direction
-Planning context includes Next.js, React, TypeScript and Tailwind; PostgreSQL/Neon; and Vercel as a possible deployment target. Final production choices must be confirmed from actual configuration and constraints. Do not describe a considered technology as deployed without evidence.
+Pages must not own scraping, migrations, recommendation algorithms or AI orchestration.
 
-## APIs and services
-Use typed contracts and server-side validation. Separate services for catalogue search/details, student context, saved items/progress, source registry, ingestion/review, publication, recommendations, retrieval/answer generation and location. Use pagination. Run long extraction, embedding and indexing tasks asynchronously and observe their status.
+## 4.4 Domains
 
-## Security and privacy
-Enforce authentication/authorization server-side; least-privilege admin roles; server-side secrets; upload/API validation; safe logging; documented retention/deletion/consent; and audit consequential admin actions.
+Identity/accounts; student discovery; Guided Explorer; education catalogue; saved/history/next steps; source governance; recommendations; XAI; knowledge base/RAG; LLM assistant; location; Admin.
 
-## Reliability
-Use idempotent jobs and retries. Preserve last-known-good published data. Maintain separate development/test/staging/production configuration. Keep demo/test records identifiable and out of verified production content. Version migrations. Select a scheduler compatible with execution limits.
+## 4.5 Canonical data boundaries
 
-## Decisions requiring validation
-Identity provider/migration; SQL/ORM migration conventions; background scheduler; source-document storage; vector retrieval and embedding model; LLM provider/cost/safety; Maps provider/quotas; backups, monitoring and deployment topology.
+PostgreSQL holds canonical structured facts. Source documents retain evidence and feed RAG. RAG chunks are not automatically verified structured records. ML uses structured student context and catalogue attributes. LLM generates answers using retrieved evidence. XAI references actual answer and catalogue evidence. Admin controls review/publication.
+
+## 4.6 Ingestion flow
+
+Official source or permitted import → source registry → collection → parse → validate → duplicate/change detection → review → approval → publication → dependent search/recommendation/RAG refresh. Failed collection must preserve last-known-good published values.
+
+## 4.7 AI boundaries
+
+ML must not invent catalogue records. LLM must not invent current fees, deadlines or eligibility. RAG must retrieve traceable approved evidence. XAI must explain actual evidence, not create plausible reasons after selection. Guided Explorer is rule-based and separate from the LLM.
+
+## 4.8 Database and ORM
+
+Neon is the hosted PostgreSQL direction; PostgreSQL is the database system; Drizzle is the ORM/schema/migration tooling; a driver/adapter connects the application. Current code uses `pg` directly. Introduce Drizzle with a compatible adapter after checking runtime, transactions and deployment constraints. Drizzle does not eliminate SQL; migrations remain versioned and may contain SQL.
+
+## 4.9 Authentication
+
+Clerk is the agreed authentication direction. Preserve existing student/account data. Establish stable Clerk-user-to-application-user mapping. Replace custom sessions only after integration and migration verification. Enforce role authorization on the server. Do not delete existing auth tables prematurely.
+
+## 4.10 Background jobs
+
+Long-running refresh, import, extraction and embedding work must not run in normal page requests. The selected job provider must support schedules, retries, idempotency, failure state, observability and safe reprocessing, and must be compatible with the deployment runtime. Provider remains open.
+
+## 4.11 Maps
+
+Store institution/campus address and coordinates with provenance. Use Google Maps Platform for supported map and route features. Do not require exact home address for general browsing. Never invent route metrics.
+
+## 4.12 Deployment and reliability
+
+Vercel is the deployment direction. Validate Neon connection behaviour, Drizzle adapter, Clerk configuration, background jobs, storage, scheduled tasks, environment separation, backups and provider limits before production. Keep secrets server-side. Use migrations, idempotent jobs, last-known-good data, monitoring and recovery procedures.

@@ -1,55 +1,55 @@
 # 11. Security, Privacy and Quality Assurance
 
-## Purpose
-CareerBridge may process information about school students, including minors. Privacy, security and trustworthy information are foundational requirements, not optional polish.
+## 11.1 Security principles
 
-## Data minimisation
-- Collect only information needed for a clearly defined student-facing purpose.
-- Make optional questions genuinely optional.
-- Avoid collecting sensitive personal details unless there is a justified requirement and an approved handling policy.
-- Do not use student free-text responses as training data by default.
-- Define retention and deletion rules for accounts, answers, saved items, logs and evaluation records.
-- Explain where data is stored, how it is used and how a student can request deletion.
-- Obtain appropriate consent/assent and guardian involvement where required by applicable law and the research context.
+Use least privilege, defence in depth, server-side authorization, secret isolation, input validation, secure session handling through Clerk, auditable admin actions and privacy minimisation.
 
-## Access control
-- Enforce authorization server-side for every student and admin resource.
-- Use least-privilege roles for contributors, reviewers, publishers and system administrators.
-- Separate student access from administrative data operations.
-- Prevent cross-user access to profiles, answers, saved items and private traces.
-- Audit privileged actions, role changes, approvals and publication.
-- Avoid storing secrets in source code, client bundles, logs or ordinary database fields.
+## 11.2 Identity and authorization
 
-## Application security
-Validate all inputs server-side; constrain uploads by type and size; protect file parsing; use secure session/cookie settings; rate-limit sensitive endpoints; prevent injection and unsafe query construction; apply CSRF/origin protections where relevant; use secure headers and dependency updates; and avoid returning stack traces or internal details to users.
+Clerk is the agreed authentication direction. Authentication proves identity; CareerBridge authorization decides what that identity may do. Enforce student ownership and Admin role/permission checks on the server for every protected operation. Never rely on hidden UI controls or client-provided role values. Map Clerk identities to internal application users using stable identifiers and verified webhook/synchronization logic.
 
-Treat scraped pages, uploaded documents and retrieved RAG chunks as untrusted data. They may contain prompt-injection instructions; never let them override system policy, authorization or tool boundaries.
+## 11.3 Student privacy
 
-## AI-specific controls
-- Retrieve only data the requesting user is allowed to access.
-- Keep provider keys server-side.
-- Validate citations against retrieved source references.
-- Do not expose private student context in another student's answer.
-- Do not allow the LLM to invent catalogue records, eligibility, dates, fees or personalised rationale.
-- Clearly distinguish generated explanations from official source statements.
-- Apply rate limits, cost controls and safe failure behaviour.
-- Minimise and redact personal information in observability traces.
+Collect only data necessary for a stated feature. Explain optional inputs. Avoid exact home address for general institution discovery. Protect discovery answers, saved items, history and next steps as private student data. Provide approved data access/deletion/export controls and document retention rules. Do not put secrets or sensitive student data in logs.
 
-## Data and publication quality
-Test source provenance, freshness, duplicate detection, relationship integrity, status transitions, review permissions, last-known-good preservation and superseded-document exclusion. Corrections should be traceable. Unknown data must remain unknown rather than being filled with guesses.
+## 11.4 Secrets and integrations
 
-## Test strategy
-- **Unit:** domain rules, validators, transformations, status transitions and recommendation evidence construction.
-- **Integration:** database constraints, API authorization, imports, source adapters, review/publication and indexing.
-- **End-to-end:** student discovery, Guided Explorer, Explore catalogues, saved/next-step journeys and complete Admin data workflow.
-- **AI/RAG:** retrieval relevance, citation correctness, unsupported questions, stale/superseded source handling, prompt injection and privacy boundaries.
-- **Data quality:** source conflicts, malformed imports, duplicate entities, missing values and failed refreshes.
-- **UX/accessibility:** keyboard operation, focus, contrast, labels, responsive layouts, loading/empty/error/recovery states.
-- **Security:** cross-user access, role escalation, upload abuse, rate limits, secret exposure and common web vulnerabilities.
-- **Performance/reliability:** pagination, long-running jobs, retries, timeouts, backups and recovery.
+Keep DB, Clerk, Maps, LLM, embedding, storage and job credentials server-side. Use separate development/staging/production credentials. Rotate compromised credentials. Restrict API keys by application/API where supported. Never commit `.env` files or paste connection strings into issues/docs.
 
-## Evaluation with students
-Use a documented protocol, appropriate consent and privacy safeguards. Evaluate whether students understand options and explanations, whether sources are trusted, whether the experience feels pressuring, and whether next steps are clear. A small usability study can reveal issues but must not be described as statistically representative without a suitable design.
+## 11.5 API and application security
 
-## Release readiness
-A feature is not complete because its page renders. Before release, verify permissions, data quality, source/freshness behaviour, error handling, accessibility, integration and tests. Record known limitations and do not claim checks that were not run.
+Validate all inputs at trust boundaries. Enforce authorization on every read/write. Use parameterized/typed DB access. Apply rate limits to authentication, AI and expensive operations. Protect state-changing routes against CSRF where relevant. Configure secure cookie/session behaviour through the selected auth integration. Prevent mass assignment and unsafe object access. Avoid exposing stack traces or secrets to clients.
+
+## 11.6 Admin security
+
+Separate contributor, reviewer, publisher and system-admin permissions. Require server-side checks and audit high-impact actions. Protect role changes, source configuration, publication and exports. Reviewers should not silently approve their own material changes by default.
+
+## 11.7 AI security
+
+Treat retrieved documents and user input as untrusted. Defend against prompt injection. Do not allow retrieved text to change system instructions or authorization. Do not expose another student's data through retrieval. Validate citations against retrieved evidence. Apply rate/cost controls and safe failure behaviour.
+
+## 11.8 Data integrity
+
+Use migrations, foreign keys, uniqueness constraints, transactions and validation. Preserve last-known-good records. Use idempotent imports/jobs. Separate real/demo/test data. Audit publication and important changes. Back up and test restore.
+
+## 11.9 Quality assurance
+
+Test unit/domain rules, API/service contracts, database constraints/migrations, authentication, authorization, student flows, Admin workflows, ingestion, AI retrieval/explanations, maps, localization, accessibility, responsive layouts and recovery paths.
+
+## 11.10 Minimum test categories
+
+- Unit tests for domain logic and validation.
+- Integration tests for DB, auth and services.
+- API tests for permissions and response contracts.
+- End-to-end tests for Discover → Results → Guided/independent → Explore.
+- Admin vertical-slice tests from draft to publication.
+- Migration/data-preservation tests.
+- Source failure/last-known-good tests.
+- RAG citation and unsupported-answer tests.
+- XAI evidence-faithfulness tests.
+- Accessibility and responsive checks.
+- Backup/restore drills.
+
+## 11.11 Release quality gate
+
+No release based solely on pages rendering. Require passing build/typecheck/lint and relevant tests, verified migrations, permission checks, source/data quality review, secrets scan, backup/restore evidence, operational monitoring and documented known limitations. Do not report checks as passed unless actually executed.
