@@ -57,3 +57,21 @@ Use deterministic seed scripts for tests and clearly labelled demo data. Product
 ## 3.10 Verification
 
 Test fresh database setup, upgrade from the current schema, foreign-key behaviour, uniqueness, transaction rollback, student ownership, query performance and backup restoration.
+
+## 3.11 Initial Drizzle migration scope
+
+The initial Drizzle schema contains only the approved catalogue and student domains:
+
+- Geography: `states`.
+- Catalogue identities and lifecycle: `catalog_items`, `catalog_item_aliases`, `catalog_item_revisions`.
+- Typed catalogue revisions: `field_revisions`, `institution_revisions`, `campus_revisions`, `course_revisions`, `course_offering_revisions`, `pathway_revisions`, `examination_revisions`, and `scholarship_revisions`.
+- Provenance: `source_registry`, `catalog_revision_sources`.
+- Student data: `student_profiles`, `discover_answers`, `guided_explorer_sessions`, `guided_explorer_session_questions`, `guided_explorer_answers`, `saved_items`, and `exploration_history`.
+
+The migration does not declare or alter `users`, `auth_sessions`, or `account_data`. It requires all three existing `public` tables and an integer `public.users.id` before creating the new schema, then adds foreign keys to `users`. Provision or restore the legacy authentication schema and preserve its data separately before applying this migration; no legacy account or session copy is included here.
+
+The migration seeds the eight Northeast state rows and deterministic CareerBridge aliases for current static field, course, institution, pathway, examination, scholarship, and institution-offering identities. It does not seed catalogue revision content or backfill student rows. Saved/history backfill must resolve each legacy key through `catalog_item_aliases`, keep offering `courseId` as the context key (including the empty-string case), leave `account_data` intact during reconciliation, and switch reads/writes only after counts, contexts, timestamps, removals, and restored items match.
+
+Handwritten migration SQL enforces the published-revision pointer/status relationship and immutability, exactly one correctly typed row per catalogue revision, catalogue relationship item types, source URL normalization, legacy alias type mapping, and Saved/History context-key consistency. `UNIQUE NULLS NOT DISTINCT` requires PostgreSQL 15 or later.
+
+Admin review/publication event tables, `student_next_steps`, Clerk, AI/RAG/recommendation data, source-fetch scheduling, and catalogue content imports remain later-phase work. The initial migration has not been applied; do not treat successful Drizzle generation as validation against a database.

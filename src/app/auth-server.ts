@@ -1,7 +1,7 @@
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { Pool } from "pg";
 import type { AuthUser } from "./auth-types";
+import { getPool } from "../db/pool";
 import {
   emptyPersonalData,
   isPersonalDataSnapshot,
@@ -15,20 +15,7 @@ const SESSION_COOKIE = "cb_session";
 const SESSION_DAYS = 30;
 const deriveKey = promisify(scrypt);
 
-let pool: Pool | undefined;
 let schemaReady: Promise<void> | undefined;
-
-function getPool() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("Authentication is unavailable because DATABASE_URL is not configured.");
-  }
-  pool ??= new Pool({
-    connectionString: process.env.DATABASE_URL,
-    connectionTimeoutMillis: 3000,
-    max: 5,
-  });
-  return pool;
-}
 
 async function ensureSchema() {
   if (!schemaReady) {

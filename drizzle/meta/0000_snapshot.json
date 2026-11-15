@@ -1,0 +1,2054 @@
+{
+  "id": "219c6693-16ee-4424-af62-eb732ad4fe63",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.campus_revisions": {
+      "name": "campus_revisions",
+      "schema": "",
+      "columns": {
+        "revision_id": {
+          "name": "revision_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "institution_item_id": {
+          "name": "institution_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state_id": {
+          "name": "state_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campus_content": {
+          "name": "campus_content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        }
+      },
+      "indexes": {
+        "campus_revisions_institution_idx": {
+          "name": "campus_revisions_institution_idx",
+          "columns": [
+            {
+              "expression": "institution_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "campus_revisions_state_idx": {
+          "name": "campus_revisions_state_idx",
+          "columns": [
+            {
+              "expression": "state_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "campus_revisions_revision_id_catalog_item_revisions_id_fk": {
+          "name": "campus_revisions_revision_id_catalog_item_revisions_id_fk",
+          "tableFrom": "campus_revisions",
+          "tableTo": "catalog_item_revisions",
+          "columnsFrom": [
+            "revision_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "campus_revisions_institution_item_id_catalog_items_id_fk": {
+          "name": "campus_revisions_institution_item_id_catalog_items_id_fk",
+          "tableFrom": "campus_revisions",
+          "tableTo": "catalog_items",
+          "columnsFrom": [
+            "institution_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "campus_revisions_state_id_states_id_fk": {
+          "name": "campus_revisions_state_id_states_id_fk",
+          "tableFrom": "campus_revisions",
+          "tableTo": "states",
+          "columnsFrom": [
+            "state_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "campus_revisions_content_object_check": {
+          "name": "campus_revisions_content_object_check",
+          "value": "jsonb_typeof(\"campus_revisions\".\"campus_content\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.catalog_item_aliases": {
+      "name": "catalog_item_aliases",
+      "schema": "",
+      "columns": {
+        "source_system": {
+          "name": "source_system",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "external_type": {
+          "name": "external_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "external_key": {
+          "name": "external_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "external_context_key": {
+          "name": "external_context_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "catalog_item_id": {
+          "name": "catalog_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "catalog_item_aliases_item_idx": {
+          "name": "catalog_item_aliases_item_idx",
+          "columns": [
+            {
+              "expression": "catalog_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "catalog_item_aliases_catalog_item_id_catalog_items_id_fk": {
+          "name": "catalog_item_aliases_catalog_item_id_catalog_items_id_fk",
+          "tableFrom": "catalog_item_aliases",
+          "tableTo": "catalog_items",
+          "columnsFrom": [
+            "catalog_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "catalog_item_aliases_pk": {
+          "name": "catalog_item_aliases_pk",
+          "columns": [
+            "source_system",
+            "external_type",
+            "external_key",
+            "external_context_key"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "catalog_item_aliases_external_values_check": {
+          "name": "catalog_item_aliases_external_values_check",
+          "value": "\"catalog_item_aliases\".\"source_system\" <> '' AND \"catalog_item_aliases\".\"external_type\" <> '' AND \"catalog_item_aliases\".\"external_key\" <> ''"
+        },
+        "catalog_item_aliases_context_check": {
+          "name": "catalog_item_aliases_context_check",
+          "value": "\"catalog_item_aliases\".\"external_type\" = 'institution-offering' OR \"catalog_item_aliases\".\"external_context_key\" = ''"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.catalog_item_revisions": {
+      "name": "catalog_item_revisions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "catalog_item_id": {
+          "name": "catalog_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revision_number": {
+          "name": "revision_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "publication_status": {
+          "name": "publication_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data_classification": {
+          "name": "data_classification",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "verification_status": {
+          "name": "verification_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unverified'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "published_by": {
+          "name": "published_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "catalog_item_revisions_status_idx": {
+          "name": "catalog_item_revisions_status_idx",
+          "columns": [
+            {
+              "expression": "publication_status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "catalog_item_revisions_classification_idx": {
+          "name": "catalog_item_revisions_classification_idx",
+          "columns": [
+            {
+              "expression": "data_classification",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "catalog_item_revisions_verification_idx": {
+          "name": "catalog_item_revisions_verification_idx",
+          "columns": [
+            {
+              "expression": "verification_status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "catalog_item_revisions_item_status_idx": {
+          "name": "catalog_item_revisions_item_status_idx",
+          "columns": [
+            {
+              "expression": "catalog_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "publication_status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "catalog_item_revisions_catalog_item_id_catalog_items_id_fk": {
+          "name": "catalog_item_revisions_catalog_item_id_catalog_items_id_fk",
+          "tableFrom": "catalog_item_revisions",
+          "tableTo": "catalog_items",
+          "columnsFrom": [
+            "catalog_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "catalog_item_revisions_item_revision_unique": {
+          "name": "catalog_item_revisions_item_revision_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "catalog_item_id",
+            "revision_number"
+          ]
+        },
+        "catalog_item_revisions_item_id_unique": {
+          "name": "catalog_item_revisions_item_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "catalog_item_id",
+            "id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "catalog_item_revisions_number_check": {
+          "name": "catalog_item_revisions_number_check",
+          "value": "\"catalog_item_revisions\".\"revision_number\" >= 1"
+        },
+        "catalog_item_revisions_publication_status_check": {
+          "name": "catalog_item_revisions_publication_status_check",
+          "value": "\"catalog_item_revisions\".\"publication_status\" IN ('draft', 'in_review', 'approved', 'published', 'archived', 'rejected')"
+        },
+        "catalog_item_revisions_classification_check": {
+          "name": "catalog_item_revisions_classification_check",
+          "value": "\"catalog_item_revisions\".\"data_classification\" IN ('real', 'demo', 'test')"
+        },
+        "catalog_item_revisions_verification_check": {
+          "name": "catalog_item_revisions_verification_check",
+          "value": "\"catalog_item_revisions\".\"verification_status\" IN ('not_collected', 'unverified', 'pending_review', 'verified', 'partially_verified', 'disputed', 'unavailable', 'stale', 'expired', 'superseded')"
+        },
+        "catalog_item_revisions_published_at_check": {
+          "name": "catalog_item_revisions_published_at_check",
+          "value": "(\"catalog_item_revisions\".\"publication_status\" = 'published') = (\"catalog_item_revisions\".\"published_at\" IS NOT NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.catalog_items": {
+      "name": "catalog_items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "item_type": {
+          "name": "item_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "published_revision_id": {
+          "name": "published_revision_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "catalog_items_type_idx": {
+          "name": "catalog_items_type_idx",
+          "columns": [
+            {
+              "expression": "item_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "catalog_items_published_revision_idx": {
+          "name": "catalog_items_published_revision_idx",
+          "columns": [
+            {
+              "expression": "published_revision_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "catalog_items_id_type_unique": {
+          "name": "catalog_items_id_type_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "item_type"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "catalog_items_type_check": {
+          "name": "catalog_items_type_check",
+          "value": "\"catalog_items\".\"item_type\" IN ('field', 'institution', 'campus', 'course', 'course_offering', 'pathway', 'examination', 'scholarship')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.catalog_revision_sources": {
+      "name": "catalog_revision_sources",
+      "schema": "",
+      "columns": {
+        "revision_id": {
+          "name": "revision_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_id": {
+          "name": "source_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checked_at": {
+          "name": "checked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verified_at": {
+          "name": "verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verification_status": {
+          "name": "verification_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "catalog_revision_sources_source_idx": {
+          "name": "catalog_revision_sources_source_idx",
+          "columns": [
+            {
+              "expression": "source_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "catalog_revision_sources_revision_id_catalog_item_revisions_id_fk": {
+          "name": "catalog_revision_sources_revision_id_catalog_item_revisions_id_fk",
+          "tableFrom": "catalog_revision_sources",
+          "tableTo": "catalog_item_revisions",
+          "columnsFrom": [
+            "revision_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "catalog_revision_sources_source_id_source_registry_id_fk": {
+          "name": "catalog_revision_sources_source_id_source_registry_id_fk",
+          "tableFrom": "catalog_revision_sources",
+          "tableTo": "source_registry",
+          "columnsFrom": [
+            "source_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "catalog_revision_sources_pk": {
+          "name": "catalog_revision_sources_pk",
+          "columns": [
+            "revision_id",
+            "source_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "catalog_revision_sources_verification_check": {
+          "name": "catalog_revision_sources_verification_check",
+          "value": "\"catalog_revision_sources\".\"verification_status\" IS NULL OR \"catalog_revision_sources\".\"verification_status\" IN ('not_collected', 'unverified', 'pending_review', 'verified', 'partially_verified', 'disputed', 'unavailable', 'stale', 'expired', 'superseded')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.course_offering_revisions": {
+      "name": "course_offering_revisions",
+      "schema": "",
+      "columns": {
+        "revision_id": {
+          "name": "revision_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "course_item_id": {
+          "name": "course_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "course_revision_id": {
+          "name": "course_revision_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "campus_item_id": {
+          "name": "campus_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "campus_revision_id": {
+          "name": "campus_revision_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "offering_content": {
+          "name": "offering_content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        }
+      },
+      "indexes": {
+        "course_offering_revisions_course_idx": {
+          "name": "course_offering_revisions_course_idx",
+          "columns": [
+            {
+              "expression": "course_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "course_revision_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "course_offering_revisions_campus_idx": {
+          "name": "course_offering_revisions_campus_idx",
+          "columns": [
+            {
+              "expression": "campus_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "campus_revision_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "course_offering_revisions_revision_id_catalog_item_revisions_id_fk": {
+          "name": "course_offering_revisions_revision_id_catalog_item_revisions_id_fk",
+          "tableFrom": "course_offering_revisions",
+          "tableTo": "catalog_item_revisions",
+          "columnsFrom": [
+            "revision_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "course_offering_revisions_course_revision_fk": {
+          "name": "course_offering_revisions_course_revision_fk",
+          "tableFrom": "course_offering_revisions",
+          "tableTo": "catalog_item_revisions",
+          "columnsFrom": [
+            "course_item_id",
+            "course_revision_id"
+          ],
+          "columnsTo": [
+            "catalog_item_id",
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "course_offering_revisions_campus_revision_fk": {
+          "name": "course_offering_revisions_campus_revision_fk",
+          "tableFrom": "course_offering_revisions",
+          "tableTo": "catalog_item_revisions",
+          "columnsFrom": [
+            "campus_item_id",
+            "campus_revision_id"
+          ],
+          "columnsTo": [
+            "catalog_item_id",
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "course_offering_revisions_content_object_check": {
+          "name": "course_offering_revisions_content_object_check",
+          "value": "jsonb_typeof(\"course_offering_revisions\".\"offering_content\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.course_revisions": {
+      "name": "course_revisions",
+      "schema": "",
+      "columns": {
+        "revision_id": {
+          "name": "revision_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "field_item_id": {
+          "name": "field_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "field_revision_id": {
+          "name": "field_revision_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "qualification": {
+          "name": "qualification",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "study_stages": {
+          "name": "study_stages",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "course_content": {
+          "name": "course_content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        }
+      },
+      "indexes": {
+        "course_revisions_field_item_idx": {
+          "name": "course_revisions_field_item_idx",
+          "columns": [
+            {
+              "expression": "field_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "course_revisions_field_revision_idx": {
+          "name": "course_revisions_field_revision_idx",
+          "columns": [
+            {
+              "expression": "field_revision_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "course_revisions_revision_id_catalog_item_revisions_id_fk": {
+          "name": "course_revisions_revision_id_catalog_item_revisions_id_fk",
+          "tableFrom": "course_revisions",
+          "tableTo": "catalog_item_revisions",
+          "columnsFrom": [
+            "revision_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "course_revisions_field_revision_fk": {
+          "name": "course_revisions_field_revision_fk",
+          "tableFrom": "course_revisions",
+          "tableTo": "catalog_item_revisions",
+          "columnsFrom": [
+            "field_item_id",
+            "field_revision_id"
+          ],
+          "columnsTo": [
+            "catalog_item_id",
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "course_revisions_qualification_check": {
+          "name": "course_revisions_qualification_check",
+          "value": "\"course_revisions\".\"qualification\" IN ('Higher secondary', 'Degree', 'Diploma', 'Certificate', 'Vocational', 'Professional', 'Skill training')"
+        },
+        "course_revisions_stages_array_check": {
+          "name": "course_revisions_stages_array_check",
+          "value": "jsonb_typeof(\"course_revisions\".\"study_stages\") = 'array'"
+        },
+        "course_revisions_content_object_check": {
+          "name": "course_revisions_content_object_check",
+          "value": "jsonb_typeof(\"course_revisions\".\"course_content\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.examination_revisions": {
+      "name": "examination_revisions",
+      "schema": "",
+      "columns": {
+        "revision_id": {
+          "name": "revision_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "level": {
+          "name": "level",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stages": {
+          "name": "stages",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "examination_content": {
+          "name": "examination_content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "examination_revisions_revision_id_catalog_item_revisions_id_fk": {
+          "name": "examination_revisions_revision_id_catalog_item_revisions_id_fk",
+          "tableFrom": "examination_revisions",
+          "tableTo": "catalog_item_revisions",
+          "columnsFrom": [
+            "revision_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "examination_revisions_level_check": {
+          "name": "examination_revisions_level_check",
+          "value": "\"examination_revisions\".\"level\" IN ('national', 'state', 'institution')"
+        },
+        "examination_revisions_stages_array_check": {
+          "name": "examination_revisions_stages_array_check",
+          "value": "jsonb_typeof(\"examination_revisions\".\"stages\") = 'array'"
+        },
+        "examination_revisions_content_object_check": {
+          "name": "examination_revisions_content_object_check",
+          "value": "jsonb_typeof(\"examination_revisions\".\"examination_content\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.field_revisions": {
+      "name": "field_revisions",
+      "schema": "",
+      "columns": {
+        "revision_id": {
+          "name": "revision_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "field_content": {
+          "name": "field_content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "field_revisions_revision_id_catalog_item_revisions_id_fk": {
+          "name": "field_revisions_revision_id_catalog_item_revisions_id_fk",
+          "tableFrom": "field_revisions",
+          "tableTo": "catalog_item_revisions",
+          "columnsFrom": [
+            "revision_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "field_revisions_content_object_check": {
+          "name": "field_revisions_content_object_check",
+          "value": "jsonb_typeof(\"field_revisions\".\"field_content\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.institution_revisions": {
+      "name": "institution_revisions",
+      "schema": "",
+      "columns": {
+        "revision_id": {
+          "name": "revision_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "institution_type": {
+          "name": "institution_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ownership": {
+          "name": "ownership",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "institution_content": {
+          "name": "institution_content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "institution_revisions_revision_id_catalog_item_revisions_id_fk": {
+          "name": "institution_revisions_revision_id_catalog_item_revisions_id_fk",
+          "tableFrom": "institution_revisions",
+          "tableTo": "catalog_item_revisions",
+          "columnsFrom": [
+            "revision_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "institution_revisions_type_check": {
+          "name": "institution_revisions_type_check",
+          "value": "\"institution_revisions\".\"institution_type\" IN ('College', 'University', 'Institute', 'School', 'Training centre')"
+        },
+        "institution_revisions_ownership_check": {
+          "name": "institution_revisions_ownership_check",
+          "value": "\"institution_revisions\".\"ownership\" IS NULL OR \"institution_revisions\".\"ownership\" IN ('Government', 'Private', 'Public')"
+        },
+        "institution_revisions_content_object_check": {
+          "name": "institution_revisions_content_object_check",
+          "value": "jsonb_typeof(\"institution_revisions\".\"institution_content\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.pathway_revisions": {
+      "name": "pathway_revisions",
+      "schema": "",
+      "columns": {
+        "revision_id": {
+          "name": "revision_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "stage": {
+          "name": "stage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "course_stage": {
+          "name": "course_stage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pathway_content": {
+          "name": "pathway_content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pathway_revisions_revision_id_catalog_item_revisions_id_fk": {
+          "name": "pathway_revisions_revision_id_catalog_item_revisions_id_fk",
+          "tableFrom": "pathway_revisions",
+          "tableTo": "catalog_item_revisions",
+          "columnsFrom": [
+            "revision_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "pathway_revisions_stage_check": {
+          "name": "pathway_revisions_stage_check",
+          "value": "\"pathway_revisions\".\"stage\" IN ('class-10', 'class-12')"
+        },
+        "pathway_revisions_course_stage_check": {
+          "name": "pathway_revisions_course_stage_check",
+          "value": "\"pathway_revisions\".\"course_stage\" IN ('class-10', 'class-12')"
+        },
+        "pathway_revisions_content_object_check": {
+          "name": "pathway_revisions_content_object_check",
+          "value": "jsonb_typeof(\"pathway_revisions\".\"pathway_content\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.scholarship_revisions": {
+      "name": "scholarship_revisions",
+      "schema": "",
+      "columns": {
+        "revision_id": {
+          "name": "revision_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "eligibility_regions": {
+          "name": "eligibility_regions",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scholarship_content": {
+          "name": "scholarship_content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "scholarship_revisions_revision_id_catalog_item_revisions_id_fk": {
+          "name": "scholarship_revisions_revision_id_catalog_item_revisions_id_fk",
+          "tableFrom": "scholarship_revisions",
+          "tableTo": "catalog_item_revisions",
+          "columnsFrom": [
+            "revision_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "scholarship_revisions_status_check": {
+          "name": "scholarship_revisions_status_check",
+          "value": "\"scholarship_revisions\".\"status\" IN ('open', 'upcoming', 'closed', 'unknown')"
+        },
+        "scholarship_revisions_eligibility_regions_check": {
+          "name": "scholarship_revisions_eligibility_regions_check",
+          "value": "(\"scholarship_revisions\".\"eligibility_regions\" = '\"all\"'::jsonb) OR jsonb_typeof(\"scholarship_revisions\".\"eligibility_regions\") = 'array'"
+        },
+        "scholarship_revisions_content_object_check": {
+          "name": "scholarship_revisions_content_object_check",
+          "value": "jsonb_typeof(\"scholarship_revisions\".\"scholarship_content\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.source_registry": {
+      "name": "source_registry",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_type": {
+          "name": "source_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "canonical_url": {
+          "name": "canonical_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "normalized_url": {
+          "name": "normalized_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "source_registry_type_status_idx": {
+          "name": "source_registry_type_status_idx",
+          "columns": [
+            {
+              "expression": "source_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "source_registry_normalized_url_unique": {
+          "name": "source_registry_normalized_url_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "normalized_url"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "source_registry_type_check": {
+          "name": "source_registry_type_check",
+          "value": "\"source_registry\".\"source_type\" IN ('official_api', 'structured_government_dataset', 'official_download', 'official_public_web_page', 'admin_manual_entry')"
+        },
+        "source_registry_status_check": {
+          "name": "source_registry_status_check",
+          "value": "\"source_registry\".\"status\" IN ('active', 'paused', 'retired')"
+        },
+        "source_registry_url_pair_check": {
+          "name": "source_registry_url_pair_check",
+          "value": "(\"source_registry\".\"canonical_url\" IS NULL) = (\"source_registry\".\"normalized_url\" IS NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.states": {
+      "name": "states",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "country_code": {
+          "name": "country_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "states_country_name_unique": {
+          "name": "states_country_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "country_code",
+            "name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "states_country_code_check": {
+          "name": "states_country_code_check",
+          "value": "\"states\".\"country_code\" = 'IN'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.discover_answers": {
+      "name": "discover_answers",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "answers": {
+          "name": "answers",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "schema_version": {
+          "name": "schema_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "discover_answers_schema_version_check": {
+          "name": "discover_answers_schema_version_check",
+          "value": "\"discover_answers\".\"schema_version\" = 1"
+        },
+        "discover_answers_shape_check": {
+          "name": "discover_answers_shape_check",
+          "value": "jsonb_typeof(\"discover_answers\".\"answers\") = 'object'\n          AND \"discover_answers\".\"answers\" ? 'activityIds'\n          AND \"discover_answers\".\"answers\" - 'activityIds' = '{}'::jsonb\n          AND jsonb_typeof(\"discover_answers\".\"answers\"->'activityIds') = 'array'\n          AND jsonb_array_length(\"discover_answers\".\"answers\"->'activityIds') <= 3"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.exploration_history": {
+      "name": "exploration_history",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "catalog_item_id": {
+          "name": "catalog_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "context_key": {
+          "name": "context_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "context": {
+          "name": "context",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_visited_at": {
+          "name": "last_visited_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "visit_count": {
+          "name": "visit_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        }
+      },
+      "indexes": {
+        "exploration_history_catalog_item_idx": {
+          "name": "exploration_history_catalog_item_idx",
+          "columns": [
+            {
+              "expression": "catalog_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "exploration_history_last_visited_idx": {
+          "name": "exploration_history_last_visited_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "last_visited_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "exploration_history_catalog_item_id_catalog_items_id_fk": {
+          "name": "exploration_history_catalog_item_id_catalog_items_id_fk",
+          "tableFrom": "exploration_history",
+          "tableTo": "catalog_items",
+          "columnsFrom": [
+            "catalog_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "exploration_history_identity_unique": {
+          "name": "exploration_history_identity_unique",
+          "nullsNotDistinct": true,
+          "columns": [
+            "user_id",
+            "catalog_item_id",
+            "context_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "exploration_history_visit_count_check": {
+          "name": "exploration_history_visit_count_check",
+          "value": "\"exploration_history\".\"visit_count\" >= 1"
+        },
+        "exploration_history_context_object_check": {
+          "name": "exploration_history_context_object_check",
+          "value": "\"exploration_history\".\"context\" IS NULL OR jsonb_typeof(\"exploration_history\".\"context\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.guided_explorer_answers": {
+      "name": "guided_explorer_answers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "question_id": {
+          "name": "question_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "option_ids": {
+          "name": "option_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "original_text": {
+          "name": "original_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "interpretation_status": {
+          "name": "interpretation_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "response_state": {
+          "name": "response_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "context_option_id": {
+          "name": "context_option_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "edited_at": {
+          "name": "edited_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "guided_explorer_answers_session_question_idx": {
+          "name": "guided_explorer_answers_session_question_idx",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "question_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "guided_explorer_answers_id_check": {
+          "name": "guided_explorer_answers_id_check",
+          "value": "\"guided_explorer_answers\".\"id\" <> ''"
+        },
+        "guided_explorer_answers_option_ids_check": {
+          "name": "guided_explorer_answers_option_ids_check",
+          "value": "jsonb_typeof(\"guided_explorer_answers\".\"option_ids\") = 'array' AND jsonb_array_length(\"guided_explorer_answers\".\"option_ids\") <= 20"
+        },
+        "guided_explorer_answers_interpretation_check": {
+          "name": "guided_explorer_answers_interpretation_check",
+          "value": "\"guided_explorer_answers\".\"interpretation_status\" IN ('clear', 'probable', 'ambiguous', 'unrecognised')"
+        },
+        "guided_explorer_answers_response_state_check": {
+          "name": "guided_explorer_answers_response_state_check",
+          "value": "\"guided_explorer_answers\".\"response_state\" IN ('answered', 'unsure', 'none', 'skip')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.guided_explorer_session_questions": {
+      "name": "guided_explorer_session_questions",
+      "schema": "",
+      "columns": {
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "question_id": {
+          "name": "question_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "path_position": {
+          "name": "path_position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        }
+      },
+      "indexes": {
+        "guided_explorer_session_questions_position_idx": {
+          "name": "guided_explorer_session_questions_position_idx",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "path_position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "guided_explorer_session_questions_session_id_guided_explorer_sessions_id_fk": {
+          "name": "guided_explorer_session_questions_session_id_guided_explorer_sessions_id_fk",
+          "tableFrom": "guided_explorer_session_questions",
+          "tableTo": "guided_explorer_sessions",
+          "columnsFrom": [
+            "session_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "guided_explorer_session_questions_pk": {
+          "name": "guided_explorer_session_questions_pk",
+          "columns": [
+            "session_id",
+            "question_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "guided_explorer_session_questions_position_unique": {
+          "name": "guided_explorer_session_questions_position_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "session_id",
+            "path_position"
+          ]
+        },
+        "guided_explorer_session_questions_position_question_unique": {
+          "name": "guided_explorer_session_questions_position_question_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "session_id",
+            "path_position",
+            "question_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "guided_explorer_session_questions_question_check": {
+          "name": "guided_explorer_session_questions_question_check",
+          "value": "\"guided_explorer_session_questions\".\"question_id\" <> ''"
+        },
+        "guided_explorer_session_questions_path_position_check": {
+          "name": "guided_explorer_session_questions_path_position_check",
+          "value": "\"guided_explorer_session_questions\".\"path_position\" >= 0"
+        },
+        "guided_explorer_session_questions_state_check": {
+          "name": "guided_explorer_session_questions_state_check",
+          "value": "\"guided_explorer_session_questions\".\"state\" IN ('pending', 'asked', 'skipped')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.guided_explorer_sessions": {
+      "name": "guided_explorer_sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "question_bank_version": {
+          "name": "question_bank_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "completion_reason": {
+          "name": "completion_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "current_question_id": {
+          "name": "current_question_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resume_question_id": {
+          "name": "resume_question_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "path_index": {
+          "name": "path_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "guided_explorer_sessions_user_idx": {
+          "name": "guided_explorer_sessions_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "guided_explorer_sessions_status_idx": {
+          "name": "guided_explorer_sessions_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "guided_explorer_sessions_one_current_per_user": {
+          "name": "guided_explorer_sessions_one_current_per_user",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"guided_explorer_sessions\".\"status\" IN ('active', 'paused')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "guided_explorer_sessions_id_check": {
+          "name": "guided_explorer_sessions_id_check",
+          "value": "\"guided_explorer_sessions\".\"id\" <> ''"
+        },
+        "guided_explorer_sessions_version_check": {
+          "name": "guided_explorer_sessions_version_check",
+          "value": "\"guided_explorer_sessions\".\"version\" = 1"
+        },
+        "guided_explorer_sessions_question_bank_version_check": {
+          "name": "guided_explorer_sessions_question_bank_version_check",
+          "value": "\"guided_explorer_sessions\".\"question_bank_version\" >= 1"
+        },
+        "guided_explorer_sessions_status_check": {
+          "name": "guided_explorer_sessions_status_check",
+          "value": "\"guided_explorer_sessions\".\"status\" IN ('active', 'paused', 'completed')"
+        },
+        "guided_explorer_sessions_completion_reason_check": {
+          "name": "guided_explorer_sessions_completion_reason_check",
+          "value": "\"guided_explorer_sessions\".\"completion_reason\" IS NULL OR (\"guided_explorer_sessions\".\"status\" = 'completed' AND \"guided_explorer_sessions\".\"completion_reason\" = 'finished_early')"
+        },
+        "guided_explorer_sessions_path_index_check": {
+          "name": "guided_explorer_sessions_path_index_check",
+          "value": "\"guided_explorer_sessions\".\"path_index\" >= 0"
+        },
+        "guided_explorer_sessions_question_pointer_check": {
+          "name": "guided_explorer_sessions_question_pointer_check",
+          "value": "(\n            \"guided_explorer_sessions\".\"status\" IN ('active', 'paused')\n            AND \"guided_explorer_sessions\".\"current_question_id\" IS NOT NULL\n            AND \"guided_explorer_sessions\".\"resume_question_id\" IS NULL\n          ) OR (\n            \"guided_explorer_sessions\".\"status\" = 'completed'\n            AND \"guided_explorer_sessions\".\"current_question_id\" IS NULL\n            AND (\n              (\"guided_explorer_sessions\".\"completion_reason\" = 'finished_early' AND \"guided_explorer_sessions\".\"resume_question_id\" IS NOT NULL)\n              OR (\"guided_explorer_sessions\".\"completion_reason\" IS NULL AND \"guided_explorer_sessions\".\"resume_question_id\" IS NULL)\n            )\n          )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.saved_items": {
+      "name": "saved_items",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "catalog_item_id": {
+          "name": "catalog_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "context_key": {
+          "name": "context_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "context": {
+          "name": "context",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "saved_at": {
+          "name": "saved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "saved_items_catalog_item_idx": {
+          "name": "saved_items_catalog_item_idx",
+          "columns": [
+            {
+              "expression": "catalog_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "saved_items_catalog_item_id_catalog_items_id_fk": {
+          "name": "saved_items_catalog_item_id_catalog_items_id_fk",
+          "tableFrom": "saved_items",
+          "tableTo": "catalog_items",
+          "columnsFrom": [
+            "catalog_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "saved_items_identity_unique": {
+          "name": "saved_items_identity_unique",
+          "nullsNotDistinct": true,
+          "columns": [
+            "user_id",
+            "catalog_item_id",
+            "context_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "saved_items_context_object_check": {
+          "name": "saved_items_context_object_check",
+          "value": "\"saved_items\".\"context\" IS NULL OR jsonb_typeof(\"saved_items\".\"context\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.student_profiles": {
+      "name": "student_profiles",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "education_stage": {
+          "name": "education_stage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "student_profiles_education_stage_check": {
+          "name": "student_profiles_education_stage_check",
+          "value": "\"student_profiles\".\"education_stage\" IS NULL OR \"student_profiles\".\"education_stage\" IN ('class-10', 'class-12')"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
