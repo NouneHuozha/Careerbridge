@@ -692,23 +692,28 @@ CREATE FUNCTION public.prevent_published_provenance_update()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
-DECLARE
-	revision_id uuid;
 	revision_status text;
 BEGIN
-	IF TG_OP = 'DELETE' THEN
-		revision_id := OLD.revision_id;
-	ELSE
-		revision_id := NEW.revision_id;
+	IF TG_OP <> 'INSERT' THEN
+		SELECT publication_status
+		INTO revision_status
+		FROM public.catalog_item_revisions
+		WHERE id = OLD.revision_id;
+
+		IF revision_status = 'published' THEN
+			RAISE EXCEPTION 'Published catalogue provenance is immutable';
+		END IF;
 	END IF;
 
-	SELECT publication_status
-	INTO revision_status
-	FROM public.catalog_item_revisions
-	WHERE id = revision_id;
+	IF TG_OP <> 'DELETE' THEN
+		SELECT publication_status
+		INTO revision_status
+		FROM public.catalog_item_revisions
+		WHERE id = NEW.revision_id;
 
-	IF revision_status = 'published' THEN
-		RAISE EXCEPTION 'Published catalogue provenance is immutable';
+		IF revision_status = 'published' THEN
+			RAISE EXCEPTION 'Published catalogue provenance is immutable';
+		END IF;
 	END IF;
 
 	IF TG_OP = 'DELETE' THEN
