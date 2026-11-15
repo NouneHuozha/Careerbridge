@@ -692,6 +692,7 @@ CREATE FUNCTION public.prevent_published_provenance_update()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
+DECLARE
 	revision_status text;
 BEGIN
 	IF TG_OP <> 'INSERT' THEN
