@@ -8,7 +8,7 @@ export function getPool() {
   }
   pool ??= new Pool({
     connectionString: process.env.DATABASE_URL,
-    connectionTimeoutMillis: 3000,
+    connectionTimeoutMillis: 10000,
     max: 5,
   });
   return pool;
