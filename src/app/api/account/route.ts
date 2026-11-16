@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  AccountDeletionBlockedError,
   AccountDeletionPartialError,
-  AccountIdentityConflictError,
-  AccountProvisioningRequiredError,
   AuthenticationRequiredError,
   deleteAccount,
-  getCurrentUser,
 } from "../../auth-server";
 
 const noStore = { "Cache-Control": "no-store" };
@@ -35,11 +33,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Sign in again before deleting your account." }, { status: 401, headers: noStore });
-    }
-    const deleted = await deleteAccount(user.id, body.password);
+    const deleted = await deleteAccount(body.password);
     if (!deleted) {
       return NextResponse.json({ error: "That password doesn't match this account." }, { status: 401, headers: noStore });
     }
@@ -48,12 +42,18 @@ export async function DELETE(request: NextRequest) {
     if (error instanceof AuthenticationRequiredError) {
       return NextResponse.json({ error: error.message }, { status: 401, headers: noStore });
     }
-    if (error instanceof AccountProvisioningRequiredError || error instanceof AccountIdentityConflictError) {
-      return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
-    }
     if (error instanceof AccountDeletionPartialError) {
       console.error("[careerbridge-next] account deletion partially completed", error);
-      return NextResponse.json({ error: error.message }, { status: 503, headers: noStore });
+      return NextResponse.json(
+        { error: error.message, deletionPending: true },
+        { status: 503, headers: noStore },
+      );
+    }
+    if (error instanceof AccountDeletionBlockedError) {
+      return NextResponse.json(
+        { error: error.message, deletionBlocked: true },
+        { status: 409, headers: noStore },
+      );
     }
     console.error("[careerbridge-next] account deletion failed", error);
     return NextResponse.json(

@@ -56,13 +56,33 @@ export function StudentNavigation() {
   }
 
   async function deleteAccount(password: string, confirmation: string) {
-    if (!(await account.flushChanges())) {
-      return {
-        ok: false,
-        error: "Some changes still need to sync. Retry them before deleting your account.",
-      };
-    }
     try {
+      const sessionResponse = await fetch("/api/auth/session", { cache: "no-store" });
+      let sessionResult: unknown = null;
+      try {
+        sessionResult = await sessionResponse.json();
+      } catch {
+        sessionResult = null;
+      }
+      const deletionPending =
+        sessionResponse.status === 409 &&
+        typeof sessionResult === "object" &&
+        sessionResult !== null &&
+        "deletionPending" in sessionResult &&
+        sessionResult.deletionPending === true;
+      if (!sessionResponse.ok && !deletionPending) {
+        return {
+          ok: false,
+          error: "Your account status could not be verified. Please try again.",
+        };
+      }
+      if (!deletionPending && !(await account.flushChanges())) {
+        return {
+          ok: false,
+          error: "Some changes still need to sync. Retry them before deleting your account.",
+        };
+      }
+
       const response = await fetch("/api/account", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },

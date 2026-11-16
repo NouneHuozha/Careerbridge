@@ -1,5 +1,6 @@
 import { connection, NextRequest, NextResponse } from "next/server";
 import {
+  AccountDeletionPendingError,
   AccountIdentityConflictError,
   AccountProvisioningRequiredError,
   getAccountData,
@@ -26,6 +27,9 @@ export async function GET() {
     const data = await getAccountData(user.id);
     return NextResponse.json({ data }, { headers: noStore });
   } catch (error) {
+    if (error instanceof AccountDeletionPendingError) {
+      return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
+    }
     if (error instanceof AccountProvisioningRequiredError || error instanceof AccountIdentityConflictError) {
       return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
     }
@@ -70,6 +74,9 @@ export async function POST(request: NextRequest) {
     const data = await updateAccountData(user.id, input);
     return NextResponse.json({ data }, { headers: noStore });
   } catch (error) {
+    if (error instanceof AccountDeletionPendingError) {
+      return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
+    }
     if (error instanceof AccountProvisioningRequiredError || error instanceof AccountIdentityConflictError) {
       return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
     }

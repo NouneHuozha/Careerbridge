@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   AccountIdentityConflictError,
+  AccountDeletionPendingError,
   AccountSetupValidationError,
   AuthenticationRequiredError,
   provisionCurrentUser,
@@ -55,6 +56,12 @@ export async function POST(request: NextRequest) {
     const user = await provisionCurrentUser(input);
     return NextResponse.json({ user }, { headers: noStore });
   } catch (error) {
+    if (error instanceof AccountDeletionPendingError) {
+      return NextResponse.json(
+        { error: error.message, deletionPending: true },
+        { status: 409, headers: noStore },
+      );
+    }
     if (error instanceof AuthenticationRequiredError) {
       return NextResponse.json({ error: error.message }, { status: 401, headers: noStore });
     }

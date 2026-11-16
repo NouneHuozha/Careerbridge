@@ -1,5 +1,6 @@
 import { connection, NextResponse } from "next/server";
 import {
+  AccountDeletionPendingError,
   AccountIdentityConflictError,
   AccountProvisioningRequiredError,
   getCurrentUser,
@@ -13,6 +14,12 @@ export async function GET() {
     const user = await getCurrentUser();
     return NextResponse.json({ user }, { headers: noStore });
   } catch (error) {
+    if (error instanceof AccountDeletionPendingError) {
+      return NextResponse.json(
+        { error: error.message, deletionPending: true },
+        { status: 409, headers: noStore },
+      );
+    }
     if (error instanceof AccountProvisioningRequiredError) {
       return NextResponse.json(
         { error: error.message, provisioningRequired: true },

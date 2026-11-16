@@ -57,6 +57,15 @@ export default function SignInForm({
       result = null;
     }
     if (response.status === 409) {
+      if (
+        typeof result === "object" &&
+        result !== null &&
+        (("provisioningRequired" in result && result.provisioningRequired === true) ||
+          ("deletionPending" in result && result.deletionPending === true))
+      ) {
+        router.push(`/sign-up?next=${encodeURIComponent(next)}`);
+        return;
+      }
       setError(responseError(
         result,
         "This Clerk identity is not set up for CareerBridge. Create an account to finish setup.",

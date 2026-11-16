@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import SignInForm from "./sign-in-form";
 import SignUpForm from "./sign-up-form";
@@ -15,18 +14,11 @@ export default function AuthPageLayout({
 }: {
   initialMode: AuthMode;
 }) {
-  const [mode, setMode] = useState(initialMode);
+  const pathname = usePathname();
+  const mode = pathname === "/sign-up" ? "sign-up" : initialMode;
   const searchParams = useSearchParams();
   const next = safeReturnPath(searchParams.get("next"));
   const errorMessage = searchParams.get("error") ?? undefined;
-
-  useEffect(() => {
-    function syncMode() {
-      setMode(window.location.pathname === "/sign-up" ? "sign-up" : "sign-in");
-    }
-    window.addEventListener("popstate", syncMode);
-    return () => window.removeEventListener("popstate", syncMode);
-  }, []);
 
   function switchMode(nextMode: AuthMode) {
     if (nextMode === mode) return;
@@ -34,7 +26,6 @@ export default function AuthPageLayout({
     url.pathname = `/${nextMode}`;
     url.search = new URLSearchParams({ next }).toString();
     window.history.pushState(null, "", url);
-    setMode(nextMode);
   }
 
   const signingUp = mode === "sign-up";
