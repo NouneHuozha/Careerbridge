@@ -1,5 +1,6 @@
 "use client";
 
+import { useClerk } from "@clerk/nextjs";
 import {
   createContext,
   useCallback,
@@ -43,6 +44,7 @@ type AccountContextValue = {
   flushChanges: () => Promise<boolean>;
   refresh: () => Promise<void>;
   signOut: () => Promise<boolean>;
+  finishAccountDeletion: () => Promise<boolean>;
 };
 
 const AccountContext = createContext<AccountContextValue | null>(null);
@@ -56,6 +58,7 @@ function accountError(value: unknown, fallback: string) {
 }
 
 export function AccountProvider({ children }: { children: ReactNode }) {
+  const { signOut: clerkSignOut } = useClerk();
   const [status, setStatus] = useState<AccountStatus>("loading");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +74,15 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     const currentRequest = ++requestId.current;
     try {
       const sessionResponse = await fetch("/api/auth/session", { cache: "no-store" });
-      if (!sessionResponse.ok) throw new Error("Account services are unavailable.");
+      if (!sessionResponse.ok) {
+        let responseBody: unknown = null;
+        try {
+          responseBody = await sessionResponse.json();
+        } catch {
+          responseBody = null;
+        }
+        throw new Error(accountError(responseBody, "Account services are unavailable."));
+      }
       const sessionResult: unknown = await sessionResponse.json();
       if (!isRecord(sessionResult) || !("user" in sessionResult)) {
         throw new Error("The account session response couldn't be validated.");
@@ -228,8 +239,20 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     if (!(await flushAccountMutations())) return false;
     try {
-      const response = await fetch("/api/auth/sign-out", { method: "POST" });
-      if (!response.ok) return false;
+      await clerkSignOut();
+    } catch {
+      return false;
+    }
+
+    function broadcastSignOut() {
+      if ("BroadcastChannel" in window) {
+        const channel = new BroadcastChannel("careerbridge-auth-state");
+        channel.postMessage("signed-out");
+        channel.close();
+      }
+    }
+
+    try {
       try {
         clearPersonalDataCache();
       } catch {
@@ -237,6 +260,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         setStatus("unavailable");
         setError("You are signed out, but this tab couldn't clear its account data. Close this tab and reopen CareerBridge.");
         setUser(null);
+        broadcastSignOut();
         return true;
       }
       setUser(null);
@@ -245,16 +269,41 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       setMigration(null);
       setSyncError(null);
       accountData.current = emptyPersonalData();
-      if ("BroadcastChannel" in window) {
-        const channel = new BroadcastChannel("careerbridge-auth-state");
-        channel.postMessage("signed-out");
-        channel.close();
-      }
+      broadcastSignOut();
       return true;
     } catch {
       return false;
     }
-  }, []);
+  }, [clerkSignOut]);
+
+  const finishAccountDeletion = useCallback(async () => {
+    let cleared = true;
+    try {
+      await clerkSignOut();
+    } catch {
+      cleared = false;
+    }
+
+    try {
+      clearPersonalDataCache();
+    } catch {
+      lockPersonalData();
+      cleared = false;
+    }
+
+    setUser(null);
+    setMigration(null);
+    setSyncError(null);
+    accountData.current = emptyPersonalData();
+    setStatus(cleared ? "guest" : "unavailable");
+    setError(cleared ? null : "Your CareerBridge account was deleted, but this tab couldn't clear its session. Close all CareerBridge tabs.");
+    if ("BroadcastChannel" in window) {
+      const channel = new BroadcastChannel("careerbridge-auth-state");
+      channel.postMessage("signed-out");
+      channel.close();
+    }
+    return cleared;
+  }, [clerkSignOut]);
 
   async function chooseMigration(keep: boolean) {
     if (!migration || !user || migrationBusy) return;
@@ -300,7 +349,8 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       await refresh();
     },
     signOut,
-  }), [error, refresh, retrySync, signOut, status, syncError, user]);
+    finishAccountDeletion,
+  }), [error, finishAccountDeletion, refresh, retrySync, signOut, status, syncError, user]);
 
   return (
     <AccountContext.Provider value={value}>

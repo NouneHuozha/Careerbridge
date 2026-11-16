@@ -12,6 +12,7 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.10.0",
     "@neon/config": "^1.14.0",
     "@next/env": "^16.4.3",
     "drizzle-orm": "^0.45.4",

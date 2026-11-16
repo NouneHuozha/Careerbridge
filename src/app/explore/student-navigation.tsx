@@ -86,7 +86,12 @@ export function StudentNavigation() {
               : "We couldn't delete your account. Please try again.",
         };
       }
-      await account.refresh();
+      if (!(await account.finishAccountDeletion())) {
+        return {
+          ok: false,
+          error: "Your CareerBridge account was deleted, but this tab couldn't clear its session. Close all CareerBridge tabs.",
+        };
+      }
       return { ok: true, error: "" };
     } catch {
       return { ok: false, error: "We couldn't delete your account. Please try again." };

@@ -1,16 +1,34 @@
-import { NextRequest, NextResponse } from "next/server";
-import { authSessionCookie, getCurrentUser } from "../../../auth-server";
+import { connection, NextResponse } from "next/server";
+import {
+  AccountIdentityConflictError,
+  AccountProvisioningRequiredError,
+  getCurrentUser,
+} from "../../../auth-server";
 
-export async function GET(request: NextRequest) {
-  const token = request.cookies.get(authSessionCookie)?.value;
+const noStore = { "Cache-Control": "no-store" };
+
+export async function GET() {
+  await connection();
   try {
-    const user = await getCurrentUser(token);
-    return NextResponse.json({ user }, { headers: { "Cache-Control": "no-store" } });
+    const user = await getCurrentUser();
+    return NextResponse.json({ user }, { headers: noStore });
   } catch (error) {
+    if (error instanceof AccountProvisioningRequiredError) {
+      return NextResponse.json(
+        { error: error.message, provisioningRequired: true },
+        { status: 409, headers: noStore },
+      );
+    }
+    if (error instanceof AccountIdentityConflictError) {
+      return NextResponse.json(
+        { error: error.message, provisioningRequired: false },
+        { status: 409, headers: noStore },
+      );
+    }
     console.error("[careerbridge-next] session lookup failed", error);
     return NextResponse.json(
       { error: "Account services are unavailable. Check the database configuration and try again." },
-      { status: 503, headers: { "Cache-Control": "no-store" } },
+      { status: 503, headers: noStore },
     );
   }
 }

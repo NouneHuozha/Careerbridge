@@ -1,5 +1,4 @@
-import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
-import { promisify } from "node:util";
+import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
 import type { AuthUser } from "./auth-types";
 import { getPool } from "../db/pool";
 import {
@@ -11,10 +10,6 @@ import type {
   PersonalDataSnapshot,
 } from "./personal-data-types";
 
-const SESSION_COOKIE = "cb_session";
-const SESSION_DAYS = 30;
-const deriveKey = promisify(scrypt);
-
 let schemaReady: Promise<void> | undefined;
 
 async function ensureSchema() {
@@ -22,15 +17,13 @@ async function ensureSchema() {
     schemaReady = (async () => {
       const result = await getPool().query<{
         users: string | null;
-        sessions: string | null;
         accountData: string | null;
       }>(
         `SELECT to_regclass('public.users') AS users,
-                to_regclass('public.auth_sessions') AS sessions,
                 to_regclass('public.account_data') AS "accountData"`,
       );
-      if (!result.rows[0]?.users || !result.rows[0]?.sessions || !result.rows[0]?.accountData) {
-        throw new Error("Authentication tables are missing. Apply src/app/auth-schema.sql to the configured PostgreSQL database.");
+      if (!result.rows[0]?.users || !result.rows[0]?.accountData) {
+        throw new Error("The users and account_data tables are missing from the configured PostgreSQL database.");
       }
     })().catch((error: unknown) => {
       schemaReady = undefined;
@@ -40,133 +33,122 @@ async function ensureSchema() {
   await schemaReady;
 }
 
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
-}
-
-function isValidEmail(email: string) {
-  return email.length <= 191 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const hash = await deriveKey(password, salt, 64) as Buffer;
-  return `scrypt:${salt}:${hash.toString("hex")}`;
-}
-
-async function verifyPassword(password: string, stored: string | null) {
-  if (!stored) return false;
-  const [scheme, salt, hash] = stored.split(":");
-  if (scheme !== "scrypt" || !salt || !hash) return false;
-
-  const expected = Buffer.from(hash, "hex");
-  if (expected.length !== 64) return false;
-  const candidate = await deriveKey(password, salt, expected.length) as Buffer;
-  return timingSafeEqual(candidate, expected);
-}
-
 function toUser(row: { id: number; email: string; full_name: string | null }): AuthUser {
   return { id: row.id, email: row.email, name: row.full_name };
 }
 
-export async function signUp(input: {
-  email: string;
-  password: string;
-  fullName: string;
+export class AuthenticationRequiredError extends Error {}
+export class AccountProvisioningRequiredError extends Error {}
+export class AccountIdentityConflictError extends Error {}
+export class AccountSetupValidationError extends Error {}
+export class AccountDeletionPartialError extends Error {}
+
+function isPostgresUniqueViolation(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
+}
+
+function errorStatus(error: unknown) {
+  return typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    typeof error.status === "number"
+    ? error.status
+    : null;
+}
+
+export async function getCurrentUser() {
+  const { userId: clerkUserId } = await auth();
+  if (!clerkUserId) return null;
+  await ensureSchema();
+  const result = await getPool().query<{
+    id: number;
+    email: string;
+    full_name: string | null;
+    auth_provider: string;
+  }>(
+    "SELECT id, email, full_name, auth_provider FROM users WHERE external_id = $1 LIMIT 1",
+    [clerkUserId],
+  );
+  const record = result.rows[0];
+  if (!record) throw new AccountProvisioningRequiredError("Finish setting up your CareerBridge account.");
+  if (record.auth_provider !== "clerk") {
+    throw new AccountIdentityConflictError("This identity is not linked to a CareerBridge account.");
+  }
+  return toUser(record);
+}
+
+export async function provisionCurrentUser(input: {
   privacyAccepted: boolean;
-  ageAttestation: string;
+  ageAttestation: "adult" | "minor-guardian";
 }) {
-  const email = normalizeEmail(input.email);
-  const fullName = input.fullName.trim();
-  if (!isValidEmail(email)) return { ok: false as const, error: "Please enter a valid email address." };
-  if (input.password.length < 8 || input.password.length > 128) {
-    return { ok: false as const, error: "Use a password between 8 and 128 characters." };
-  }
-  if (!fullName || fullName.length > 120) {
-    return { ok: false as const, error: "Please enter a name of 1 to 120 characters." };
-  }
-  if (!input.privacyAccepted) {
-    return { ok: false as const, error: "Please review and accept the Privacy Notice to create an account." };
+  if (input.privacyAccepted !== true) {
+    throw new AccountSetupValidationError("Please review and accept the Privacy Notice.");
   }
   if (input.ageAttestation !== "adult" && input.ageAttestation !== "minor-guardian") {
-    return { ok: false as const, error: "Please confirm the age and guardian information." };
+    throw new AccountSetupValidationError("Please confirm the age and guardian information.");
+  }
+
+  const { userId: clerkUserId } = await auth();
+  if (!clerkUserId) throw new AuthenticationRequiredError("Sign in to finish account setup.");
+  const clerkUser = await currentUser();
+  if (!clerkUser || clerkUser.id !== clerkUserId) {
+    throw new AuthenticationRequiredError("Sign in to finish account setup.");
+  }
+
+  const primaryEmail = clerkUser.emailAddresses.find(
+    (email) => email.id === clerkUser.primaryEmailAddressId,
+  );
+  if (!primaryEmail || primaryEmail.verification?.status !== "verified") {
+    throw new AccountSetupValidationError("Verify your email address before creating a CareerBridge account.");
+  }
+  const email = primaryEmail.emailAddress.trim().toLowerCase();
+  const fullName = [clerkUser.firstName, clerkUser.lastName]
+    .filter((name): name is string => Boolean(name?.trim()))
+    .join(" ")
+    .trim();
+  if (email.length > 191 || !fullName || fullName.length > 120) {
+    throw new AccountSetupValidationError("Your verified Clerk profile needs a valid email and first name.");
   }
 
   await ensureSchema();
-  const passwordHash = await hashPassword(input.password);
   try {
-    const result = await getPool().query<{ id: number; email: string; full_name: string | null }>(
+    const result = await getPool().query<{
+      id: number;
+      email: string;
+      full_name: string | null;
+      auth_provider: string;
+    }>(
       `INSERT INTO users (
-         email, full_name, password_hash, auth_provider,
+         external_id, email, full_name, auth_provider,
          privacy_notice_version, privacy_notice_accepted_at, age_attestation, age_attested_at
        )
-       VALUES ($1, $2, $3, 'local', 'careerbridge-privacy-v1', NOW(), $4, NOW())
-       RETURNING id, email, full_name`,
-      [email, fullName, passwordHash, input.ageAttestation],
+       VALUES ($1, $2, $3, 'clerk', 'careerbridge-privacy-v1', NOW(), $4, NOW())
+       ON CONFLICT (external_id) DO UPDATE SET
+         email = EXCLUDED.email,
+         full_name = EXCLUDED.full_name,
+         privacy_notice_version = COALESCE(users.privacy_notice_version, EXCLUDED.privacy_notice_version),
+         privacy_notice_accepted_at = COALESCE(users.privacy_notice_accepted_at, EXCLUDED.privacy_notice_accepted_at),
+         age_attestation = COALESCE(users.age_attestation, EXCLUDED.age_attestation),
+         age_attested_at = COALESCE(users.age_attested_at, EXCLUDED.age_attested_at),
+         updated_at = NOW()
+       WHERE users.auth_provider = 'clerk'
+       RETURNING id, email, full_name, auth_provider`,
+      [clerkUserId, email, fullName, input.ageAttestation],
     );
-    return { ok: true as const, user: toUser(result.rows[0]) };
+    if (result.rows[0]) return toUser(result.rows[0]);
+
+    throw new AccountIdentityConflictError(
+      "This identity is already associated with an account that cannot be linked to Clerk.",
+    );
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "23505") {
-      return { ok: false as const, error: "An account with this email already exists. Try signing in." };
+    if (error instanceof AccountIdentityConflictError) throw error;
+    if (isPostgresUniqueViolation(error)) {
+      throw new AccountIdentityConflictError(
+        "An account with this email already exists and cannot be linked to this Clerk identity.",
+      );
     }
     throw error;
   }
-}
-
-export async function signIn(input: { email: string; password: string }) {
-  const email = normalizeEmail(input.email);
-  if (!isValidEmail(email) || input.password.length === 0 || input.password.length > 128) {
-    return { ok: false as const, error: "We couldn't match that email and password." };
-  }
-
-  await ensureSchema();
-  const result = await getPool().query<{
-    id: number;
-    email: string;
-    full_name: string | null;
-    password_hash: string | null;
-  }>("SELECT id, email, full_name, password_hash FROM users WHERE email = $1 LIMIT 1", [email]);
-  const record = result.rows[0];
-  if (!record || !(await verifyPassword(input.password, record.password_hash))) {
-    return { ok: false as const, error: "We couldn't match that email and password." };
-  }
-  return { ok: true as const, user: toUser(record) };
-}
-
-export async function createSession(userId: number) {
-  await ensureSchema();
-  const token = randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
-  await getPool().query("DELETE FROM auth_sessions WHERE expires_at <= NOW()");
-  await getPool().query(
-    "INSERT INTO auth_sessions (user_id, token, expires_at) VALUES ($1, $2, $3)",
-    [userId, token, expiresAt],
-  );
-  return { token, expiresAt };
-}
-
-export async function getCurrentUser(token: string | undefined) {
-  if (!token) return null;
-  await ensureSchema();
-  const result = await getPool().query<{
-    id: number;
-    email: string;
-    full_name: string | null;
-  }>(
-    `SELECT users.id, users.email, users.full_name
-     FROM auth_sessions
-     INNER JOIN users ON users.id = auth_sessions.user_id
-     WHERE auth_sessions.token = $1 AND auth_sessions.expires_at > NOW()
-     LIMIT 1`,
-    [token],
-  );
-  return result.rows[0] ? toUser(result.rows[0]) : null;
-}
-
-export async function deleteSession(token: string | undefined) {
-  if (!token) return;
-  await ensureSchema();
-  await getPool().query("DELETE FROM auth_sessions WHERE token = $1", [token]);
 }
 
 function personalDataKey(item: { type: string; id: string; context?: { courseId?: string } }) {
@@ -319,28 +301,54 @@ export async function updateAccountData(
 }
 
 export async function deleteAccount(userId: number, password: string) {
+  const { userId: clerkUserId } = await auth();
+  if (!clerkUserId) throw new AuthenticationRequiredError("Sign in again before deleting your account.");
+
+  const clerk = await clerkClient();
+  try {
+    await clerk.users.verifyPassword({ userId: clerkUserId, password });
+  } catch (error) {
+    if (errorStatus(error) === 422) return false;
+    throw error;
+  }
+
   await ensureSchema();
   const client = await getPool().connect();
+  let clerkIdentityDeleted = false;
   try {
     await client.query("BEGIN");
-    const result = await client.query<{ password_hash: string | null }>(
-      "SELECT password_hash FROM users WHERE id = $1 FOR UPDATE",
-      [userId],
+    const result = await client.query<{ id: number }>(
+      "SELECT id FROM users WHERE id = $1 AND external_id = $2 AND auth_provider = 'clerk' FOR UPDATE",
+      [userId, clerkUserId],
     );
-    if (!result.rows[0] || !(await verifyPassword(password, result.rows[0].password_hash))) {
+    if (!result.rows[0]) {
       await client.query("ROLLBACK");
       return false;
     }
-    await client.query("DELETE FROM auth_sessions WHERE user_id = $1", [userId]);
-    await client.query("DELETE FROM users WHERE id = $1", [userId]);
+
+    await clerk.users.deleteUser(clerkUserId);
+    clerkIdentityDeleted = true;
+    const deleted = await client.query(
+      "DELETE FROM users WHERE id = $1 AND external_id = $2 AND auth_provider = 'clerk'",
+      [userId, clerkUserId],
+    );
+    if (deleted.rowCount !== 1) throw new Error("The CareerBridge user record could not be deleted.");
+
     await client.query("COMMIT");
     return true;
   } catch (error) {
-    await client.query("ROLLBACK");
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error("[careerbridge-next] account deletion rollback failed", rollbackError);
+    }
+    if (clerkIdentityDeleted) {
+      throw new AccountDeletionPartialError(
+        "Your Clerk sign-in was removed, but CareerBridge could not confirm deletion of stored account data.",
+      );
+    }
     throw error;
   } finally {
     client.release();
   }
 }
-
-export const authSessionCookie = SESSION_COOKIE;

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { AccountProvider } from "./account-provider";
 
@@ -14,7 +15,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <body>
-        <AccountProvider>{children}</AccountProvider>
+        <ClerkProvider>
+          <AccountProvider>{children}</AccountProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

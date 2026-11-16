@@ -132,7 +132,14 @@ export default function AuthPageLayout({
 }
 
 function safeReturnPath(value: string | null) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/explore";
-  const path = value.split(/[?#]/, 1)[0];
-  return path === "/sign-in" || path === "/sign-up" ? "/explore" : value;
+  if (!value) return "/explore";
+  try {
+    const url = new URL(value, window.location.origin);
+    if (url.origin !== window.location.origin || url.pathname === "/sign-in" || url.pathname === "/sign-up") {
+      return "/explore";
+    }
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/explore";
+  }
 }

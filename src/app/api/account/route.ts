@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authSessionCookie, deleteAccount, getCurrentUser } from "../../auth-server";
+import {
+  AccountDeletionPartialError,
+  AccountIdentityConflictError,
+  AccountProvisioningRequiredError,
+  AuthenticationRequiredError,
+  deleteAccount,
+  getCurrentUser,
+} from "../../auth-server";
 
 const noStore = { "Cache-Control": "no-store" };
 
@@ -28,7 +35,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    const user = await getCurrentUser(request.cookies.get(authSessionCookie)?.value);
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Sign in again before deleting your account." }, { status: 401, headers: noStore });
     }
@@ -36,10 +43,18 @@ export async function DELETE(request: NextRequest) {
     if (!deleted) {
       return NextResponse.json({ error: "That password doesn't match this account." }, { status: 401, headers: noStore });
     }
-    const response = NextResponse.json({ ok: true }, { headers: noStore });
-    response.cookies.delete(authSessionCookie);
-    return response;
+    return NextResponse.json({ ok: true }, { headers: noStore });
   } catch (error) {
+    if (error instanceof AuthenticationRequiredError) {
+      return NextResponse.json({ error: error.message }, { status: 401, headers: noStore });
+    }
+    if (error instanceof AccountProvisioningRequiredError || error instanceof AccountIdentityConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
+    }
+    if (error instanceof AccountDeletionPartialError) {
+      console.error("[careerbridge-next] account deletion partially completed", error);
+      return NextResponse.json({ error: error.message }, { status: 503, headers: noStore });
+    }
     console.error("[careerbridge-next] account deletion failed", error);
     return NextResponse.json(
       { error: "We couldn't delete your account just now. Please try again." },

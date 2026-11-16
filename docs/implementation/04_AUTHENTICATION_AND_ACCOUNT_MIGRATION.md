@@ -1,41 +1,59 @@
-# 4. Authentication and Account Migration
+# Clerk Authentication and Account Provisioning
 
-## 4.1 Target
+## Provider and routes
 
-Clerk is the agreed authentication provider. CareerBridge maintains its own application-user record and domain data. Clerk identity is not a replacement for application roles, student profile data or database authorization.
+Clerk is the sole authentication provider. The existing custom sign-in and sign-up pages remain in place; their forms use Clerk's email/password APIs and email-code verification. `ClerkProvider` is mounted above `AccountProvider`, and `src/proxy.ts` runs `clerkMiddleware()` without making guest-facing pages private.
 
-## 4.2 Current baseline
+Every protected Route Handler checks the Clerk session on the server and resolves it through `users.external_id`. Proxy execution is not an authorization check. Account and student ownership uses only the internal numeric `users.id` returned by this lookup; client-provided IDs, email addresses, and Clerk IDs are never used as ownership proof.
 
-The inspected application contains custom password hashing/session handling and tables for users, auth_sessions and account_data. Treat these as existing user data and migration dependencies. Do not delete or disable them before cutover is verified.
+## Clerk development configuration
 
-## 4.3 Identity mapping
+Add these variable names to the local environment, using values from a Clerk **development** instance:
 
-Create a stable internal application-user ID and a unique mapping to Clerk user ID. Decide how email changes, account linking, duplicate emails, deleted Clerk users and webhook retries are handled. Never trust a client-supplied Clerk ID without verifying the authenticated server context.
+```env
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+```
 
-## 4.4 Sign-in migration
+In the Clerk Dashboard:
 
-Choose and document a migration strategy supported by Clerk for existing users (for example, supported import/password migration or staged reauthentication). Do not export or expose password hashes unnecessarily. Do not promise password continuity until the chosen migration method is tested.
+- Enable email address and password sign-up/sign-in.
+- Require verification of the primary email address with an email code.
+- Enable first name collection because CareerBridge records the verified Clerk profile name.
+- Set the development application URL to `http://localhost:3000`.
+- Use `/sign-in` and `/sign-up` as the custom sign-in/sign-up URLs; successful flows return to `/explore` unless a safe same-origin `next` path was requested.
+- Configure the development email delivery method so verification codes can be received.
 
-## 4.5 Data migration
+No Clerk webhook is currently used. Do not add a webhook secret unless a separately reviewed webhook implementation is introduced. Never copy real keys into `.env.example`.
 
-Inventory every existing account_data field and its actual usage. Map saved items, history, education stage, discovery answers and Guided Explorer data to approved models. Preserve ownership. Reconcile user counts, row counts and representative records. Keep a rollback path until validation is complete.
+## Identity and internal user provisioning
 
-## 4.6 Session cutover
+The identity mapping is:
 
-Integrate Clerk server-side identity checks, route protection and session handling. Update API handlers and account queries to use the authenticated application-user mapping. Only after successful verification should custom session creation/sign-in be disabled. Retire old session tables only after migration and retention review.
+```text
+Clerk user ID -> users.external_id -> users.id (integer)
+```
 
-## 4.7 Roles and Admin access
+Student-owned records and the existing `account_data` snapshot continue to use internal numeric `users.id`. A verified Clerk session must explicitly complete `/api/auth/provision` with the required Privacy Notice acceptance and age/guardian attestation. The server obtains the Clerk identity, verified primary email, and profile name itself; it does not trust identity or profile fields posted by the browser.
 
-Define application roles and permissions in a server-controlled source of truth. Clerk metadata may carry claims for convenience, but privileged actions must be checked against trusted server-side role state and current policy. Role changes are audited. Default new users to student-level access; never allow self-assignment of Admin roles.
+Provisioning is idempotent for a Clerk identity. Unique email or identity conflicts return an explicit error. Legacy local-auth accounts are not linked, imported, or recovered; a conflicting legacy email is not silently claimed by a Clerk identity.
 
-## 4.8 Webhooks
+## Existing CareerBridge data and guest behavior
 
-Verify webhook signatures, handle retries idempotently, record event IDs, and reconcile missed events. Webhooks may synchronize identity metadata but must not be the sole basis for sensitive authorization if a stale claim could grant access.
+The existing JSONB `account_data` snapshot and its API contract are retained. The API resolves the caller's internal numeric user ID from Clerk before reading or writing data. The existing explicit guest-data transfer prompt and cache isolation remain in place; only data the user chooses to transfer is merged, using the existing deduplication behavior.
 
-## 4.9 Guest behaviour
+The Drizzle student tables continue to reference integer user IDs. Their database foreign keys cascade on user deletion; no student table or account-data schema change is part of this cutover.
 
-Document what guests can do, what is device-local, what requires sign-in and how guest data may be transferred if that feature is approved. Do not silently merge accounts or overwrite data.
+## Sign-out and deletion
 
-## 4.10 Acceptance tests
+Sign-out uses Clerk, then clears CareerBridge's account-specific browser cache and broadcasts the signed-out state to other tabs.
 
-New user, existing user migration, sign-in, sign-out, session expiry, email change, account deletion, webhook retry, student data ownership, guest behaviour, Admin denial for students, role revocation and preservation of saved/history/progress data.
+Account deletion requires the existing password confirmation and `DELETE` confirmation. The server verifies the password with Clerk, deletes the Clerk identity, then deletes the internal user in a database transaction; existing foreign-key cascades remove associated CareerBridge data. If Clerk deletion fails, the transaction is rolled back. If the Clerk identity is removed but the database commit fails, the endpoint reports a partial failure instead of success; the remaining database cleanup requires support intervention.
+
+## Legacy database objects
+
+`auth_sessions` and `users.password_hash` are retained in the current database for now and are no longer used by application authentication. The existing SQL foundation and initial migration are not changed here. Review their eventual removal separately after confirming deployment and migration dependencies.
+
+## Verification
+
+Local type, lint, and focused regression checks can run without external services. End-to-end registration, email verification, Clerk sign-in/sign-out, identity provisioning, and deletion require a configured Clerk development instance and test account. Database integration checks must target a confirmed development database, never production.
