@@ -22,21 +22,14 @@ export async function DELETE(request: NextRequest) {
   if (
     typeof body !== "object" ||
     body === null ||
-    !("password" in body) ||
-    typeof body.password !== "string" ||
-    body.password.length === 0 ||
-    body.password.length > 128 ||
     !("confirmation" in body) ||
     body.confirmation !== "DELETE"
   ) {
-    return NextResponse.json({ error: "Enter your password and type DELETE to confirm." }, { status: 422, headers: noStore });
+    return NextResponse.json({ error: "Type DELETE to confirm account deletion." }, { status: 422, headers: noStore });
   }
 
   try {
-    const deleted = await deleteAccount(body.password);
-    if (!deleted) {
-      return NextResponse.json({ error: "That password doesn't match this account." }, { status: 401, headers: noStore });
-    }
+    await deleteAccount();
     return NextResponse.json({ ok: true }, { headers: noStore });
   } catch (error) {
     if (error instanceof AuthenticationRequiredError) {

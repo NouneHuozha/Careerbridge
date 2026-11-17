@@ -1,11 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { Menu, MessageCircle, X } from "lucide-react";
+import { ChevronDown, Menu, MessageCircle, UserRound, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useUser } from "@clerk/nextjs";
+import { useAccount } from "./account-provider";
+import { accountHeaderState } from "./account-header-state";
 import { setCounsellingStatus, type CounsellingSession } from "./counselling/counselling-engine";
+import { ProfileMenu, type ProfilePreview } from "./explore/student-navigation";
 
 const navPill =
   "inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-white/35 bg-[#103f35]/60 px-5 text-sm font-semibold text-white shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-white/70 hover:bg-[#145543]/80 hover:shadow-md active:translate-y-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white motion-reduce:transform-none motion-reduce:transition-none xl:px-6 xl:text-[15px]";
@@ -24,9 +28,27 @@ export function SiteHeader({
   counsellingSession?: CounsellingSession;
 }) {
   const router = useRouter();
+  const account = useAccount();
+  const { user: clerkUser } = useUser();
   const [exitOpen, setExitOpen] = useState(false);
   const [exitError, setExitError] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDetailsElement>(null);
+  const desktopProfileRef = useRef<HTMLDivElement>(null);
+  const mobileProfileRef = useRef<HTMLDivElement>(null);
+  const desktopProfileButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileProfileButtonRef = useRef<HTMLButtonElement>(null);
+  const headerState = home ? accountHeaderState(account.status) : "loading";
+  const profile: ProfilePreview = account.user
+    ? {
+      name: account.user.name ?? "Student",
+      email: clerkUser?.primaryEmailAddress?.emailAddress ?? account.user.email,
+    }
+    : { name: "Guest session", email: "" };
+
+  function closeProfile() {
+    setProfileOpen(false);
+  }
 
   useEffect(() => {
     const mobileMenu = mobileMenuRef.current;
@@ -45,6 +67,37 @@ export function SiteHeader({
     document.addEventListener("pointerdown", closeOnOutsideClick, true);
     return () => document.removeEventListener("pointerdown", closeOnOutsideClick, true);
   }, []);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+
+    function closeOutside(event: PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        !desktopProfileRef.current?.contains(event.target) &&
+        !mobileProfileRef.current?.contains(event.target)
+      ) {
+        setProfileOpen(false);
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setProfileOpen(false);
+        const button = window.matchMedia("(min-width: 1280px)").matches
+          ? desktopProfileButtonRef.current
+          : mobileProfileButtonRef.current;
+        button?.focus();
+      }
+    }
+
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [profileOpen]);
 
   const brand = (
     <Link
@@ -198,12 +251,56 @@ export function SiteHeader({
           </button>
         </div>
         <div className="hidden shrink-0 items-center gap-2 sm:gap-3 xl:flex">
-          <Link
-            href="/sign-in"
-            className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/60 bg-[#e7f1e9] px-5 text-sm font-semibold text-[#173e32] shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-[#f2cf78] hover:bg-[#f2cf78] hover:shadow-md active:translate-y-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white motion-reduce:transform-none motion-reduce:transition-none xl:text-[15px]"
-          >
-            Sign in / Sign up
-          </Link>
+          {headerState === "loading" && (
+            <span role="status" className="sr-only">Loading account controls</span>
+          )}
+          {headerState === "unavailable" && (
+            <span role="status" className="rounded-full border border-white/40 px-4 py-3 text-sm text-white/85">
+              Account unavailable
+            </span>
+          )}
+          {headerState === "signed-out" && (
+            <>
+              <Link
+                href="/sign-in"
+                className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/60 bg-[#e7f1e9] px-5 text-sm font-semibold text-[#173e32] shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-[#f2cf78] hover:bg-[#f2cf78] hover:shadow-md active:translate-y-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white motion-reduce:transform-none motion-reduce:transition-none xl:text-[15px]"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/sign-up"
+                className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/60 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white xl:text-[15px]"
+              >
+                Sign up
+              </Link>
+            </>
+          )}
+          {headerState === "signed-in" && (
+            <div ref={desktopProfileRef} className="relative">
+              <button
+                ref={desktopProfileButtonRef}
+                type="button"
+                aria-expanded={profileOpen}
+                aria-controls="landing-profile-menu"
+                onClick={() => setProfileOpen((open) => !open)}
+                className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/55 bg-[#103f35]/60 px-5 text-sm font-semibold text-white transition-colors hover:border-white/75 hover:bg-[#145543]/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                <UserRound aria-hidden="true" className="h-4 w-4" />
+                Profile
+                <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" />
+              </button>
+              {profileOpen && (
+                <ProfileMenu
+                  id="landing-profile-menu"
+                  profile={profile}
+                  isAuthenticated
+                  authUnavailable={false}
+                  onSignOut={account.signOut}
+                  onNavigate={closeProfile}
+                />
+              )}
+            </div>
+          )}
         </div>
         <details ref={mobileMenuRef} className="group relative xl:hidden">
           <summary
@@ -234,9 +331,45 @@ export function SiteHeader({
               <MessageCircle aria-hidden="true" className="h-4 w-4" />
               Ask Mentor
             </button>
-            <Link href="/sign-in" className="inline-flex min-h-11 items-center rounded-xl bg-[#e7f1e9] px-4 text-sm font-semibold text-[#173e32] transition-colors hover:bg-[#f2cf78] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543] motion-reduce:transition-none">
-              Sign in / Sign up
-            </Link>
+            {headerState === "loading" && <p role="status" className="px-4 py-2 text-sm text-[#52645a]">Checking account…</p>}
+            {headerState === "unavailable" && <p role="status" className="px-4 py-2 text-sm text-[#7b5b1f]">Account unavailable</p>}
+            {headerState === "signed-out" && (
+              <>
+                <Link href="/sign-in" className="inline-flex min-h-11 items-center rounded-xl bg-[#e7f1e9] px-4 text-sm font-semibold text-[#173e32] transition-colors hover:bg-[#f2cf78] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543] motion-reduce:transition-none">
+                  Sign in
+                </Link>
+                <Link href="/sign-up" className="inline-flex min-h-11 items-center rounded-xl border border-[#d1ddd4] px-4 text-sm font-semibold text-[#173e32] transition-colors hover:bg-[#e3ece5]/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543] motion-reduce:transition-none">
+                  Sign up
+                </Link>
+              </>
+            )}
+            {headerState === "signed-in" && (
+              <div ref={mobileProfileRef} className="relative">
+                <button
+                  ref={mobileProfileButtonRef}
+                  type="button"
+                  aria-expanded={profileOpen}
+                  aria-controls="landing-mobile-profile-menu"
+                  onClick={() => setProfileOpen((open) => !open)}
+                  className="inline-flex min-h-11 w-full items-center gap-2 rounded-xl px-4 text-left text-sm font-semibold text-[#173e32] transition-colors hover:bg-[#e3ece5]/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+                >
+                  <UserRound aria-hidden="true" className="h-4 w-4" />
+                  Profile
+                  <ChevronDown aria-hidden="true" className="ml-auto h-3.5 w-3.5" />
+                </button>
+                {profileOpen && (
+                  <ProfileMenu
+                    id="landing-mobile-profile-menu"
+                    profile={profile}
+                    isAuthenticated
+                    authUnavailable={false}
+                    onSignOut={account.signOut}
+                    onNavigate={closeProfile}
+                    mobile
+                  />
+                )}
+              </div>
+            )}
           </nav>
         </details>
       </div>

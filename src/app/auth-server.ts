@@ -506,7 +506,7 @@ export async function updateAccountData(
   });
 }
 
-export async function deleteAccount(password: string) {
+export async function deleteAccount() {
   const { userId: clerkUserId } = await auth();
   if (!clerkUserId) throw new AuthenticationRequiredError("Sign in again before deleting your account.");
 
@@ -518,12 +518,6 @@ export async function deleteAccount(password: string) {
     }
 
     const clerk = await clerkClient();
-    try {
-      await clerk.users.verifyPassword({ userId: clerkUserId, password });
-    } catch (error) {
-      if (errorStatus(error) === 422) return false;
-      throw error;
-    }
 
     await clerk.users.updateUserMetadata(clerkUserId, {
       privateMetadata: { careerbridgeDeletionPending: true },
@@ -576,7 +570,7 @@ export async function deleteAccount(password: string) {
     } catch (error) {
       if (errorStatus(error) === 404) return true;
       throw new AccountDeletionPartialError(
-        "Your CareerBridge data has been removed, but Clerk sign-in cleanup is still pending. Re-enter your password and retry account deletion.",
+        "Your CareerBridge data has been removed, but Clerk sign-in cleanup is still pending. Type DELETE and retry account deletion.",
       );
     }
 

@@ -45,7 +45,6 @@ export default function SignUpForm({
   const [setupRequired, setSetupRequired] = useState(false);
   const [deletionPending, setDeletionPending] = useState(false);
   const [deletionBlocked, setDeletionBlocked] = useState(false);
-  const [deletionPassword, setDeletionPassword] = useState("");
   const [deletionConfirmation, setDeletionConfirmation] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -121,15 +120,15 @@ export default function SignUpForm({
   }
 
   async function retryAccountDeletion() {
-    if (!deletionPassword || deletionConfirmation !== "DELETE") {
-      setError("Enter your password and type DELETE to retry account deletion.");
+    if (deletionConfirmation !== "DELETE") {
+      setError("Type DELETE to retry account deletion.");
       return;
     }
 
     const response = await fetch("/api/account", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: deletionPassword, confirmation: deletionConfirmation }),
+      body: JSON.stringify({ confirmation: deletionConfirmation }),
     });
     let result: unknown = null;
     try {
@@ -248,7 +247,7 @@ export default function SignUpForm({
         {deletionBlocked
           ? "Your account is still active. Contact support to resolve the retained CareerBridge records."
           : deletionPending
-            ? "Account removal was interrupted. Re-enter your password and retry to finish removing your CareerBridge data and Clerk sign-in."
+            ? "Account removal was interrupted. Type DELETE and retry to finish removing your CareerBridge data and Clerk sign-in."
             : setupRequired
               ? "Your verified Clerk account still needs a CareerBridge profile."
               : "Save your answers, possibilities and next steps in one place."}
@@ -309,18 +308,6 @@ export default function SignUpForm({
         )}
         {deletionPending && (
           <>
-            <label className="block text-sm font-semibold text-[#273d34]">
-              Password
-              <input
-                type="password"
-                required
-                autoComplete="current-password"
-                maxLength={128}
-                value={deletionPassword}
-                onChange={(event) => setDeletionPassword(event.target.value)}
-                className="mt-1.5 h-11 w-full rounded-xl border border-[#d5dfd8] bg-white px-4 text-base outline-none focus:border-[#145543] focus:ring-2 focus:ring-[#e2f0e7]"
-              />
-            </label>
             <label className="block text-sm font-semibold text-[#273d34]">
               Type DELETE to confirm
               <input

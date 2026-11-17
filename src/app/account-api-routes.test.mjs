@@ -89,7 +89,6 @@ function resetState() {
   state.dataWrites = [];
   state.deleteTargets = [];
   state.clerkDeleteTargets = [];
-  state.passwordChecks = [];
   state.statements = [];
 };
 
@@ -283,12 +282,6 @@ const clerkServer = {
   currentUser: async () => state.clerkProfiles.get(state.clerkUserId) ?? null,
   clerkClient: async () => ({
     users: {
-      verifyPassword: async ({ userId, password }) => {
-        state.passwordChecks.push(userId);
-        if (password !== "test-password") {
-          throw Object.assign(new Error("invalid password"), { status: 422 });
-        }
-      },
       updateUserMetadata: async (userId, metadata) => {
         const privateMetadata = metadata.privateMetadata;
         if (privateMetadata.careerbridgeDeletionPending === null) {
@@ -413,13 +406,11 @@ test("Account B's delete route ignores Account A IDs and targets Account B", asy
   const response = await accountRoute.DELETE(
     makeRequest(`/api/account?userId=${userA}`, "DELETE", {
       userId: userA,
-      password: "test-password",
       confirmation: "DELETE",
     }),
   );
 
   assert.equal(response.status, 200);
-  assert.deepEqual(state.passwordChecks, [clerkB]);
   assert.deepEqual(state.deleteTargets, [clerkB]);
   assert.deepEqual(state.clerkDeleteTargets, [clerkB]);
   assert.deepEqual(state.accountData.get(userA), beforeA);
@@ -442,7 +433,6 @@ test("unauthenticated account-data and deletion requests are rejected without da
   const deleteResponse = await accountRoute.DELETE(
     makeRequest("/api/account", "DELETE", {
       userId: userA,
-      password: "test-password",
       confirmation: "DELETE",
     }),
   );
@@ -457,7 +447,7 @@ test("unauthenticated account-data and deletion requests are rejected without da
   assert.deepEqual(state.accountData.get(userB), beforeB);
 });
 
-test("a rejected Account B deletion request leaves both accounts' data unchanged", async () => {
+test("account deletion requires the exact confirmation word", async () => {
   resetState();
   const beforeA = copy(state.accountData.get(userA));
   const beforeB = copy(state.accountData.get(userB));
@@ -465,13 +455,11 @@ test("a rejected Account B deletion request leaves both accounts' data unchanged
   const response = await accountRoute.DELETE(
     makeRequest("/api/account", "DELETE", {
       userId: userA,
-      password: "wrong-password",
-      confirmation: "DELETE",
+      confirmation: "delete",
     }),
   );
 
-  assert.equal(response.status, 401);
-  assert.deepEqual(state.passwordChecks, [clerkB]);
+  assert.equal(response.status, 422);
   assert.deepEqual(state.deleteTargets, []);
   assert.deepEqual(state.clerkDeleteTargets, []);
   assert.deepEqual(state.accountData.get(userA), beforeA);

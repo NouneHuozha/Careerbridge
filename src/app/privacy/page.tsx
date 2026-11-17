@@ -32,7 +32,7 @@ const sections = [
   {
     title: "Your choices and deletion",
     paragraphs: [
-      "You can remove saved items and history entries, clear your history, and delete Guided Explorer progress. Use Delete account in your profile menu to permanently delete your account, its saved items, history, progress and active sign-in sessions. Account deletion requires your password and cannot be undone.",
+      "You can remove saved items and history entries, clear your history, and delete Guided Explorer progress. Use Delete account in Settings to permanently delete your account, its saved items, history, progress and active sign-in sessions. Type DELETE to confirm; account deletion cannot be undone.",
       "Deletion removes the live account records managed by CareerBridge. Any retention in infrastructure backups is governed by the database and hosting operator's backup practices.",
     ],
   },

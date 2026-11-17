@@ -3,9 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import SignInForm from "./sign-in-form";
 import SignUpForm from "./sign-up-form";
+import PasswordRecoveryForm from "./password-recovery-form";
 
 type AuthMode = "sign-in" | "sign-up";
 
@@ -19,9 +21,11 @@ export default function AuthPageLayout({
   const searchParams = useSearchParams();
   const next = safeReturnPath(searchParams.get("next"));
   const errorMessage = searchParams.get("error") ?? undefined;
+  const [recoveringPassword, setRecoveringPassword] = useState(false);
 
   function switchMode(nextMode: AuthMode) {
     if (nextMode === mode) return;
+    setRecoveringPassword(false);
     const url = new URL(window.location.href);
     url.pathname = `/${nextMode}`;
     url.search = new URLSearchParams({ next }).toString();
@@ -88,7 +92,15 @@ export default function AuthPageLayout({
                       {signInError}
                     </div>
                   )}
-                  <SignInForm next={next} onSwitch={() => switchMode("sign-up")} />
+                  {recoveringPassword ? (
+                    <PasswordRecoveryForm onReturn={() => setRecoveringPassword(false)} />
+                  ) : (
+                    <SignInForm
+                      next={next}
+                      onSwitch={() => switchMode("sign-up")}
+                      onForgotPassword={() => setRecoveringPassword(true)}
+                    />
+                  )}
                   <div className="mt-5 flex items-center justify-center gap-3 text-sm text-[#52645a]">
                     <span className="grid h-9 w-9 place-items-center rounded-full bg-[#edf7f3] text-[#145543]">
                       <ShieldCheck aria-hidden="true" className="h-5 w-5" />

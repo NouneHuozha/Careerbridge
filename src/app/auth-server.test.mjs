@@ -140,12 +140,6 @@ const clerkServer = {
   currentUser: async () => state.clerkExists ? state.clerkUser : null,
   clerkClient: async () => ({
     users: {
-      verifyPassword: async ({ password }) => {
-        state.events.push("verify-password");
-        if (password !== "correct-password") {
-          throw Object.assign(new Error("invalid password"), { status: 422 });
-        }
-      },
       updateUserMetadata: async (_userId, metadata) => {
         state.events.push(metadata.privateMetadata.careerbridgeDeletionPending ? "mark-deletion" : "clear-deletion");
         if (metadata.privateMetadata.careerbridgeDeletionPending === null) {
@@ -219,16 +213,16 @@ test("provisioning is blocked while account deletion is pending", async () => {
   assert.equal(state.provisionCalls, 0);
 });
 
-test("incorrect reauthentication leaves both identities and data untouched", async () => {
+test("authenticated account deletion does not require password verification", async () => {
   resetState();
   state.users.set(state.clerkUserId, { id: 7, auth_provider: "clerk" });
 
-  assert.equal(await authServer.deleteAccount("wrong-password"), false);
-  assert.equal(state.users.size, 1);
-  assert.equal(state.clerkExists, true);
-  assert.equal(state.clerkUser.privateMetadata.careerbridgeDeletionPending, undefined);
-  assert.equal(state.events.includes("delete-careerbridge-user"), false);
-  assert.equal(state.events.includes("delete-clerk-user"), false);
+  assert.equal(await authServer.deleteAccount(), true);
+  assert.equal(state.users.size, 0);
+  assert.equal(state.clerkExists, false);
+  assert.equal(state.events.includes("verify-password"), false);
+  assert.equal(state.events.includes("delete-careerbridge-user"), true);
+  assert.equal(state.events.includes("delete-clerk-user"), true);
 });
 
 test("database failure keeps Clerk active and a retry finishes deletion", async () => {
@@ -237,14 +231,14 @@ test("database failure keeps Clerk active and a retry finishes deletion", async 
   state.failDeleteOnce = true;
 
   await assert.rejects(
-    authServer.deleteAccount("correct-password"),
+    authServer.deleteAccount(),
     authServer.AccountDeletionPartialError,
   );
   assert.equal(state.users.size, 1);
   assert.equal(state.clerkExists, true);
   assert.equal(state.clerkUser.privateMetadata.careerbridgeDeletionPending, true);
 
-  assert.equal(await authServer.deleteAccount("correct-password"), true);
+  assert.equal(await authServer.deleteAccount(), true);
   assert.equal(state.users.size, 0);
   assert.equal(state.clerkExists, false);
   assert.ok(state.events.indexOf("commit") < state.events.indexOf("delete-clerk-user"));
@@ -256,14 +250,14 @@ test("Clerk failure after database commit can be retried without a user row", as
   state.failClerkDeleteOnce = true;
 
   await assert.rejects(
-    authServer.deleteAccount("correct-password"),
+    authServer.deleteAccount(),
     authServer.AccountDeletionPartialError,
   );
   assert.equal(state.users.size, 0);
   assert.equal(state.clerkExists, true);
   assert.equal(state.clerkUser.privateMetadata.careerbridgeDeletionPending, true);
 
-  assert.equal(await authServer.deleteAccount("correct-password"), true);
+  assert.equal(await authServer.deleteAccount(), true);
   assert.equal(state.users.size, 0);
   assert.equal(state.clerkExists, false);
   assert.equal(
@@ -278,7 +272,7 @@ test("restrictive catalogue references preserve the user and clear deletion stat
   state.failForeignKey = true;
 
   await assert.rejects(
-    authServer.deleteAccount("correct-password"),
+    authServer.deleteAccount(),
     authServer.AccountDeletionBlockedError,
   );
   assert.equal(state.users.size, 1);

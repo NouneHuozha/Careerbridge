@@ -25,9 +25,11 @@ function responseError(value: unknown, fallback: string) {
 export default function SignInForm({
   next,
   onSwitch,
+  onForgotPassword,
 }: {
   next: string;
   onSwitch: () => void;
+  onForgotPassword: () => void;
 }) {
   const { isLoaded } = useAuth();
   const { signIn } = useSignIn();
@@ -204,6 +206,9 @@ export default function SignInForm({
             <div>
               <div className="mb-1.5 flex items-center justify-between gap-3">
                 <label htmlFor="sign-in-password" className="block text-sm font-semibold text-[#273d34]">Password</label>
+                <button type="button" onClick={onForgotPassword} className="text-sm font-medium text-[#17664e] underline underline-offset-2 hover:text-[#0f4537]">
+                  Forgot password?
+                </button>
               </div>
               <div className="relative">
                 <LockKeyhole aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#87958d]" />
