@@ -1,7 +1,10 @@
 import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
+import { eq, sql } from "drizzle-orm";
 import type { PoolClient } from "pg";
 import type { AuthUser } from "./auth-types";
+import { getDb } from "../db/client";
 import { getPool } from "../db/pool";
+import { discoverAnswers, studentProfiles } from "../db/schema/student";
 import {
   emptyPersonalData,
   isPersonalDataSnapshot,
@@ -10,6 +13,10 @@ import type {
   PersonalDataMutation,
   PersonalDataSnapshot,
 } from "./personal-data-types";
+
+type DatabaseTransaction = Parameters<
+  Parameters<ReturnType<typeof getDb>["transaction"]>[0]
+>[0];
 
 let schemaReady: Promise<void> | undefined;
 
@@ -307,17 +314,165 @@ function applyPersonalDataMutation(
   }
 }
 
-export async function getAccountData(userId: number): Promise<PersonalDataSnapshot> {
-  await ensureSchema();
-  const result = await getPool().query<{ data: unknown }>(
-    "SELECT data FROM account_data WHERE user_id = $1",
-    [userId],
-  );
-  const data = result.rows[0]?.data ?? emptyPersonalData();
-  if (!isPersonalDataSnapshot(data)) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function snapshotFromStoredData(
+  data: unknown,
+  educationStage: unknown,
+  answers: unknown,
+): PersonalDataSnapshot {
+  if (!isRecord(data)) {
     throw new Error("Stored account data is invalid and requires support.");
   }
-  return data;
+  const snapshot = { ...data, educationStage, discoveryAnswers: answers };
+  if (!isPersonalDataSnapshot(snapshot)) {
+    throw new Error("Stored account data is invalid and requires support.");
+  }
+  return snapshot;
+}
+
+function serializeAccountData(snapshot: PersonalDataSnapshot) {
+  const serialized = JSON.stringify({
+    ...snapshot,
+    educationStage: undefined,
+    discoveryAnswers: undefined,
+  });
+  if (serialized === undefined) {
+    throw new Error("Account data could not be serialized.");
+  }
+  return serialized;
+}
+
+async function writeAccountData(
+  tx: DatabaseTransaction,
+  userId: number,
+  snapshot: PersonalDataSnapshot,
+) {
+  await tx.execute(sql`
+    UPDATE public.account_data
+    SET data = ${serializeAccountData(snapshot)}::jsonb, updated_at = NOW()
+    WHERE user_id = ${userId}
+  `);
+}
+
+async function loadAccountSnapshot(
+  tx: DatabaseTransaction,
+  userId: number,
+  createAccountData: boolean,
+) {
+  if (createAccountData) {
+    await tx.execute(sql`
+      INSERT INTO public.account_data (user_id)
+      VALUES (${userId})
+      ON CONFLICT (user_id) DO NOTHING
+    `);
+  }
+
+  const accountResult = await tx.execute<{ data: unknown }>(sql`
+    SELECT data
+    FROM public.account_data
+    WHERE user_id = ${userId}
+    FOR UPDATE
+  `);
+  const accountDataExists = accountResult.rows.length > 0;
+  const storedData = accountDataExists ? accountResult.rows[0].data : emptyPersonalData();
+  if (!isRecord(storedData)) {
+    throw new Error("Stored account data is invalid and requires support.");
+  }
+
+  let [profile] = await tx
+    .select()
+    .from(studentProfiles)
+    .where(eq(studentProfiles.userId, userId))
+    .limit(1);
+  let [answersRecord] = await tx
+    .select()
+    .from(discoverAnswers)
+    .where(eq(discoverAnswers.userId, userId))
+    .limit(1);
+
+  const initialSnapshot = snapshotFromStoredData(
+    storedData,
+    profile ? profile.educationStage : storedData.educationStage ?? null,
+    answersRecord ? answersRecord.answers : storedData.discoveryAnswers ?? null,
+  );
+
+  if (!profile && initialSnapshot.educationStage !== null) {
+    await tx
+      .insert(studentProfiles)
+      .values({ userId, educationStage: initialSnapshot.educationStage })
+      .onConflictDoNothing();
+    [profile] = await tx
+      .select()
+      .from(studentProfiles)
+      .where(eq(studentProfiles.userId, userId))
+      .limit(1);
+  }
+
+  if (!answersRecord && initialSnapshot.discoveryAnswers !== null) {
+    await tx
+      .insert(discoverAnswers)
+      .values({ userId, answers: initialSnapshot.discoveryAnswers })
+      .onConflictDoNothing();
+    [answersRecord] = await tx
+      .select()
+      .from(discoverAnswers)
+      .where(eq(discoverAnswers.userId, userId))
+      .limit(1);
+  }
+
+  const snapshot = snapshotFromStoredData(
+    storedData,
+    profile ? profile.educationStage : initialSnapshot.educationStage,
+    answersRecord ? answersRecord.answers : initialSnapshot.discoveryAnswers,
+  );
+  return {
+    snapshot,
+    accountDataExists,
+    hasLegacyProgress:
+      storedData.educationStage != null || storedData.discoveryAnswers != null,
+  };
+}
+
+async function saveEducationStage(
+  tx: DatabaseTransaction,
+  userId: number,
+  educationStage: PersonalDataSnapshot["educationStage"],
+) {
+  await tx
+    .insert(studentProfiles)
+    .values({ userId, educationStage })
+    .onConflictDoUpdate({
+      target: studentProfiles.userId,
+      set: { educationStage, updatedAt: sql`now()` },
+    });
+}
+
+async function saveDiscoveryAnswers(
+  tx: DatabaseTransaction,
+  userId: number,
+  answers: NonNullable<PersonalDataSnapshot["discoveryAnswers"]>,
+) {
+  await tx
+    .insert(discoverAnswers)
+    .values({ userId, answers })
+    .onConflictDoUpdate({
+      target: discoverAnswers.userId,
+      set: { answers, updatedAt: sql`now()` },
+    });
+}
+
+export async function getAccountData(userId: number): Promise<PersonalDataSnapshot> {
+  await ensureSchema();
+  return getDb().transaction(async (tx) => {
+    const loaded = await loadAccountSnapshot(tx, userId, false);
+    if (loaded.accountDataExists && loaded.hasLegacyProgress) {
+      await writeAccountData(tx, userId, loaded.snapshot);
+    }
+    return loaded.snapshot;
+  });
 }
 
 export async function updateAccountData(
@@ -325,34 +480,30 @@ export async function updateAccountData(
   mutation: PersonalDataMutation,
 ): Promise<PersonalDataSnapshot> {
   await ensureSchema();
-  const client = await getPool().connect();
-  try {
-    await client.query("BEGIN");
-    await client.query(
-      "INSERT INTO account_data (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING",
-      [userId],
-    );
-    const result = await client.query<{ data: unknown }>(
-      "SELECT data FROM account_data WHERE user_id = $1 FOR UPDATE",
-      [userId],
-    );
-    const current = result.rows[0]?.data;
-    if (!isPersonalDataSnapshot(current)) {
-      throw new Error("Stored account data is invalid and requires support.");
-    }
+  return getDb().transaction(async (tx) => {
+    const { snapshot: current } = await loadAccountSnapshot(tx, userId, true);
     const next = applyPersonalDataMutation(current, mutation);
-    await client.query(
-      "UPDATE account_data SET data = $2::jsonb, updated_at = NOW() WHERE user_id = $1",
-      [userId, JSON.stringify(next)],
-    );
-    await client.query("COMMIT");
+
+    if (mutation.type === "progress.educationStage") {
+      await saveEducationStage(tx, userId, mutation.value);
+    } else if (mutation.type === "progress.discoveryAnswers") {
+      if (mutation.value === null) {
+        await tx.delete(discoverAnswers).where(eq(discoverAnswers.userId, userId));
+      } else {
+        await saveDiscoveryAnswers(tx, userId, mutation.value);
+      }
+    } else if (mutation.type === "migration.keep") {
+      if (mutation.data.educationStage !== null) {
+        await saveEducationStage(tx, userId, mutation.data.educationStage);
+      }
+      if (mutation.data.discoveryAnswers !== null) {
+        await saveDiscoveryAnswers(tx, userId, mutation.data.discoveryAnswers);
+      }
+    }
+
+    await writeAccountData(tx, userId, next);
     return next;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  });
 }
 
 export async function deleteAccount(password: string) {

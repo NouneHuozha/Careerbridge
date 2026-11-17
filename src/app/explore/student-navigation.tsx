@@ -3,14 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, Check, ChevronDown, ChevronRight, CircleHelp, Compass, GraduationCap, ListChecks, LogOut, Mail, Menu, Pencil, Trash2, UserRound, X, type LucideIcon } from "lucide-react";
+import { Bookmark, ChevronDown, ChevronRight, CircleHelp, Compass, GraduationCap, ListChecks, LogOut, Mail, Menu, Trash2, UserRound, X, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useAccount } from "../account-provider";
-import {
-  saveEducationStage,
-  useEducationStage,
-  type EducationStage,
-} from "../education-stage";
+import { useEducationStage } from "../education-stage";
 
 const navigationItems: {
   label: string;
@@ -483,9 +479,6 @@ function ProfileMenu({
   mobile?: boolean;
 }) {
   const education = useEducationStage();
-  const [editingStage, setEditingStage] = useState(false);
-  const [stageDraft, setStageDraft] = useState<EducationStage | null>(null);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [signingOut, setSigningOut] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -503,13 +496,6 @@ function ProfileMenu({
           : education.status === "invalid"
             ? "Couldn’t read stage"
             : "Unavailable";
-
-  function openStageEditor() {
-    setStageDraft(education.status === "saved" ? education.stage : null);
-    setError("");
-    setMessage("");
-    setEditingStage(true);
-  }
 
   async function submitAccountDeletion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -529,21 +515,6 @@ function ProfileMenu({
     } finally {
       setDeletingAccount(false);
     }
-  }
-
-  function saveStage(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!stageDraft) {
-      setError("Choose a study stage to continue.");
-      return;
-    }
-    if (!saveEducationStage(stageDraft)) {
-      setError("Your study stage couldn’t be updated in this browser. Check your storage settings and try again.");
-      return;
-    }
-    setEditingStage(false);
-    setError("");
-    setMessage("Study stage updated. Your other exploration information is unchanged.");
   }
 
   return (
@@ -583,67 +554,9 @@ function ProfileMenu({
             <p className="text-xs font-medium text-[#59675f]">Current study stage</p>
             <p className="mt-0.5 text-sm font-semibold">{stageLabel}</p>
           </div>
-          <button
-            type="button"
-            onClick={openStageEditor}
-            disabled={education.status === "loading" || education.status === "unavailable"}
-            className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-[#315345] transition-colors hover:bg-[#f3f7f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3d8b72] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Pencil aria-hidden="true" className="h-3 w-3" />
-            Edit
-          </button>
         </div>
-        {editingStage && (
-          <form onSubmit={saveStage} className="mt-3 border-t border-[#edf1ed] pt-3">
-            <fieldset>
-              <legend className="sr-only">Choose your current study stage</legend>
-              <div className="grid grid-cols-2 gap-2">
-                {([
-                  ["class-10", "Class 10"],
-                  ["class-12", "Class 12"],
-                ] as const).map(([value, label]) => (
-                  <label key={value} className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-2 text-xs font-semibold ${
-                    stageDraft === value ? "border-[#145543] bg-[#edf5ef]" : "border-[#dce7df] bg-white"
-                  }`}>
-                    <input
-                      type="radio"
-                      name="profile-study-stage"
-                      value={value}
-                      required
-                      checked={stageDraft === value}
-                      onChange={() => setStageDraft(value)}
-                      className="h-3.5 w-3.5 accent-[#145543]"
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            {error && <p role="alert" className="mt-2 text-xs leading-5 text-[#8b3529]">{error}</p>}
-            <div className="mt-3 flex justify-end gap-2">
-              <button type="button" onClick={() => setEditingStage(false)} className="min-h-9 rounded-lg px-3 text-xs font-semibold text-[#59675f] hover:bg-[#f3f7f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3d8b72]">
-                Cancel
-              </button>
-              <button type="submit" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#145543] px-3 text-xs font-semibold text-white hover:bg-[#0f4537] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3d8b72]">
-                <Check aria-hidden="true" className="h-3.5 w-3.5" />
-                Save changes
-              </button>
-            </div>
-          </form>
-        )}
-        {education.status === "invalid" && (
-          <p role="alert" className="mt-2 text-xs leading-5 text-[#8b5a1f]">
-            The saved stage couldn’t be read. Choose a new stage to replace it.
-          </p>
-        )}
-        {education.status === "unavailable" && (
-          <p role="alert" className="mt-2 text-xs leading-5 text-[#8b5a1f]">
-            Browser storage is unavailable, so the stage can’t be updated.
-          </p>
-        )}
       </div>
-      {message && <p role="status" className="px-2 py-2 text-xs leading-5 text-[#315345]">{message}</p>}
-      {error && !editingStage && (
+      {error && (
         <p role="alert" className="px-2 py-2 text-xs leading-5 text-[#8b3529]">{error}</p>
       )}
       {authUnavailable && <p role="status" className="px-2 py-2 text-xs leading-5 text-[#8b5a1f]">Account services are unavailable.</p>}
