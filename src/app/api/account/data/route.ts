@@ -71,6 +71,33 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Sign in to update account data." }, { status: 401, headers: noStore });
     }
+
+    const url = new URL(request.url);
+    const queryUserIdRaw = url.searchParams.get("expectedUserId") ?? url.searchParams.get("userId");
+    const queryUserId = queryUserIdRaw !== null && /^\d+$/.test(queryUserIdRaw)
+      ? Number.parseInt(queryUserIdRaw, 10)
+      : undefined;
+
+    const rawInput = input as Record<string, unknown>;
+    const bodyExpectedUserId =
+      typeof rawInput.expectedUserId === "number"
+        ? rawInput.expectedUserId
+        : typeof rawInput.userId === "number"
+          ? rawInput.userId
+          : undefined;
+
+    const expectedUserId = bodyExpectedUserId ?? queryUserId;
+
+    if (
+      (expectedUserId !== undefined && expectedUserId !== user.id) ||
+      (queryUserId !== undefined && queryUserId !== user.id)
+    ) {
+      return NextResponse.json(
+        { error: "Account session changed. This change was not saved to this account." },
+        { status: 409, headers: noStore },
+      );
+    }
+
     const data = await updateAccountData(user.id, input);
     return NextResponse.json({ data }, { headers: noStore });
   } catch (error) {

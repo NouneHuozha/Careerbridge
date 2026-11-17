@@ -254,6 +254,10 @@ function reset() {
         testState.failNextPost = false;
         return response(503, { error: "Failed to update account data." });
       }
+      const activeId = clerkUserId === "clerk-a" ? 101 : 202;
+      if (body.expectedUserId !== undefined && body.expectedUserId !== activeId) {
+        return response(409, { error: "Account session changed. This change was not saved to this account." });
+      }
       if (body.type === "progress.educationStage") {
         testState.overrideStage = body.value;
       }
@@ -469,6 +473,7 @@ test("Account A pending writes are preserved and NEVER sent under Account B sess
   assert.deepEqual(testState.transfers[0], {
     type: "progress.educationStage",
     value: "class-12",
+    expectedUserId: 202,
   });
   assert.equal(sync.hasPendingAccountMutations(202), false);
 
@@ -488,6 +493,67 @@ test("Account A pending writes are preserved and NEVER sent under Account B sess
   const accountAPosts = testState.transfers.filter((t) => t.type === "progress.discoveryAnswers");
   assert.equal(accountAPosts.length, 1);
   assert.deepEqual(accountAPosts[0].value, { activityIds: ["fixing", "helping"] });
+  assert.equal(accountAPosts[0].expectedUserId, 101);
+});
+
+test("Account A queued mutation reaching API while Account B is authenticated is rejected with 409 and preserved for recovery", async () => {
+  reset();
+  clerkUserId = "clerk-a";
+  testState.dataForUser = (id) => id === 101
+    ? accountSnapshot("class-10", ["fixing"])
+    : accountSnapshot("class-12", ["computers"]);
+
+  const harness = activeHarness;
+  render(harness);
+  runEffects(harness);
+  await waitFor(() => providerValue(harness).status === "authenticated");
+
+  // Account A enqueues a change while network is offline/slow
+  testState.failNextPost = true;
+  assert.equal(saveAnswers({ activityIds: ["fixing", "helping"] }), true);
+  await waitFor(() => sync.hasPendingAccountMutations(101));
+  assert.equal(sync.hasPendingAccountMutations(101), true);
+
+  // Rapid switch to Account B
+  clerkUserId = "clerk-b";
+  render(harness);
+  runEffects(harness);
+  await waitFor(() => providerValue(harness).status === "authenticated");
+  assert.equal(sync.getAccountCacheUserId(), 202);
+
+  // Simulate an in-flight or delayed flush of Account A's mutation arriving while Account B is authenticated
+  const rogueResponse = await globalThis.fetch("/api/account/data", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "progress.discoveryAnswers",
+      value: { activityIds: ["fixing", "helping"] },
+      expectedUserId: 101,
+    }),
+  });
+  assert.equal(rogueResponse.status, 409);
+  const rogueJson = await rogueResponse.json();
+  assert.match(rogueJson.error, /Account session changed/);
+
+  // Assert Account B was NOT modified
+  assert.deepEqual(useDiscoverHooks().answers, {
+    status: "saved",
+    answers: { activityIds: ["computers"] },
+  });
+  // Assert Account A's queue remains intact in sessionStorage
+  assert.equal(sync.hasPendingAccountMutations(101), true);
+
+  // Account B signs out and Account A signs back in
+  assert.equal(await providerValue(harness).signOut(), true);
+  clerkUserId = "clerk-a";
+  render(harness);
+  runEffects(harness);
+  await waitFor(() => providerValue(harness).status === "authenticated");
+  assert.equal(sync.getAccountCacheUserId(), 101);
+
+  // Account A's pending write is now safely synced
+  await waitFor(() => !sync.hasPendingAccountMutations(101));
+  assert.equal(sync.hasPendingAccountMutations(101), false);
 });
 
 test("failed writes do not overwrite browser snapshot on refresh or focus", async () => {

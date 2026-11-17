@@ -370,36 +370,39 @@ test("Account A reads its own Discover answers and exploration history", async (
 test("Account B's body-supplied Account A ID cannot read, modify, or remove Account A data", async () => {
   resetState();
   const beforeA = copy(state.accountData.get(userA));
+  const beforeB = copy(state.accountData.get(userB));
 
   const removeResponse = await accountDataRoute.POST(
     makeRequest("/api/account/data", "POST", {
       userId: userA,
+      expectedUserId: userA,
       type: "history.remove",
       item: { type: "field", id: "history-a-1", context: {} },
     }),
   );
   const removeResult = await responseBody(removeResponse);
 
-  assert.equal(removeResponse.status, 200);
-  assert.deepEqual(removeResult.data, emptyData());
-  assert.deepEqual(state.dataSelects, [userB]);
-  assert.deepEqual(state.dataWrites, [userB]);
+  assert.equal(removeResponse.status, 409);
+  assert.match(removeResult.error, /Account session changed/);
+  assert.deepEqual(state.dataWrites, []);
   assert.deepEqual(state.accountData.get(userA), beforeA);
+  assert.deepEqual(state.accountData.get(userB), beforeB);
 
   const updateResponse = await accountDataRoute.POST(
     makeRequest(`/api/account/data?userId=${userA}`, "POST", {
       userId: userA,
+      expectedUserId: userA,
       type: "progress.discoveryAnswers",
       value: { activityIds: ["computers"] },
     }),
   );
   const updateResult = await responseBody(updateResponse);
 
-  assert.equal(updateResponse.status, 200);
-  assert.deepEqual(updateResult.data.discoveryAnswers, { activityIds: ["computers"] });
-  assert.deepEqual(state.dataSelects, [userB, userB]);
-  assert.deepEqual(state.dataWrites, [userB, userB]);
+  assert.equal(updateResponse.status, 409);
+  assert.match(updateResult.error, /Account session changed/);
+  assert.deepEqual(state.dataWrites, []);
   assert.deepEqual(state.accountData.get(userA), beforeA);
+  assert.deepEqual(state.accountData.get(userB), beforeB);
 });
 
 test("Account B's delete route ignores Account A IDs and targets Account B", async () => {
@@ -831,12 +834,12 @@ test("Account B cannot read or change Account A's dedicated Discover data", asyn
   assert.equal(getResponse.status, 200);
   assert.equal(getResult.data.educationStage, "class-10");
   assert.deepEqual(getResult.data.discoveryAnswers, { activityIds: ["computers"] });
-  assert.equal(stageResponse.status, 200);
-  assert.equal(answersResponse.status, 200);
+  assert.equal(stageResponse.status, 409);
+  assert.equal(answersResponse.status, 409);
   assert.deepEqual(state.studentProfiles.get(userA), beforeA.profile);
   assert.deepEqual(state.discoverAnswers.get(userA), beforeA.answers);
-  assert.equal(state.studentProfiles.get(userB).educationStage, "class-12");
-  assert.deepEqual(state.discoverAnswers.get(userB).answers, { activityIds: ["helping"] });
+  assert.equal(state.studentProfiles.get(userB).educationStage, "class-10");
+  assert.deepEqual(state.discoverAnswers.get(userB).answers, { activityIds: ["computers"] });
 
   const transferResponse = await accountDataRoute.POST(
     makeRequest("/api/account/data", "POST", {
@@ -849,13 +852,30 @@ test("Account B cannot read or change Account A's dedicated Discover data", asyn
       },
     }),
   );
-  const transferred = await responseBody(transferResponse);
 
-  assert.equal(transferResponse.status, 200);
-  assert.equal(transferred.data.educationStage, "class-12");
-  assert.deepEqual(transferred.data.discoveryAnswers, { activityIds: ["helping"] });
+  assert.equal(transferResponse.status, 409);
   assert.deepEqual(state.studentProfiles.get(userA), beforeA.profile);
   assert.deepEqual(state.discoverAnswers.get(userA), beforeA.answers);
+  assert.equal(state.studentProfiles.get(userB).educationStage, "class-10");
+  assert.deepEqual(state.discoverAnswers.get(userB).answers, { activityIds: ["computers"] });
+
+  // Valid Account B writes without mismatch succeed
+  const validStageResponse = await accountDataRoute.POST(
+    makeRequest("/api/account/data", "POST", {
+      expectedUserId: userB,
+      type: "progress.educationStage",
+      value: "class-12",
+    }),
+  );
+  const validAnswersResponse = await accountDataRoute.POST(
+    makeRequest("/api/account/data", "POST", {
+      expectedUserId: userB,
+      type: "progress.discoveryAnswers",
+      value: { activityIds: ["helping"] },
+    }),
+  );
+  assert.equal(validStageResponse.status, 200);
+  assert.equal(validAnswersResponse.status, 200);
   assert.equal(state.studentProfiles.get(userB).educationStage, "class-12");
   assert.deepEqual(state.discoverAnswers.get(userB).answers, { activityIds: ["helping"] });
 

@@ -246,7 +246,11 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         const response = await fetch("/api/account/data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "saved.add", item: pending.item }),
+          body: JSON.stringify({
+            type: "saved.add",
+            item: pending.item,
+            expectedUserId: sessionUser.id,
+          }),
         });
         if (!response.ok) {
           let responseBody: unknown = null;
@@ -436,7 +440,11 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         const response = await fetch("/api/account/data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "migration.keep", data: migration.data }),
+          body: JSON.stringify({
+            type: "migration.keep",
+            data: migration.data,
+            expectedUserId: user.id,
+          }),
         });
         const result: unknown = await response.json();
         if (!response.ok || !isRecord(result) || !isPersonalDataSnapshot(result.data)) {

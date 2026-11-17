@@ -421,15 +421,25 @@ export function flushAccountMutations(targetUserId?: number): Promise<boolean> {
         response = await fetch("/api/account/data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(item.mutation),
+          body: JSON.stringify({
+            ...item.mutation,
+            expectedUserId: item.userId,
+          }),
         });
       } catch {
         notifySync("We couldn't sync your latest account change. Your tab still has it; retry to save it to your account.");
         return false;
       }
 
-      if (targetUserId === undefined && !isAccountMode()) {
-        return false;
+      if (getActiveUserId() !== userId || !isAccountMode()) {
+        if (response.ok) {
+          const currentQueue = loadAccountMutationQueue(userId);
+          if (currentQueue.length > 0 && currentQueue[0].id === item.id) {
+            currentQueue.shift();
+            saveAccountMutationQueue(userId, currentQueue);
+          }
+        }
+        return response.ok;
       }
 
       if (!response.ok) {

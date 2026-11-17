@@ -207,8 +207,10 @@ test("queued mutations are associated with active user ID and scoped by account 
 test("mutations cannot flush under a mismatched target user ID or when account mode is locked", async () => {
   reset();
   let postCalls = 0;
-  globalThis.fetch = async () => {
+  let lastBody = null;
+  globalThis.fetch = async (url, options) => {
     postCalls += 1;
+    lastBody = JSON.parse(options.body);
     return { ok: true, status: 200, json: async () => ({}) };
   };
 
@@ -231,11 +233,29 @@ test("mutations cannot flush under a mismatched target user ID or when account m
   await flushAccountMutations(101);
   assert.equal(postCalls, 0);
 
-  // Restore active user 101: flush now sends
+  // Restore active user 101: flush now sends with expectedUserId
   setAccountMode(true, 101);
   assert.equal(await flushAccountMutations(101), true);
   assert.equal(postCalls, 1);
+  assert.equal(lastBody.expectedUserId, 101);
+  assert.equal(lastBody.type, "progress.educationStage");
+  assert.equal(lastBody.value, "class-12");
   assert.equal(hasPendingAccountMutations(101), false);
+
+  // When server rejects with 409, queue is preserved for recovery
+  saveAccountMutationQueue(101, [{
+    id: "m2",
+    userId: 101,
+    mutation: { type: "progress.educationStage", value: "class-10" },
+    createdAt: Date.now(),
+  }]);
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 409,
+    json: async () => ({ error: "Account session changed." }),
+  });
+  assert.equal(await flushAccountMutations(101), false);
+  assert.equal(hasPendingAccountMutations(101), true);
 });
 
 test("pending account mutations survive sign-out and cache clearing", () => {
