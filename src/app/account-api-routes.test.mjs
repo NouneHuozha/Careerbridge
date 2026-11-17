@@ -621,7 +621,7 @@ test("dedicated values take precedence over conflicting legacy snapshot values",
   assert.equal(Object.hasOwn(state.accountData.get(userA), "discoveryAnswers"), false);
 });
 
-test("guest transfer preserves existing values when guest progress is empty and merges unrelated data", async () => {
+test("guest transfer keeps existing Discover values and merges saved items and history", async () => {
   resetState();
   state.studentProfiles.set(userB, { userId: userB, educationStage: "class-12" });
   state.discoverAnswers.set(userB, {
@@ -676,10 +676,86 @@ test("guest transfer preserves existing values when guest progress is empty and 
   const transferred = await responseBody(transferResponse);
 
   assert.equal(transferResponse.status, 200);
-  assert.equal(transferred.data.educationStage, "class-10");
-  assert.deepEqual(transferred.data.discoveryAnswers, { activityIds: ["fixing"] });
-  assert.equal(state.studentProfiles.get(userB).educationStage, "class-10");
-  assert.deepEqual(state.discoverAnswers.get(userB).answers, { activityIds: ["fixing"] });
+  assert.equal(transferred.data.educationStage, "class-12");
+  assert.deepEqual(transferred.data.discoveryAnswers, { activityIds: ["computers"] });
+  assert.equal(state.studentProfiles.get(userB).educationStage, "class-12");
+  assert.deepEqual(state.discoverAnswers.get(userB).answers, { activityIds: ["computers"] });
+  assert.equal(Object.hasOwn(state.accountData.get(userB), "educationStage"), false);
+  assert.equal(Object.hasOwn(state.accountData.get(userB), "discoveryAnswers"), false);
+});
+
+test("guest Discover values transfer independently when only one account value exists", async () => {
+  const scenarios = [
+    {
+      profile: { userId: userB, educationStage: "class-12" },
+      answers: null,
+      expectedStage: "class-12",
+      expectedAnswers: { activityIds: ["fixing"] },
+    },
+    {
+      profile: null,
+      answers: {
+        userId: userB,
+        answers: { activityIds: ["computers"] },
+        schemaVersion: 1,
+      },
+      expectedStage: "class-10",
+      expectedAnswers: { activityIds: ["computers"] },
+    },
+  ];
+
+  for (const scenario of scenarios) {
+    resetState();
+    if (scenario.profile) state.studentProfiles.set(userB, scenario.profile);
+    if (scenario.answers) state.discoverAnswers.set(userB, scenario.answers);
+
+    const response = await accountDataRoute.POST(
+      makeRequest("/api/account/data", "POST", {
+        type: "migration.keep",
+        data: {
+          ...emptyData(),
+          educationStage: "class-10",
+          discoveryAnswers: { activityIds: ["fixing"] },
+        },
+      }),
+    );
+    const result = await responseBody(response);
+
+    assert.equal(response.status, 200);
+    assert.equal(result.data.educationStage, scenario.expectedStage);
+    assert.deepEqual(result.data.discoveryAnswers, scenario.expectedAnswers);
+    assert.equal(state.studentProfiles.get(userB).educationStage, scenario.expectedStage);
+    assert.deepEqual(state.discoverAnswers.get(userB).answers, scenario.expectedAnswers);
+  }
+});
+
+test("legacy Discover values are backfilled and preserved during guest transfer", async () => {
+  resetState();
+  state.accountData.set(userB, {
+    ...emptyData(),
+    educationStage: "class-12",
+    discoveryAnswers: { activityIds: ["computers"] },
+    savedItems: [{ type: "course", id: "legacy-course", savedAt: 1 }],
+  });
+
+  const response = await accountDataRoute.POST(
+    makeRequest("/api/account/data", "POST", {
+      type: "migration.keep",
+      data: {
+        ...emptyData(),
+        educationStage: "class-10",
+        discoveryAnswers: { activityIds: ["fixing"] },
+      },
+    }),
+  );
+  const result = await responseBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(result.data.educationStage, "class-12");
+  assert.deepEqual(result.data.discoveryAnswers, { activityIds: ["computers"] });
+  assert.deepEqual(result.data.savedItems.map(({ id }) => id), ["legacy-course"]);
+  assert.equal(state.studentProfiles.get(userB).educationStage, "class-12");
+  assert.deepEqual(state.discoverAnswers.get(userB).answers, { activityIds: ["computers"] });
   assert.equal(Object.hasOwn(state.accountData.get(userB), "educationStage"), false);
   assert.equal(Object.hasOwn(state.accountData.get(userB), "discoveryAnswers"), false);
 });
@@ -757,6 +833,27 @@ test("Account B cannot read or change Account A's dedicated Discover data", asyn
   assert.deepEqual(getResult.data.discoveryAnswers, { activityIds: ["computers"] });
   assert.equal(stageResponse.status, 200);
   assert.equal(answersResponse.status, 200);
+  assert.deepEqual(state.studentProfiles.get(userA), beforeA.profile);
+  assert.deepEqual(state.discoverAnswers.get(userA), beforeA.answers);
+  assert.equal(state.studentProfiles.get(userB).educationStage, "class-12");
+  assert.deepEqual(state.discoverAnswers.get(userB).answers, { activityIds: ["helping"] });
+
+  const transferResponse = await accountDataRoute.POST(
+    makeRequest("/api/account/data", "POST", {
+      userId: userA,
+      type: "migration.keep",
+      data: {
+        ...emptyData(),
+        educationStage: "class-10",
+        discoveryAnswers: { activityIds: ["outdoors"] },
+      },
+    }),
+  );
+  const transferred = await responseBody(transferResponse);
+
+  assert.equal(transferResponse.status, 200);
+  assert.equal(transferred.data.educationStage, "class-12");
+  assert.deepEqual(transferred.data.discoveryAnswers, { activityIds: ["helping"] });
   assert.deepEqual(state.studentProfiles.get(userA), beforeA.profile);
   assert.deepEqual(state.discoverAnswers.get(userA), beforeA.answers);
   assert.equal(state.studentProfiles.get(userB).educationStage, "class-12");

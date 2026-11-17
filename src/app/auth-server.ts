@@ -246,9 +246,9 @@ function mergePersonalData(
   return {
     savedItems: [...saved.values()],
     history: [...history.values()],
-    educationStage: incoming.educationStage ?? current.educationStage,
+    educationStage: current.educationStage ?? incoming.educationStage,
     counsellingSession: incoming.counsellingSession ?? current.counsellingSession,
-    discoveryAnswers: incoming.discoveryAnswers ?? current.discoveryAnswers,
+    discoveryAnswers: current.discoveryAnswers ?? incoming.discoveryAnswers,
   };
 }
 
@@ -493,10 +493,10 @@ export async function updateAccountData(
         await saveDiscoveryAnswers(tx, userId, mutation.value);
       }
     } else if (mutation.type === "migration.keep") {
-      if (mutation.data.educationStage !== null) {
+      if (current.educationStage === null && mutation.data.educationStage !== null) {
         await saveEducationStage(tx, userId, mutation.data.educationStage);
       }
-      if (mutation.data.discoveryAnswers !== null) {
+      if (current.discoveryAnswers === null && mutation.data.discoveryAnswers !== null) {
         await saveDiscoveryAnswers(tx, userId, mutation.data.discoveryAnswers);
       }
     }

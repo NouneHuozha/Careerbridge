@@ -10,6 +10,7 @@ import {
   Plus,
   ArrowRight,
 } from "lucide-react";
+import { useAccount } from "../account-provider";
 import {
   saveEducationStage,
   useEducationStage,
@@ -50,20 +51,35 @@ const classOptions: {
 
 export default function DiscoveryForm() {
   const router = useRouter();
+  const account = useAccount();
   const stored = useStoredDiscoveryAnswers();
   const savedEducation = useEducationStage();
-  const [draft, setDraft] = useState<DiscoveryAnswers | null>(null);
-  const [stageDraft, setStageDraft] = useState<EducationStage | null>(null);
+  const [draft, setDraft] = useState<{ owner: string; answers: DiscoveryAnswers } | null>(null);
+  const [stageDraft, setStageDraft] = useState<{ owner: string; stage: EducationStage } | null>(null);
   const [notice, setNotice] = useState("");
   const [selectionMessage, setSelectionMessage] = useState("");
-  const ready = stored.status !== "loading" && savedEducation.status !== "loading";
-  const answers =
-    draft ??
-    (stored.status === "saved" || stored.status === "empty"
-      ? stored.answers
-      : createEmptyAnswers());
+  const owner =
+    account.status === "authenticated" && account.user
+      ? `account:${account.user.id}`
+      : account.status === "guest"
+        ? "guest"
+        : null;
+  const ready =
+    owner !== null &&
+    stored.status !== "loading" &&
+    savedEducation.status !== "loading";
+  const answers = ready
+    ? (owner && draft?.owner === owner ? draft.answers : null) ??
+      (stored.status === "saved" || stored.status === "empty"
+        ? stored.answers
+        : createEmptyAnswers())
+    : createEmptyAnswers();
   const educationStage =
-    savedEducation.status === "saved" ? savedEducation.stage : stageDraft;
+    savedEducation.status === "saved"
+      ? savedEducation.stage
+      : ready && owner && stageDraft?.owner === owner
+        ? stageDraft.stage
+        : null;
   const storageNotice =
     stored.status === "invalid"
       ? "We couldn’t read your earlier activity choices. They haven’t been used. Choose activities again or leave them unselected."
@@ -76,14 +92,19 @@ export default function DiscoveryForm() {
             : "";
 
   function toggleActivity(id: ActivityId) {
+    if (!ready || !owner) return;
     setNotice("");
     setSelectionMessage("");
 
     if (answers.activityIds.includes(id)) {
-      setDraft({
+      const next = {
         ...answers,
         activityIds: answers.activityIds.filter((activityId) => activityId !== id),
-      });
+      };
+      setDraft({ owner, answers: next });
+      if (!saveAnswers(next)) {
+        setNotice("We couldn’t save your choices in this tab. Your selections are still shown here.");
+      }
       return;
     }
 
@@ -92,14 +113,19 @@ export default function DiscoveryForm() {
       return;
     }
 
-    setDraft({
+    const next = {
       ...answers,
       activityIds: [...answers.activityIds, id],
-    });
+    };
+    setDraft({ owner, answers: next });
+    if (!saveAnswers(next)) {
+      setNotice("We couldn’t save your choices in this tab. Your selections are still shown here.");
+    }
   }
 
   function chooseEducationStage(stage: EducationStage) {
-    setStageDraft(stage);
+    if (!owner || !ready) return;
+    setStageDraft({ owner, stage });
     if (!saveEducationStage(stage)) {
       setNotice("We couldn’t save your education stage on this device. Check your browser storage settings before continuing.");
       return;
@@ -123,11 +149,12 @@ export default function DiscoveryForm() {
   }
 
   function clearCurrentChoices() {
+    if (!owner || !ready) return false;
     if (!clearAnswers()) {
       setNotice("We couldn’t clear the saved choices in this tab. Please try again.");
       return false;
     }
-    setDraft(createEmptyAnswers());
+    setDraft({ owner, answers: createEmptyAnswers() });
     setNotice("");
     setSelectionMessage("");
     return true;
@@ -167,6 +194,23 @@ export default function DiscoveryForm() {
       </section>
 
       <div className="cb-container pb-16 pt-3 sm:pb-20 sm:pt-6 lg:pt-7">
+        {account.status === "loading" && (
+          <p role="status" className="mb-6 rounded-xl border border-[#d9ddd5] bg-white p-4 text-sm text-[#59665e]">
+            Loading your saved Discover choices…
+          </p>
+        )}
+        {account.status === "unavailable" && (
+          <div role="alert" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#c8954e] bg-[#fbf1df] p-4 text-sm text-[#4c3922]">
+            <p>{account.error ?? "Your saved Discover choices are unavailable."}</p>
+            <button
+              type="button"
+              onClick={() => void account.refresh()}
+              className="min-h-11 rounded-full border border-[#145543] px-4 font-semibold text-[#145543] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+            >
+              Retry
+            </button>
+          </div>
+        )}
         {(notice || storageNotice) && (
           <div
             role={notice.includes("couldn’t") ? "alert" : "status"}
@@ -247,6 +291,7 @@ export default function DiscoveryForm() {
                           value={value}
                           checked={selected}
                           onChange={() => chooseEducationStage(value)}
+                          disabled={!ready}
                           className="sr-only"
                           required
                         />
@@ -318,6 +363,7 @@ export default function DiscoveryForm() {
                       key={id}
                       type="button"
                       aria-pressed={selected}
+                      disabled={!ready}
                       onClick={() => toggleActivity(id)}
                       className={`cb-reveal group flex min-h-[126px] items-start gap-4 rounded-2xl border p-4 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543] motion-reduce:transform-none motion-reduce:transition-none sm:p-5 ${
                         selected
@@ -365,7 +411,7 @@ export default function DiscoveryForm() {
           <div className="border-t border-[#d9ddd5] pt-5 sm:pt-6">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-3xl">
-                {!educationStage ? (
+                {!ready ? null : !educationStage ? (
                   <>
                     <p className="font-semibold text-[#18372e]">
                       Choose your education stage to continue.

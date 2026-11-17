@@ -18,7 +18,9 @@ export const ACCOUNT_CACHE_MARKER_KEY = "careerbridge:account-cache:v1";
 export const PERSONAL_DATA_READY_EVENT = "careerbridge-personal-data-ready";
 export const ACCOUNT_SYNC_EVENT = "careerbridge-account-sync";
 export const PENDING_SAVE_KEY = "careerbridge:pending-save:v1";
+export const ACCOUNT_MUTATION_QUEUE_PREFIX = "careerbridge:account-mutations:";
 const UNREADABLE_GUEST_BACKUP_KEY = "careerbridge:unreadable-guest-data:v1";
+const GUEST_DATA_BACKUP_KEY = "careerbridge:guest-data-backup:v1";
 const legacyStorageKeys = [
   SAVED_ITEMS_STORAGE_KEY,
   EXPLORATION_HISTORY_STORAGE_KEY,
@@ -26,8 +28,20 @@ const legacyStorageKeys = [
   COUNSELLING_STORAGE_KEY,
 ];
 
+export type QueuedAccountMutation = {
+  id: string;
+  userId: number;
+  mutation: PersonalDataMutation;
+  createdAt: number;
+};
+
+export function getAccountMutationQueueKey(userId: number) {
+  return `${ACCOUNT_MUTATION_QUEUE_PREFIX}${userId}:v1`;
+}
+
 let accountMode: boolean | undefined;
-let mutationQueue: PersonalDataMutation[] = [];
+let activeUserId: number | null = null;
+let activeFlushUserId: number | null = null;
 let flushPromise: Promise<boolean> | null = null;
 
 export function isPersonalDataReady() {
@@ -38,8 +52,13 @@ export function isAccountMode() {
   return accountMode === true;
 }
 
-export function setAccountMode(enabled: boolean) {
+export function getActiveUserId(): number | null {
+  return activeUserId ?? getAccountCacheUserId();
+}
+
+export function setAccountMode(enabled: boolean, userId?: number | null) {
   accountMode = enabled;
+  activeUserId = enabled ? (userId ?? getAccountCacheUserId() ?? 0) : null;
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(PERSONAL_DATA_READY_EVENT));
   }
@@ -47,6 +66,7 @@ export function setAccountMode(enabled: boolean) {
 
 export function lockPersonalData() {
   accountMode = undefined;
+  activeUserId = null;
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(PERSONAL_DATA_READY_EVENT));
   }
@@ -198,6 +218,16 @@ export function hydrateAccountCache(
   if (!isPersonalDataSnapshot(data)) {
     throw new Error("The account returned data that could not be validated.");
   }
+  writePersonalDataCache(data);
+  window.sessionStorage.setItem(ACCOUNT_CACHE_MARKER_KEY, JSON.stringify({ userId }));
+  activeUserId = userId;
+  if (clearUnreadableBackup) {
+    window.sessionStorage.removeItem(UNREADABLE_GUEST_BACKUP_KEY);
+  }
+  emitPersonalDataChanged();
+}
+
+function writePersonalDataCache(data: PersonalDataSnapshot) {
   window.sessionStorage.setItem(
     SAVED_ITEMS_STORAGE_KEY,
     JSON.stringify({ version: 1, items: data.savedItems }),
@@ -221,11 +251,43 @@ export function hydrateAccountCache(
   } else {
     window.sessionStorage.removeItem(DISCOVERY_STORAGE_KEY);
   }
-  window.sessionStorage.setItem(ACCOUNT_CACHE_MARKER_KEY, JSON.stringify({ userId }));
-  if (clearUnreadableBackup) {
-    window.sessionStorage.removeItem(UNREADABLE_GUEST_BACKUP_KEY);
+}
+
+export function preserveGuestDataCache(data: PersonalDataSnapshot) {
+  if (!isPersonalDataSnapshot(data)) {
+    throw new Error("Guest data could not be validated for this session.");
   }
-  emitPersonalDataChanged();
+  window.sessionStorage.setItem(GUEST_DATA_BACKUP_KEY, JSON.stringify(data));
+}
+
+export function clearGuestDataCache() {
+  window.sessionStorage.removeItem(GUEST_DATA_BACKUP_KEY);
+}
+
+export function restoreGuestDataCache() {
+  const rawGuestData = window.sessionStorage.getItem(GUEST_DATA_BACKUP_KEY);
+  let guestData: PersonalDataSnapshot | null = null;
+  if (rawGuestData !== null) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawGuestData);
+    } catch {
+      throw new Error("Guest data could not be restored.");
+    }
+    if (!isPersonalDataSnapshot(parsed)) {
+      throw new Error("Guest data could not be restored.");
+    }
+    guestData = parsed;
+  }
+  const unreadableGuestData = window.sessionStorage.getItem(UNREADABLE_GUEST_BACKUP_KEY);
+
+  clearPersonalDataCache();
+  if (guestData) writePersonalDataCache(guestData);
+  if (unreadableGuestData !== null) {
+    window.sessionStorage.setItem(UNREADABLE_GUEST_BACKUP_KEY, unreadableGuestData);
+  }
+  clearGuestDataCache();
+  setAccountMode(false);
 }
 
 export function clearPersonalDataCache() {
@@ -241,7 +303,6 @@ export function clearPersonalDataCache() {
       window.localStorage.removeItem(key);
     }
   }
-  mutationQueue = [];
   setAccountMode(false);
   window.dispatchEvent(new Event("careerbridge-saved-items-change"));
   window.dispatchEvent(new Event("careerbridge-exploration-history-change"));
@@ -250,52 +311,153 @@ export function clearPersonalDataCache() {
   window.dispatchEvent(new Event("careerbridge-discovery-change"));
 }
 
+export function loadAccountMutationQueue(userId: number): QueuedAccountMutation[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.sessionStorage.getItem(getAccountMutationQueueKey(userId));
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const valid: QueuedAccountMutation[] = [];
+    for (const item of parsed) {
+      if (
+        isRecord(item) &&
+        typeof item.id === "string" &&
+        item.userId === userId &&
+        typeof item.createdAt === "number" &&
+        isRecord(item.mutation)
+      ) {
+        valid.push(item as QueuedAccountMutation);
+      }
+    }
+    return valid;
+  } catch {
+    return [];
+  }
+}
+
+export function saveAccountMutationQueue(userId: number, queue: QueuedAccountMutation[]) {
+  if (typeof window === "undefined") return;
+  try {
+    const key = getAccountMutationQueueKey(userId);
+    if (queue.length === 0) {
+      window.sessionStorage.removeItem(key);
+    } else {
+      window.sessionStorage.setItem(key, JSON.stringify(queue));
+    }
+  } catch {
+    // Keep in-memory or ignore if storage unavailable
+  }
+}
+
+export function clearAccountMutationQueue(userId: number) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(getAccountMutationQueueKey(userId));
+  } catch {
+    // Ignore
+  }
+}
+
+export function hasPendingAccountMutations(userId?: number | null): boolean {
+  const targetId = userId ?? getActiveUserId();
+  if (targetId === null || targetId === undefined) return false;
+  return loadAccountMutationQueue(targetId).length > 0;
+}
+
 function notifySync(message: string | null) {
   window.dispatchEvent(new CustomEvent(ACCOUNT_SYNC_EVENT, { detail: { message } }));
 }
 
 export function enqueueAccountMutation(mutation: PersonalDataMutation) {
   if (!isAccountMode()) return;
-  mutationQueue.push(mutation);
-  void flushAccountMutations();
+  const userId = getActiveUserId();
+  if (userId === null) return;
+
+  const queue = loadAccountMutationQueue(userId);
+  const queuedItem: QueuedAccountMutation = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    userId,
+    mutation,
+    createdAt: Date.now(),
+  };
+  queue.push(queuedItem);
+  saveAccountMutationQueue(userId, queue);
+  void flushAccountMutations(userId);
 }
 
-export function flushAccountMutations(): Promise<boolean> {
-  if (!isAccountMode()) return Promise.resolve(true);
-  if (flushPromise) return flushPromise;
+export function flushAccountMutations(targetUserId?: number): Promise<boolean> {
+  if (!isAccountMode()) return Promise.resolve(false);
+  const currentUserId = getActiveUserId();
+  if (currentUserId === null) return Promise.resolve(false);
 
+  if (targetUserId !== undefined && targetUserId !== currentUserId) {
+    return Promise.resolve(false);
+  }
+
+  const userId = currentUserId;
+  if (flushPromise && activeFlushUserId === userId) {
+    return flushPromise;
+  }
+
+  activeFlushUserId = userId;
   flushPromise = (async () => {
-    while (mutationQueue.length > 0) {
-      const mutation = mutationQueue[0];
+    while (true) {
+      if (targetUserId === undefined && !isAccountMode()) {
+        return false;
+      }
+      const queue = loadAccountMutationQueue(userId);
+      if (queue.length === 0) break;
+
+      const item = queue[0];
+      if (item.userId !== userId) {
+        queue.shift();
+        saveAccountMutationQueue(userId, queue);
+        continue;
+      }
+
       let response: Response;
       try {
         response = await fetch("/api/account/data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(mutation),
+          body: JSON.stringify(item.mutation),
         });
       } catch {
         notifySync("We couldn't sync your latest account change. Your tab still has it; retry to save it to your account.");
         return false;
       }
+
+      if (targetUserId === undefined && !isAccountMode()) {
+        return false;
+      }
+
       if (!response.ok) {
         let message = "We couldn't sync your latest account change. Your tab still has it; retry to save it to your account.";
         try {
-          const result = await response.json() as { error?: string };
+          const result = (await response.json()) as { error?: string };
           if (result.error) message = result.error;
         } catch {
-          // Keep the actionable default when the server response isn't readable.
+          // Keep default
         }
         notifySync(message);
         return false;
       }
-      mutationQueue.shift();
+
+      const currentQueue = loadAccountMutationQueue(userId);
+      if (currentQueue.length > 0 && currentQueue[0].id === item.id) {
+        currentQueue.shift();
+        saveAccountMutationQueue(userId, currentQueue);
+      }
     }
+
     notifySync(null);
     return true;
   })().finally(() => {
+    activeFlushUserId = null;
     flushPromise = null;
   });
+
   return flushPromise;
 }
 
