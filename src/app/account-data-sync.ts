@@ -33,6 +33,7 @@ export type QueuedAccountMutation = {
   userId: number;
   mutation: PersonalDataMutation;
   createdAt: number;
+  conflictCount?: number;
 };
 
 export function getAccountMutationQueueKey(userId: number) {
@@ -369,6 +370,151 @@ function notifySync(message: string | null) {
   window.dispatchEvent(new CustomEvent(ACCOUNT_SYNC_EVENT, { detail: { message } }));
 }
 
+function timestampValue(value: string | undefined): number {
+  if (!value) return 0;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function answerTimestamp(answer: Record<string, unknown>): number {
+  return timestampValue(
+    typeof answer.editedAt === "string"
+      ? answer.editedAt
+      : typeof answer.createdAt === "string"
+        ? answer.createdAt
+        : undefined,
+  );
+}
+
+function hasNewerCounsellingAnswer(
+  local: Record<string, unknown>,
+  server: Record<string, unknown>,
+): boolean {
+  const localAnswers = Array.isArray(local.answers) ? local.answers : [];
+  const serverAnswers = Array.isArray(server.answers) ? server.answers : [];
+  const serverUpdatedAt = timestampValue(
+    typeof server.updatedAt === "string" ? server.updatedAt : undefined,
+  );
+  return localAnswers.some((localAnswer) => {
+    if (!isRecord(localAnswer) || typeof localAnswer.questionId !== "string") return false;
+    const serverAnswer = serverAnswers.find((answer) =>
+      isRecord(answer) && answer.questionId === localAnswer.questionId,
+    );
+    return isRecord(serverAnswer)
+      ? answerTimestamp(localAnswer) > answerTimestamp(serverAnswer)
+      : answerTimestamp(localAnswer) > serverUpdatedAt;
+  });
+}
+
+function mergeCounsellingConflictSnapshot(
+  local: Record<string, unknown>,
+  server: Record<string, unknown>,
+): Record<string, unknown> {
+  const localUpdatedAt =
+    typeof local.updatedAt === "string" ? local.updatedAt : "";
+  const serverUpdatedAt =
+    typeof server.updatedAt === "string" ? server.updatedAt : "";
+
+  if (timestampValue(serverUpdatedAt) >= timestampValue(localUpdatedAt)) {
+    const localAnswers = Array.isArray(local.answers) ? local.answers : [];
+    const serverAnswers = Array.isArray(server.answers) ? server.answers : [];
+    const mergedAnswers = [...serverAnswers];
+    for (const localAnswer of localAnswers) {
+      if (!isRecord(localAnswer) || typeof localAnswer.questionId !== "string") continue;
+      const serverIndex = mergedAnswers.findIndex((answer) =>
+        isRecord(answer) && answer.questionId === localAnswer.questionId,
+      );
+      if (serverIndex === -1) {
+        if (answerTimestamp(localAnswer) > timestampValue(serverUpdatedAt)) {
+          mergedAnswers.push(localAnswer);
+        }
+      } else {
+        const serverAnswer = mergedAnswers[serverIndex];
+        if (isRecord(serverAnswer) && answerTimestamp(localAnswer) > answerTimestamp(serverAnswer)) {
+          mergedAnswers[serverIndex] = localAnswer;
+        }
+      }
+    }
+    return {
+      ...server,
+      answers: mergedAnswers,
+      persistedUpdatedAt: server.persistedUpdatedAt,
+    };
+  }
+
+  const serverAnswers = Array.isArray(server.answers) ? server.answers : [];
+  const localAnswers = Array.isArray(local.answers) ? local.answers : [];
+  const mergedAnswers = [...localAnswers];
+  for (const serverAnswer of serverAnswers) {
+    if (!isRecord(serverAnswer) || typeof serverAnswer.questionId !== "string") continue;
+    const localIndex = mergedAnswers.findIndex((answer) =>
+      isRecord(answer) && answer.questionId === serverAnswer.questionId,
+    );
+    if (localIndex === -1) {
+      mergedAnswers.push(serverAnswer);
+    } else {
+      const localAnswer = mergedAnswers[localIndex];
+      if (isRecord(localAnswer) && answerTimestamp(serverAnswer) > answerTimestamp(localAnswer)) {
+        mergedAnswers[localIndex] = serverAnswer;
+      }
+    }
+  }
+  return {
+    ...local,
+    answers: mergedAnswers,
+    persistedUpdatedAt: server.persistedUpdatedAt,
+  };
+}
+
+function rebaseCounsellingPersistenceState(
+  userId: number,
+  serverSession: Record<string, unknown>,
+  queue: QueuedAccountMutation[],
+) {
+  const sessionId = serverSession.id;
+  const persistedUpdatedAt = serverSession.persistedUpdatedAt;
+  if (typeof sessionId !== "string" || typeof persistedUpdatedAt !== "string") return;
+
+  for (const queuedItem of queue) {
+    const mutation = queuedItem.mutation;
+    if (
+      mutation.type === "progress.counsellingSession" &&
+      mutation.value?.id === sessionId
+    ) {
+      const merged = mergeCounsellingConflictSnapshot(
+        mutation.value as unknown as Record<string, unknown>,
+        serverSession,
+      );
+      queuedItem.mutation = {
+        ...mutation,
+        value: {
+          ...merged,
+          persistedUpdatedAt,
+        } as typeof mutation.value,
+      };
+    }
+  }
+
+  if (getActiveUserId() !== userId) return;
+  try {
+    const raw = window.sessionStorage.getItem(COUNSELLING_STORAGE_KEY);
+    if (!raw) return;
+    const session: unknown = JSON.parse(raw);
+    if (isRecord(session) && session.id === sessionId) {
+      const merged = hasNewerCounsellingAnswer(session, serverSession)
+        ? mergeCounsellingConflictSnapshot(session, serverSession)
+        : serverSession;
+      window.sessionStorage.setItem(
+        COUNSELLING_STORAGE_KEY,
+        JSON.stringify({ ...merged, persistedUpdatedAt }),
+      );
+      window.dispatchEvent(new Event(PERSONAL_DATA_READY_EVENT));
+    }
+  } catch {
+    notifySync("Guided Explorer was saved, but its local sync state could not be updated.");
+  }
+}
+
 export function enqueueAccountMutation(mutation: PersonalDataMutation) {
   if (!isAccountMode()) return;
   const userId = getActiveUserId();
@@ -444,21 +590,128 @@ export function flushAccountMutations(targetUserId?: number): Promise<boolean> {
 
       if (!response.ok) {
         let message = "We couldn't sync your latest account change. Your tab still has it; retry to save it to your account.";
+        let authoritativeData: unknown;
         try {
-          const result = (await response.json()) as { error?: string };
+          const result = (await response.json()) as { error?: string; data?: unknown };
           if (result.error) message = result.error;
+          authoritativeData = result.data;
         } catch {
           // Keep default
         }
+
+        if (
+          item.mutation.type === "progress.counsellingSession" &&
+          item.mutation.value &&
+          isRecord(authoritativeData)
+        ) {
+          const serverSession = authoritativeData.counsellingSession;
+          const localSession = item.mutation.value;
+          if (isRecord(serverSession) && typeof serverSession.id === "string" &&
+            serverSession.id === localSession.id &&
+            typeof serverSession.persistedUpdatedAt === "string") {
+            if ((item.conflictCount ?? 0) >= 1) {
+              notifySync("Guided Explorer changed again while syncing. Refresh it before retrying.");
+              return false;
+            }
+
+            const currentQueue = loadAccountMutationQueue(userId);
+            const head = currentQueue[0];
+            if (head?.id === item.id) {
+              const serverTimestamp = timestampValue(
+                typeof serverSession.updatedAt === "string" ? serverSession.updatedAt : undefined,
+              );
+              const localTimestamp = timestampValue(localSession.updatedAt);
+              const hasNewerLocalAnswer = hasNewerCounsellingAnswer(localSession, serverSession);
+
+              if (serverTimestamp >= localTimestamp && !hasNewerLocalAnswer) {
+                currentQueue.shift();
+                for (const queuedItem of currentQueue) {
+                  if (
+                    queuedItem.mutation.type === "progress.counsellingSession" &&
+                    queuedItem.mutation.value?.id === serverSession.id
+                  ) {
+                    const rebased = mergeCounsellingConflictSnapshot(
+                      queuedItem.mutation.value as unknown as Record<string, unknown>,
+                      serverSession,
+                    );
+                    queuedItem.mutation = {
+                      ...queuedItem.mutation,
+                      value: rebased,
+                    } as PersonalDataMutation;
+                    queuedItem.conflictCount = 0;
+                  }
+                }
+                rebaseCounsellingPersistenceState(userId, serverSession, currentQueue);
+                saveAccountMutationQueue(userId, currentQueue);
+                notifySync("Guided Explorer loaded the latest saved progress.");
+                continue;
+              }
+
+              const rebased = mergeCounsellingConflictSnapshot(
+                localSession as unknown as Record<string, unknown>,
+                serverSession,
+              );
+              head.mutation = {
+                ...head.mutation,
+                value: rebased,
+              } as PersonalDataMutation;
+              head.conflictCount = 1;
+              saveAccountMutationQueue(userId, currentQueue);
+              if (getActiveUserId() === userId && isAccountMode()) {
+                window.sessionStorage.setItem(
+                  COUNSELLING_STORAGE_KEY,
+                  JSON.stringify(rebased),
+                );
+                window.dispatchEvent(new Event(PERSONAL_DATA_READY_EVENT));
+              }
+              continue;
+            }
+          }
+        }
+
         notifySync(message);
         return false;
+      }
+
+      let authoritativeCounsellingSession: Record<string, unknown> | undefined;
+      if (
+        item.mutation.type === "progress.counsellingSession" &&
+        item.mutation.value
+      ) {
+        try {
+          const result: unknown = await response.json();
+          const data = isRecord(result) ? result.data : null;
+          const session = isRecord(data) ? data.counsellingSession : null;
+          if (
+            !isRecord(session) ||
+            session.id !== item.mutation.value.id ||
+              typeof session.persistedUpdatedAt !== "string" ||
+              typeof session.updatedAt !== "string" ||
+              !Array.isArray(session.answers) ||
+              !Array.isArray(session.questionPath)
+          ) {
+            notifySync("Guided Explorer was saved, but its sync version could not be confirmed.");
+            return false;
+          }
+          authoritativeCounsellingSession = session;
+        } catch {
+          notifySync("Guided Explorer was saved, but its sync version could not be confirmed.");
+          return false;
+        }
       }
 
       const currentQueue = loadAccountMutationQueue(userId);
       if (currentQueue.length > 0 && currentQueue[0].id === item.id) {
         currentQueue.shift();
-        saveAccountMutationQueue(userId, currentQueue);
       }
+      if (authoritativeCounsellingSession) {
+        rebaseCounsellingPersistenceState(
+          userId,
+          authoritativeCounsellingSession,
+          currentQueue,
+        );
+      }
+      saveAccountMutationQueue(userId, currentQueue);
     }
 
     notifySync(null);

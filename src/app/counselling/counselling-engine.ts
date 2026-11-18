@@ -62,6 +62,7 @@ export type CounsellingSession = {
   skippedQuestionIds: string[];
   answers: CounsellingAnswer[];
   updatedAt: string;
+  persistedUpdatedAt?: string;
 };
 
 export type SessionRead =
@@ -182,7 +183,8 @@ function isCounsellingSession(value: unknown): value is CounsellingSession {
     value.skippedQuestionIds.every((id) => typeof id === "string" && questionIds.has(id)) &&
     Array.isArray(value.answers) &&
     value.answers.every(isCounsellingAnswer) &&
-    typeof value.updatedAt === "string"
+    typeof value.updatedAt === "string" &&
+    (value.persistedUpdatedAt === undefined || typeof value.persistedUpdatedAt === "string")
   );
 }
 

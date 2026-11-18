@@ -1,10 +1,22 @@
 import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { PoolClient } from "pg";
 import type { AuthUser } from "./auth-types";
 import { getDb } from "../db/client";
 import { getPool } from "../db/pool";
-import { discoverAnswers, studentProfiles } from "../db/schema/student";
+import { catalogItemAliases } from "../db/schema/catalog";
+import {
+  discoverAnswers,
+  explorationHistory,
+  guidedExplorerAnswers,
+  guidedExplorerSessionQuestions,
+  guidedExplorerSessions,
+  savedItems,
+  studentProfiles,
+} from "../db/schema/student";
+import type { CounsellingAnswer, CounsellingSession } from "./counselling/counselling-engine";
+import type { ExplorationHistoryItem } from "./explore/exploration-history";
+import type { SavedItem } from "./explore/saved-items";
 import {
   emptyPersonalData,
   isPersonalDataSnapshot,
@@ -26,12 +38,28 @@ async function ensureSchema() {
       const result = await getPool().query<{
         users: string | null;
         accountData: string | null;
+        catalogItemAliases: string | null;
+        studentProfiles: string | null;
+        discoverAnswers: string | null;
+        guidedExplorerSessions: string | null;
+        guidedExplorerSessionQuestions: string | null;
+        guidedExplorerAnswers: string | null;
+        savedItems: string | null;
+        explorationHistory: string | null;
       }>(
         `SELECT to_regclass('public.users') AS users,
-                to_regclass('public.account_data') AS "accountData"`,
+                to_regclass('public.account_data') AS "accountData",
+                to_regclass('public.catalog_item_aliases') AS "catalogItemAliases",
+                to_regclass('public.student_profiles') AS "studentProfiles",
+                to_regclass('public.discover_answers') AS "discoverAnswers",
+                to_regclass('public.guided_explorer_sessions') AS "guidedExplorerSessions",
+                to_regclass('public.guided_explorer_session_questions') AS "guidedExplorerSessionQuestions",
+                to_regclass('public.guided_explorer_answers') AS "guidedExplorerAnswers",
+                to_regclass('public.saved_items') AS "savedItems",
+                to_regclass('public.exploration_history') AS "explorationHistory"`,
       );
-      if (!result.rows[0]?.users || !result.rows[0]?.accountData) {
-        throw new Error("The users and account_data tables are missing from the configured PostgreSQL database.");
+      if (Object.values(result.rows[0] ?? {}).some((table) => !table)) {
+        throw new Error("The account and student-data tables are missing from the configured PostgreSQL database.");
       }
     })().catch((error: unknown) => {
       schemaReady = undefined;
@@ -52,6 +80,10 @@ export class AccountSetupValidationError extends Error {}
 export class AccountDeletionPendingError extends Error {}
 export class AccountDeletionBlockedError extends Error {}
 export class AccountDeletionPartialError extends Error {}
+export class AccountReverificationRequiredError extends Error {}
+export class AccountSessionChangedError extends Error {}
+export class CatalogueItemReferenceError extends Error {}
+export class StudentDataConflictError extends Error {}
 
 function isPostgresUniqueViolation(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
@@ -213,7 +245,12 @@ export async function provisionCurrentUser(input: {
   });
 }
 
-function personalDataKey(item: { type: string; id: string; context?: { courseId?: string } }) {
+function personalDataKey(
+  item: { type: string; id: string; context?: { courseId?: string } },
+  aliases?: CatalogueAliasIndex,
+) {
+  const alias = aliases?.byLegacyIdentity.get(legacyCatalogueAliasKey(item));
+  if (alias) return `catalog:${alias.catalogItemId}`;
   return item.type === "institution-offering"
     ? `${item.type}:${item.id}:${item.context?.courseId ?? ""}`
     : `${item.type}:${item.id}`;
@@ -222,59 +259,513 @@ function personalDataKey(item: { type: string; id: string; context?: { courseId?
 function mergePersonalData(
   current: PersonalDataSnapshot,
   incoming: PersonalDataSnapshot,
+  aliases?: CatalogueAliasIndex,
 ): PersonalDataSnapshot {
-  const saved = new Map(current.savedItems.map((item) => [personalDataKey(item), item]));
-  for (const item of incoming.savedItems) {
-    const key = personalDataKey(item);
-    const existing = saved.get(key);
-    if (!existing || item.savedAt > existing.savedAt) saved.set(key, item);
-  }
-
-  const history = new Map(current.history.map((item) => [personalDataKey(item), item]));
-  for (const item of incoming.history) {
-    const key = personalDataKey(item);
-    const existing = history.get(key);
-    history.set(key, existing
-      ? {
-          ...existing,
-          lastVisitedAt: Math.max(existing.lastVisitedAt, item.lastVisitedAt),
-          visitCount: Math.max(existing.visitCount, item.visitCount),
-        }
-      : item);
-  }
-
   return {
-    savedItems: [...saved.values()],
-    history: [...history.values()],
+    savedItems: mergeSavedItems(current.savedItems, incoming.savedItems, aliases),
+    history: mergeHistoryItems(current.history, incoming.history, aliases),
     educationStage: current.educationStage ?? incoming.educationStage,
-    counsellingSession: incoming.counsellingSession ?? current.counsellingSession,
+    counsellingSession: current.counsellingSession ?? incoming.counsellingSession,
     discoveryAnswers: current.discoveryAnswers ?? incoming.discoveryAnswers,
   };
+}
+
+type CatalogueAlias = typeof catalogItemAliases.$inferSelect;
+
+type CatalogueAliasIndex = {
+  byLegacyIdentity: Map<string, CatalogueAlias>;
+  byCatalogueId: Map<string, CatalogueAlias[]>;
+};
+
+function catalogueAliasKey(type: string, id: string, contextKey = "") {
+  return `${type}:${id}:${contextKey}`;
+}
+
+function legacyCatalogueAliasKey(item: {
+  type: string;
+  id: string;
+  context?: { courseId?: string };
+}) {
+  return catalogueAliasKey(
+    item.type,
+    item.id,
+    item.type === "institution-offering" ? item.context?.courseId ?? "" : "",
+  );
+}
+
+function indexCatalogueAliases(aliases: CatalogueAlias[]): CatalogueAliasIndex {
+  const byLegacyIdentity = new Map<string, CatalogueAlias>();
+  const byCatalogueId = new Map<string, CatalogueAlias[]>();
+  for (const alias of aliases) {
+    byLegacyIdentity.set(
+      catalogueAliasKey(alias.externalType, alias.externalKey, alias.externalContextKey),
+      alias,
+    );
+    const matches = byCatalogueId.get(alias.catalogItemId) ?? [];
+    matches.push(alias);
+    byCatalogueId.set(alias.catalogItemId, matches);
+  }
+  return { byLegacyIdentity, byCatalogueId };
+}
+
+function savedItemType(value: string): SavedItem["type"] | null {
+  switch (value) {
+    case "field":
+    case "course":
+    case "institution":
+    case "institution-offering":
+    case "pathway":
+    case "examination":
+    case "scholarship":
+      return value;
+    default:
+      return null;
+  }
+}
+
+function requiredCatalogueAlias(
+  item: { type: string; id: string; context?: { courseId?: string } },
+  aliases: CatalogueAliasIndex,
+) {
+  const alias = aliases.byLegacyIdentity.get(legacyCatalogueAliasKey(item));
+  if (!alias || !savedItemType(alias.externalType)) {
+    throw new CatalogueItemReferenceError(
+      "This saved item is no longer available in the CareerBridge catalogue.",
+    );
+  }
+  return alias;
+}
+
+function catalogueAliasForRow(
+  catalogueItemId: string,
+  context: Record<string, string> | null,
+  aliases: CatalogueAliasIndex,
+) {
+  const matches = aliases.byCatalogueId.get(catalogueItemId) ?? [];
+  const courseId = context?.courseId ?? "";
+  return matches.find((alias) =>
+    alias.externalType === "institution-offering" &&
+    alias.externalContextKey === courseId,
+  ) ?? matches[0];
+}
+
+function storedContext(
+  context: Record<string, string> | null,
+  alias: CatalogueAlias,
+) {
+  if (!context && !alias.externalContextKey) return undefined;
+  const result = { ...(context ?? {}) };
+  if (alias.externalType === "institution-offering" && alias.externalContextKey) {
+    result.courseId = alias.externalContextKey;
+  }
+  return result;
+}
+
+function storedTimestamp(value: Date) {
+  const timestamp = value.getTime();
+  if (!Number.isFinite(timestamp)) {
+    throw new Error("A stored student-data timestamp is invalid.");
+  }
+  return timestamp;
+}
+
+function savedItemFromRow(
+  row: typeof savedItems.$inferSelect,
+  aliases: CatalogueAliasIndex,
+): SavedItem {
+  const alias = catalogueAliasForRow(row.catalogItemId, row.context, aliases);
+  const type = alias ? savedItemType(alias.externalType) : null;
+  if (!alias || !type) {
+    throw new Error("A saved record references an unavailable catalogue item.");
+  }
+  return {
+    type,
+    id: alias.externalKey,
+    savedAt: storedTimestamp(row.savedAt),
+    context: storedContext(row.context, alias),
+  };
+}
+
+function historyItemFromRow(
+  row: typeof explorationHistory.$inferSelect,
+  aliases: CatalogueAliasIndex,
+): ExplorationHistoryItem {
+  const alias = catalogueAliasForRow(row.catalogItemId, row.context, aliases);
+  const type = alias ? savedItemType(alias.externalType) : null;
+  if (!alias || !type) {
+    throw new Error("A history record references an unavailable catalogue item.");
+  }
+  return {
+    type,
+    id: alias.externalKey,
+    lastVisitedAt: storedTimestamp(row.lastVisitedAt),
+    visitCount: row.visitCount,
+    context: storedContext(row.context, alias),
+  };
+}
+
+function savedRowsFor(
+  userId: number,
+  items: SavedItem[],
+  aliases: CatalogueAliasIndex,
+) {
+  const rows = new Map<string, typeof savedItems.$inferInsert>();
+  for (const item of items) {
+    const alias = requiredCatalogueAlias(item, aliases);
+    const row = {
+      userId,
+      catalogItemId: alias.catalogItemId,
+      context: item.context ?? null,
+      savedAt: new Date(item.savedAt),
+    };
+    const existing = rows.get(alias.catalogItemId);
+    if (!existing || row.savedAt > existing.savedAt) {
+      rows.set(alias.catalogItemId, row);
+    }
+  }
+  return [...rows.values()];
+}
+
+function historyRowsFor(
+  userId: number,
+  items: ExplorationHistoryItem[],
+  aliases: CatalogueAliasIndex,
+) {
+  const rows = new Map<string, typeof explorationHistory.$inferInsert>();
+  for (const item of items) {
+    const alias = requiredCatalogueAlias(item, aliases);
+    const row = {
+      userId,
+      catalogItemId: alias.catalogItemId,
+      context: item.context ?? null,
+      lastVisitedAt: new Date(item.lastVisitedAt),
+      visitCount: item.visitCount,
+    };
+    const existing = rows.get(alias.catalogItemId);
+    if (!existing) {
+      rows.set(alias.catalogItemId, row);
+    } else {
+      rows.set(alias.catalogItemId, {
+        ...existing,
+        ...(
+          row.lastVisitedAt > existing.lastVisitedAt
+            ? { lastVisitedAt: row.lastVisitedAt, context: row.context }
+            : {}
+        ),
+        visitCount: Math.max(existing.visitCount ?? 1, row.visitCount ?? 1),
+      });
+    }
+  }
+  return [...rows.values()];
+}
+
+async function loadCatalogueAliases(tx: DatabaseTransaction) {
+  const aliases = await tx
+    .select()
+    .from(catalogItemAliases)
+    .where(eq(catalogItemAliases.sourceSystem, "careerbridge"));
+  return indexCatalogueAliases(aliases);
+}
+
+async function persistSavedItems(
+  tx: DatabaseTransaction,
+  userId: number,
+  items: SavedItem[],
+  aliases: CatalogueAliasIndex,
+  ignoreConflicts = false,
+) {
+  const rows = savedRowsFor(userId, items, aliases);
+  if (!rows.length) return;
+  const insert = tx.insert(savedItems).values(rows);
+  if (ignoreConflicts) {
+    await insert.onConflictDoNothing();
+    return;
+  }
+  await insert.onConflictDoUpdate({
+    target: [savedItems.userId, savedItems.catalogItemId],
+    set: {
+      context: sql`excluded.context`,
+      savedAt: sql`excluded.saved_at`,
+    },
+  });
+}
+
+async function persistHistory(
+  tx: DatabaseTransaction,
+  userId: number,
+  items: ExplorationHistoryItem[],
+  aliases: CatalogueAliasIndex,
+  ignoreConflicts = false,
+) {
+  const rows = historyRowsFor(userId, items, aliases);
+  if (!rows.length) return;
+  const insert = tx.insert(explorationHistory).values(rows);
+  if (ignoreConflicts) {
+    await insert.onConflictDoNothing();
+    return;
+  }
+  await insert.onConflictDoUpdate({
+    target: [explorationHistory.userId, explorationHistory.catalogItemId],
+    set: {
+      context: sql`excluded.context`,
+      lastVisitedAt: sql`excluded.last_visited_at`,
+      visitCount: sql`excluded.visit_count`,
+    },
+  });
+}
+
+function normalizeCounsellingSession(session: CounsellingSession): CounsellingSession {
+  if (
+    session.currentQuestionId !== null ||
+    (session.status !== "active" &&
+      session.status !== "paused" &&
+      session.completionReason !== "finished_early")
+  ) {
+    return session;
+  }
+  const currentQuestionId = session.questionPath[session.pathIndex];
+  if (!currentQuestionId) {
+    throw new Error("The Guided Explorer resume question is unavailable.");
+  }
+  return { ...session, currentQuestionId };
+}
+
+function counsellingResponseState(value: string): CounsellingAnswer["responseState"] {
+  switch (value) {
+    case "answered":
+    case "unsure":
+    case "none":
+      return value;
+    case "declined":
+      return "skip";
+    default:
+      throw new Error("A stored Guided Explorer answer state is invalid.");
+  }
+}
+
+async function readCounsellingSession(
+  tx: DatabaseTransaction,
+  row: typeof guidedExplorerSessions.$inferSelect,
+): Promise<CounsellingSession> {
+  const questions = await tx
+    .select()
+    .from(guidedExplorerSessionQuestions)
+    .where(eq(guidedExplorerSessionQuestions.sessionId, row.id));
+  const answers = await tx
+    .select()
+    .from(guidedExplorerAnswers)
+    .where(eq(guidedExplorerAnswers.sessionId, row.id));
+  questions.sort((left, right) => left.pathPosition - right.pathPosition);
+  answers.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+
+  const currentQuestionId = row.status === "completed"
+    ? row.completionReason === "finished_early"
+      ? row.resumeQuestionId
+      : null
+    : row.currentQuestionId;
+  return {
+    version: 1,
+    questionBankVersion: row.questionBankVersion as 1,
+    id: row.id,
+    status: row.status as CounsellingSession["status"],
+    ...(row.completionReason === "finished_early"
+      ? { completionReason: "finished_early" as const }
+      : {}),
+    currentQuestionId,
+    questionPath: questions.map((question) => question.questionId),
+    pathIndex: row.pathIndex,
+    askedQuestionIds: questions
+      .filter((question) => question.state === "asked")
+      .map((question) => question.questionId),
+    skippedQuestionIds: questions
+      .filter((question) => question.state === "skipped")
+      .map((question) => question.questionId),
+    answers: answers.map((answer) => ({
+      id: answer.id,
+      questionId: answer.questionId,
+      optionIds: answer.optionIds,
+      originalText: answer.originalText,
+      interpretationStatus: answer.interpretationStatus as CounsellingAnswer["interpretationStatus"],
+      responseState: counsellingResponseState(answer.responseState),
+      ...(answer.contextOptionId === null
+        ? {}
+        : { contextOptionId: answer.contextOptionId }),
+      createdAt: answer.createdAt.toISOString(),
+      ...(answer.editedAt === null
+        ? {}
+        : { editedAt: answer.editedAt.toISOString() }),
+    })),
+    updatedAt: row.updatedAt.toISOString(),
+    persistedUpdatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function currentSessionRow(rows: (typeof guidedExplorerSessions.$inferSelect)[]) {
+  return [...rows].sort((left, right) => {
+    const leftCurrent = left.status === "active" || left.status === "paused" ? 0 : 1;
+    const rightCurrent = right.status === "active" || right.status === "paused" ? 0 : 1;
+    return leftCurrent - rightCurrent || right.updatedAt.getTime() - left.updatedAt.getTime();
+  })[0];
+}
+
+async function loadCounsellingSession(tx: DatabaseTransaction, userId: number) {
+  const rows = await tx
+    .select()
+    .from(guidedExplorerSessions)
+    .where(eq(guidedExplorerSessions.userId, userId));
+  const row = currentSessionRow(rows);
+  return row ? readCounsellingSession(tx, row) : null;
+}
+
+async function persistCounsellingSession(
+  tx: DatabaseTransaction,
+  userId: number,
+  source: CounsellingSession,
+) {
+  const session = normalizeCounsellingSession(source);
+  const [sameId] = await tx
+    .select()
+    .from(guidedExplorerSessions)
+    .where(eq(guidedExplorerSessions.id, session.id))
+    .limit(1);
+  if (sameId && sameId.userId !== userId) {
+    throw new StudentDataConflictError("This Guided Explorer session belongs to another account.");
+  }
+  if (
+    (sameId && session.persistedUpdatedAt !== sameId.updatedAt.toISOString()) ||
+    (!sameId && session.persistedUpdatedAt !== undefined)
+  ) {
+    throw new StudentDataConflictError(
+      "Guided Explorer progress changed elsewhere. Refresh before saving again.",
+    );
+  }
+
+  const userSessions = await tx
+    .select()
+    .from(guidedExplorerSessions)
+    .where(eq(guidedExplorerSessions.userId, userId));
+  const current = currentSessionRow(userSessions);
+  if (
+    current &&
+    current.id !== session.id &&
+    !(
+      current.status === "completed" &&
+      session.status === "active"
+    )
+  ) {
+    throw new StudentDataConflictError(
+      "Your Guided Explorer session changed. Refresh and retry your update.",
+    );
+  }
+
+  const now = new Date(Math.max(Date.now(), (sameId?.updatedAt.getTime() ?? 0) + 1));
+  const completedEarly =
+    session.status === "completed" && session.completionReason === "finished_early";
+  await tx
+    .insert(guidedExplorerSessions)
+    .values({
+      id: session.id,
+      userId,
+      version: 1,
+      questionBankVersion: session.questionBankVersion,
+      status: session.status,
+      completionReason: completedEarly ? "finished_early" : null,
+      currentQuestionId: session.status === "completed" ? null : session.currentQuestionId,
+      resumeQuestionId: completedEarly ? session.currentQuestionId : null,
+      pathIndex: session.pathIndex,
+      createdAt: sameId?.createdAt ?? now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: guidedExplorerSessions.id,
+      set: {
+        questionBankVersion: session.questionBankVersion,
+        status: session.status,
+        completionReason: completedEarly ? "finished_early" : null,
+        currentQuestionId: session.status === "completed" ? null : session.currentQuestionId,
+        resumeQuestionId: completedEarly ? session.currentQuestionId : null,
+        pathIndex: session.pathIndex,
+        updatedAt: now,
+      },
+      setWhere: eq(guidedExplorerSessions.userId, userId),
+    });
+  const [persisted] = await tx
+    .select()
+    .from(guidedExplorerSessions)
+    .where(eq(guidedExplorerSessions.id, session.id))
+    .limit(1);
+  if (!persisted || persisted.userId !== userId) {
+    throw new StudentDataConflictError("This Guided Explorer session belongs to another account.");
+  }
+
+  await tx
+    .delete(guidedExplorerSessionQuestions)
+    .where(eq(guidedExplorerSessionQuestions.sessionId, session.id));
+  await tx
+    .delete(guidedExplorerAnswers)
+    .where(eq(guidedExplorerAnswers.sessionId, session.id));
+
+  await tx.insert(guidedExplorerSessionQuestions).values(
+    session.questionPath.map((questionId, pathPosition) => ({
+      sessionId: session.id,
+      questionId,
+      pathPosition,
+      state: session.skippedQuestionIds.includes(questionId)
+        ? "skipped"
+        : session.askedQuestionIds.includes(questionId)
+          ? "asked"
+          : "pending",
+    })),
+  );
+  if (session.answers.length) {
+    await tx.insert(guidedExplorerAnswers).values(
+      session.answers.map((answer) => ({
+        id: answer.id,
+        sessionId: session.id,
+        questionId: answer.questionId,
+        optionIds: answer.optionIds,
+        originalText: answer.originalText,
+        interpretationStatus: answer.interpretationStatus,
+        responseState: answer.responseState === "skip" ? "declined" : answer.responseState,
+        contextOptionId: answer.contextOptionId ?? null,
+        createdAt: new Date(answer.createdAt),
+        editedAt: answer.editedAt ? new Date(answer.editedAt) : null,
+      })),
+    );
+  }
+  return readCounsellingSession(tx, persisted);
 }
 
 function applyPersonalDataMutation(
   current: PersonalDataSnapshot,
   mutation: PersonalDataMutation,
+  aliases?: CatalogueAliasIndex,
 ): PersonalDataSnapshot {
   switch (mutation.type) {
     case "saved.add": {
-      const key = personalDataKey(mutation.item);
-      const index = current.savedItems.findIndex((item) => personalDataKey(item) === key);
+      const key = personalDataKey(mutation.item, aliases);
+      const index = current.savedItems.findIndex((item) =>
+        personalDataKey(item, aliases) === key,
+      );
       const items = [...current.savedItems];
       if (index === -1) items.push(mutation.item);
       else if (mutation.item.savedAt > items[index].savedAt) items[index] = mutation.item;
       return { ...current, savedItems: items };
     }
     case "saved.remove": {
-      const key = personalDataKey(mutation.item);
+      const key = personalDataKey(mutation.item, aliases);
       return {
         ...current,
-        savedItems: current.savedItems.filter((item) => personalDataKey(item) !== key),
+        savedItems: current.savedItems.filter((item) =>
+          personalDataKey(item, aliases) !== key,
+        ),
       };
     }
     case "history.record": {
-      const key = personalDataKey(mutation.item);
-      const existing = current.history.find((item) => personalDataKey(item) === key);
+      const key = personalDataKey(mutation.item, aliases);
+      const existing = current.history.find((item) =>
+        personalDataKey(item, aliases) === key,
+      );
       if (existing && mutation.item.lastVisitedAt <= existing.lastVisitedAt) return current;
       const item = {
         ...mutation.item,
@@ -283,21 +774,25 @@ function applyPersonalDataMutation(
       return {
         ...current,
         history: [
-          ...current.history.filter((entry) => personalDataKey(entry) !== key),
+          ...current.history.filter((entry) =>
+            personalDataKey(entry, aliases) !== key,
+          ),
           item,
         ],
       };
     }
     case "history.remove": {
-      const key = personalDataKey(mutation.item);
+      const key = personalDataKey(mutation.item, aliases);
       return {
         ...current,
-        history: current.history.filter((item) => personalDataKey(item) !== key),
+        history: current.history.filter((item) =>
+          personalDataKey(item, aliases) !== key,
+        ),
       };
     }
     case "history.restore": {
-      const key = personalDataKey(mutation.item);
-      return current.history.some((item) => personalDataKey(item) === key)
+      const key = personalDataKey(mutation.item, aliases);
+      return current.history.some((item) => personalDataKey(item, aliases) === key)
         ? current
         : { ...current, history: [...current.history, mutation.item] };
     }
@@ -310,7 +805,7 @@ function applyPersonalDataMutation(
     case "progress.discoveryAnswers":
       return { ...current, discoveryAnswers: mutation.value };
     case "migration.keep":
-      return mergePersonalData(current, mutation.data);
+      return mergePersonalData(current, mutation.data, aliases);
   }
 }
 
@@ -326,18 +821,29 @@ function snapshotFromStoredData(
   if (!isRecord(data)) {
     throw new Error("Stored account data is invalid and requires support.");
   }
-  const snapshot = { ...data, educationStage, discoveryAnswers: answers };
+  const snapshotData = { ...data };
+  delete snapshotData.removedLegacySavedItemKeys;
+  const snapshot = { ...snapshotData, educationStage, discoveryAnswers: answers };
   if (!isPersonalDataSnapshot(snapshot)) {
     throw new Error("Stored account data is invalid and requires support.");
   }
   return snapshot;
 }
 
-function serializeAccountData(snapshot: PersonalDataSnapshot) {
+function serializeAccountData(
+  snapshot: PersonalDataSnapshot,
+  removedLegacySavedItemKeys: string[],
+) {
+  const counsellingSession = snapshot.counsellingSession
+    ? { ...snapshot.counsellingSession, persistedUpdatedAt: undefined }
+    : null;
   const serialized = JSON.stringify({
     ...snapshot,
     educationStage: undefined,
     discoveryAnswers: undefined,
+    counsellingSession,
+    removedLegacySavedItemKeys:
+      removedLegacySavedItemKeys.length > 0 ? removedLegacySavedItemKeys : undefined,
   });
   if (serialized === undefined) {
     throw new Error("Account data could not be serialized.");
@@ -349,10 +855,11 @@ async function writeAccountData(
   tx: DatabaseTransaction,
   userId: number,
   snapshot: PersonalDataSnapshot,
+  removedLegacySavedItemKeys: string[],
 ) {
   await tx.execute(sql`
     UPDATE public.account_data
-    SET data = ${serializeAccountData(snapshot)}::jsonb, updated_at = NOW()
+    SET data = ${serializeAccountData(snapshot, removedLegacySavedItemKeys)}::jsonb, updated_at = NOW()
     WHERE user_id = ${userId}
   `);
 }
@@ -381,6 +888,18 @@ async function loadAccountSnapshot(
   if (!isRecord(storedData)) {
     throw new Error("Stored account data is invalid and requires support.");
   }
+  const storedRemovedKeys = storedData.removedLegacySavedItemKeys;
+  if (
+    storedRemovedKeys !== undefined &&
+    (!Array.isArray(storedRemovedKeys) ||
+      storedRemovedKeys.length > 10_000 ||
+      !storedRemovedKeys.every((key) => typeof key === "string" && key.length <= 1_000))
+  ) {
+    throw new Error("Stored account data is invalid and requires support.");
+  }
+  const removedLegacySavedItemKeys = [
+    ...new Set((storedRemovedKeys ?? []) as string[]),
+  ];
 
   let [profile] = await tx
     .select()
@@ -398,6 +917,7 @@ async function loadAccountSnapshot(
     profile ? profile.educationStage : storedData.educationStage ?? null,
     answersRecord ? answersRecord.answers : storedData.discoveryAnswers ?? null,
   );
+  const aliases = await loadCatalogueAliases(tx);
 
   if (!profile && initialSnapshot.educationStage !== null) {
     await tx
@@ -423,17 +943,105 @@ async function loadAccountSnapshot(
       .limit(1);
   }
 
+  let savedRows = await tx
+    .select()
+    .from(savedItems)
+    .where(eq(savedItems.userId, userId));
+  let historyRows = await tx
+    .select()
+    .from(explorationHistory)
+    .where(eq(explorationHistory.userId, userId));
+  const savedCatalogueIds = new Set(savedRows.map((row) => row.catalogItemId));
+  const historyCatalogueIds = new Set(historyRows.map((row) => row.catalogItemId));
+  const legacySavedItems = mergeSavedItems([], initialSnapshot.savedItems, aliases).filter((item) => {
+    const alias = aliases.byLegacyIdentity.get(legacyCatalogueAliasKey(item));
+    if (!alias || savedCatalogueIds.has(alias.catalogItemId)) return false;
+    savedCatalogueIds.add(alias.catalogItemId);
+    return true;
+  });
+  const legacyHistory = mergeHistoryItems([], initialSnapshot.history, aliases).filter((item) => {
+    const alias = aliases.byLegacyIdentity.get(legacyCatalogueAliasKey(item));
+    if (!alias || historyCatalogueIds.has(alias.catalogItemId)) return false;
+    historyCatalogueIds.add(alias.catalogItemId);
+    return true;
+  });
+  await persistSavedItems(tx, userId, legacySavedItems, aliases, true);
+  await persistHistory(tx, userId, legacyHistory, aliases, true);
+  savedRows = await tx
+    .select()
+    .from(savedItems)
+    .where(eq(savedItems.userId, userId));
+  historyRows = await tx
+    .select()
+    .from(explorationHistory)
+    .where(eq(explorationHistory.userId, userId));
+
+  let counsellingSession = await loadCounsellingSession(tx, userId);
+  if (!counsellingSession && initialSnapshot.counsellingSession) {
+    await persistCounsellingSession(tx, userId, initialSnapshot.counsellingSession);
+    counsellingSession = await loadCounsellingSession(tx, userId);
+  }
+
   const snapshot = snapshotFromStoredData(
-    storedData,
+    {
+      ...storedData,
+      counsellingSession: counsellingSession ?? initialSnapshot.counsellingSession,
+      savedItems: mergeSavedItems(
+        savedRows.map((row) => savedItemFromRow(row, aliases)),
+        initialSnapshot.savedItems,
+        aliases,
+      ),
+      history: mergeHistoryItems(
+        historyRows.map((row) => historyItemFromRow(row, aliases)),
+        initialSnapshot.history,
+        aliases,
+      ),
+    },
     profile ? profile.educationStage : initialSnapshot.educationStage,
     answersRecord ? answersRecord.answers : initialSnapshot.discoveryAnswers,
   );
   return {
     snapshot,
+    aliases,
     accountDataExists,
+    removedLegacySavedItemKeys,
     hasLegacyProgress:
       storedData.educationStage != null || storedData.discoveryAnswers != null,
   };
+}
+
+function mergeSavedItems(
+  current: SavedItem[],
+  incoming: SavedItem[],
+  aliases?: CatalogueAliasIndex,
+) {
+  const saved = new Map(current.map((item) => [personalDataKey(item, aliases), item]));
+  for (const item of incoming) {
+    const key = personalDataKey(item, aliases);
+    const existing = saved.get(key);
+    if (!existing || item.savedAt > existing.savedAt) saved.set(key, item);
+  }
+  return [...saved.values()];
+}
+
+function mergeHistoryItems(
+  current: ExplorationHistoryItem[],
+  incoming: ExplorationHistoryItem[],
+  aliases?: CatalogueAliasIndex,
+) {
+  const history = new Map(current.map((item) => [personalDataKey(item, aliases), item]));
+  for (const item of incoming) {
+    const key = personalDataKey(item, aliases);
+    const existing = history.get(key);
+    history.set(key, existing
+      ? {
+          ...existing,
+          lastVisitedAt: Math.max(existing.lastVisitedAt, item.lastVisitedAt),
+          visitCount: Math.max(existing.visitCount, item.visitCount),
+        }
+      : item);
+  }
+  return [...history.values()];
 }
 
 async function saveEducationStage(
@@ -469,7 +1077,12 @@ export async function getAccountData(userId: number): Promise<PersonalDataSnapsh
   return getDb().transaction(async (tx) => {
     const loaded = await loadAccountSnapshot(tx, userId, false);
     if (loaded.accountDataExists && loaded.hasLegacyProgress) {
-      await writeAccountData(tx, userId, loaded.snapshot);
+      await writeAccountData(
+        tx,
+        userId,
+        loaded.snapshot,
+        loaded.removedLegacySavedItemKeys,
+      );
     }
     return loaded.snapshot;
   });
@@ -481,8 +1094,33 @@ export async function updateAccountData(
 ): Promise<PersonalDataSnapshot> {
   await ensureSchema();
   return getDb().transaction(async (tx) => {
-    const { snapshot: current } = await loadAccountSnapshot(tx, userId, true);
-    const next = applyPersonalDataMutation(current, mutation);
+    const loaded = await loadAccountSnapshot(tx, userId, true);
+    const { snapshot: current, aliases } = loaded;
+    const removedLegacySavedItemKeys = new Set(loaded.removedLegacySavedItemKeys);
+    let effectiveMutation = mutation;
+    if (mutation.type === "saved.remove") {
+      const key = legacyCatalogueAliasKey(mutation.item);
+      const isUnmappedLegacyItem = !aliases.byLegacyIdentity.has(key);
+      if (
+        isUnmappedLegacyItem &&
+        current.savedItems.some((item) => legacyCatalogueAliasKey(item) === key)
+      ) {
+        removedLegacySavedItemKeys.add(key);
+      }
+    } else if (mutation.type === "saved.add") {
+      removedLegacySavedItemKeys.delete(legacyCatalogueAliasKey(mutation.item));
+    } else if (mutation.type === "migration.keep") {
+      effectiveMutation = {
+        ...mutation,
+        data: {
+          ...mutation.data,
+          savedItems: mutation.data.savedItems.filter(
+            (item) => !removedLegacySavedItemKeys.has(legacyCatalogueAliasKey(item)),
+          ),
+        },
+      };
+    }
+    const next = applyPersonalDataMutation(current, effectiveMutation, aliases);
 
     if (mutation.type === "progress.educationStage") {
       await saveEducationStage(tx, userId, mutation.value);
@@ -492,23 +1130,112 @@ export async function updateAccountData(
       } else {
         await saveDiscoveryAnswers(tx, userId, mutation.value);
       }
-    } else if (mutation.type === "migration.keep") {
+    } else if (mutation.type === "saved.add") {
+      const item = next.savedItems.find(
+        (savedItem) =>
+          personalDataKey(savedItem, aliases) === personalDataKey(mutation.item, aliases),
+      );
+      if (item) await persistSavedItems(tx, userId, [item], aliases);
+    } else if (mutation.type === "saved.remove") {
+      const alias = aliases.byLegacyIdentity.get(legacyCatalogueAliasKey(mutation.item));
+      if (alias && savedItemType(alias.externalType)) {
+        await tx.delete(savedItems).where(and(
+          eq(savedItems.userId, userId),
+          eq(savedItems.catalogItemId, alias.catalogItemId),
+        ));
+      }
+    } else if (mutation.type === "history.record" || mutation.type === "history.restore") {
+      const item = next.history.find(
+        (historyItem) =>
+          personalDataKey(historyItem, aliases) === personalDataKey(mutation.item, aliases),
+      );
+      if (item && next.history !== current.history) {
+        await persistHistory(tx, userId, [item], aliases);
+      }
+    } else if (mutation.type === "history.remove") {
+      const alias = aliases.byLegacyIdentity.get(legacyCatalogueAliasKey(mutation.item));
+      if (alias && savedItemType(alias.externalType)) {
+        await tx.delete(explorationHistory).where(and(
+          eq(explorationHistory.userId, userId),
+          eq(explorationHistory.catalogItemId, alias.catalogItemId),
+        ));
+      }
+    } else if (mutation.type === "history.clear") {
+      await tx.delete(explorationHistory).where(eq(explorationHistory.userId, userId));
+    } else if (mutation.type === "progress.counsellingSession") {
+      if (mutation.value === null) {
+        const sessions = await tx
+          .select()
+          .from(guidedExplorerSessions)
+          .where(eq(guidedExplorerSessions.userId, userId));
+        const sessionIds = sessions.map((session) => session.id);
+        if (sessionIds.length) {
+          await tx.delete(guidedExplorerAnswers).where(
+            inArray(guidedExplorerAnswers.sessionId, sessionIds),
+          );
+          await tx.delete(guidedExplorerSessionQuestions).where(
+            inArray(guidedExplorerSessionQuestions.sessionId, sessionIds),
+          );
+          await tx.delete(guidedExplorerSessions).where(
+            eq(guidedExplorerSessions.userId, userId),
+          );
+        }
+      } else {
+        next.counsellingSession = await persistCounsellingSession(tx, userId, mutation.value);
+      }
+    } else if (effectiveMutation.type === "migration.keep") {
+      const guestData = effectiveMutation.data;
       if (current.educationStage === null && mutation.data.educationStage !== null) {
-        await saveEducationStage(tx, userId, mutation.data.educationStage);
+        await saveEducationStage(tx, userId, guestData.educationStage);
       }
-      if (current.discoveryAnswers === null && mutation.data.discoveryAnswers !== null) {
-        await saveDiscoveryAnswers(tx, userId, mutation.data.discoveryAnswers);
+      if (current.discoveryAnswers === null && guestData.discoveryAnswers !== null) {
+        await saveDiscoveryAnswers(tx, userId, guestData.discoveryAnswers);
       }
+      if (guestData.counsellingSession && current.counsellingSession === null) {
+        next.counsellingSession = await persistCounsellingSession(
+          tx,
+          userId,
+          guestData.counsellingSession,
+        );
+      }
+      await persistSavedItems(
+        tx,
+        userId,
+        guestData.savedItems.filter((item) =>
+          aliases.byLegacyIdentity.has(legacyCatalogueAliasKey(item)),
+        ).map((item) =>
+          next.savedItems.find((savedItem) =>
+            personalDataKey(savedItem, aliases) === personalDataKey(item, aliases),
+          ) ?? item,
+        ),
+        aliases,
+      );
+      await persistHistory(
+        tx,
+        userId,
+        guestData.history.map((item) =>
+          next.history.find((historyItem) =>
+            personalDataKey(historyItem, aliases) === personalDataKey(item, aliases),
+          ) ?? item,
+        ),
+        aliases,
+      );
     }
 
-    await writeAccountData(tx, userId, next);
+    await writeAccountData(tx, userId, next, [...removedLegacySavedItemKeys]);
     return next;
   });
 }
 
-export async function deleteAccount() {
-  const { userId: clerkUserId } = await auth();
+export async function deleteAccount(expectedUserId: string) {
+  const { userId: clerkUserId, has } = await auth();
   if (!clerkUserId) throw new AuthenticationRequiredError("Sign in again before deleting your account.");
+  if (expectedUserId !== clerkUserId) {
+    throw new AccountSessionChangedError("Your account session changed. Refresh and retry account deletion.");
+  }
+  if (!has({ reverification: "strict" })) {
+    throw new AccountReverificationRequiredError("Reverify your identity before deleting your account.");
+  }
 
   await ensureSchema();
   return withClerkIdentityLock(clerkUserId, async (client) => {

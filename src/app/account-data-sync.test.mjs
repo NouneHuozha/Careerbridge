@@ -56,6 +56,7 @@ const {
 } = loadModule("./account-data-sync.ts");
 const { saveEducationStage, useEducationStage } = loadModule("./education-stage.ts");
 const { saveAnswers, useStoredDiscoveryAnswers } = loadModule("./discover/flow-data.ts");
+const { COUNSELLING_STORAGE_KEY } = loadModule("./personal-data-storage-keys.ts");
 
 const emptyData = () => ({
   savedItems: [],
@@ -275,4 +276,309 @@ test("pending account mutations survive sign-out and cache clearing", () => {
 
   clearAccountMutationQueue(101);
   assert.equal(hasPendingAccountMutations(101), false);
+});
+
+test("queued Guided Explorer snapshots are rebased onto each successful server version", async () => {
+  reset();
+  hydrateAccountCache(emptyData(), 101);
+  setAccountMode(true, 101);
+
+  const firstVersion = "2026-03-01T10:00:00.001Z";
+  const secondVersion = "2026-03-01T10:00:00.002Z";
+  const thirdVersion = "2026-03-01T10:00:00.003Z";
+  const session = { id: "guided-queue", persistedUpdatedAt: firstVersion, status: "paused" };
+  const laterSnapshot = { ...session, pathIndex: 2 };
+  sessionStorage.setItem(COUNSELLING_STORAGE_KEY, JSON.stringify(laterSnapshot));
+  saveAccountMutationQueue(101, [
+    {
+      id: "guided-queue-1",
+      userId: 101,
+      mutation: { type: "progress.counsellingSession", value: session },
+      createdAt: 1,
+    },
+    {
+      id: "guided-queue-2",
+      userId: 101,
+      mutation: { type: "progress.counsellingSession", value: laterSnapshot },
+      createdAt: 2,
+    },
+  ]);
+
+  const requests = [];
+  globalThis.fetch = async (_url, options) => {
+    requests.push(JSON.parse(options.body));
+    const persistedUpdatedAt = requests.length === 1 ? secondVersion : thirdVersion;
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          counsellingSession: {
+            ...requests[requests.length - 1].value,
+            id: "guided-queue",
+            updatedAt: requests.length === 1 ? secondVersion : thirdVersion,
+            answers: [],
+            questionPath: ["Q001"],
+            persistedUpdatedAt,
+          },
+        },
+      }),
+    };
+  };
+
+  assert.equal(await flushAccountMutations(), true);
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].value.persistedUpdatedAt, firstVersion);
+  assert.equal(requests[1].value.persistedUpdatedAt, secondVersion);
+  assert.equal(
+    JSON.parse(sessionStorage.getItem(COUNSELLING_STORAGE_KEY)).persistedUpdatedAt,
+    thirdVersion,
+  );
+});
+
+test("Guided Explorer repeated 409 conflicts stop after one recovery attempt", async () => {
+  reset();
+  hydrateAccountCache(emptyData(), 101);
+  setAccountMode(true, 101);
+
+  const local = {
+    id: "guided-conflict",
+    status: "paused",
+    updatedAt: "2026-03-01T10:00:00.003Z",
+    answers: [],
+  };
+  saveAccountMutationQueue(101, [{
+    id: "guided-conflict-1",
+    userId: 101,
+    mutation: { type: "progress.counsellingSession", value: local },
+    createdAt: 1,
+  }]);
+
+  let requestCount = 0;
+  globalThis.fetch = async () => {
+    requestCount += 1;
+    return {
+      ok: false,
+      status: 409,
+      json: async () => ({
+        error: "Guided Explorer progress changed elsewhere.",
+        data: {
+          counsellingSession: {
+            ...local,
+            updatedAt: "2026-03-01T10:00:00.002Z",
+            persistedUpdatedAt: "2026-03-01T10:00:00.002Z",
+          },
+        },
+      }),
+    };
+  };
+
+  assert.equal(await flushAccountMutations(), false);
+  assert.equal(requestCount, 2);
+  assert.equal(hasPendingAccountMutations(101), true);
+});
+
+test("Guided Explorer 409 recovery succeeds when a newer local snapshot is rebased", async () => {
+  reset();
+  hydrateAccountCache(emptyData(), 101);
+  setAccountMode(true, 101);
+
+  const local = {
+    id: "guided-recovery",
+    status: "paused",
+    currentQuestionId: "Q001",
+    questionPath: ["Q001"],
+    pathIndex: 0,
+    askedQuestionIds: ["Q001"],
+    skippedQuestionIds: [],
+    updatedAt: "2026-03-01T10:00:00.003Z",
+    answers: [{
+      questionId: "Q001",
+      originalText: "newer local answer",
+      createdAt: "2026-03-01T10:00:00.003Z",
+    }],
+  };
+  saveAccountMutationQueue(101, [{
+    id: "guided-recovery-1",
+    userId: 101,
+    mutation: { type: "progress.counsellingSession", value: local },
+    createdAt: 1,
+  }]);
+
+  let requestCount = 0;
+  globalThis.fetch = async (_url, options) => {
+    requestCount += 1;
+    const body = JSON.parse(options.body);
+    if (requestCount === 1) {
+      return {
+        ok: false,
+        status: 409,
+        json: async () => ({
+          error: "Guided Explorer progress changed elsewhere.",
+          data: {
+            counsellingSession: {
+              ...local,
+              updatedAt: "2026-03-01T10:00:00.002Z",
+              persistedUpdatedAt: "2026-03-01T10:00:00.002Z",
+              answers: [],
+            },
+          },
+        }),
+      };
+    }
+    assert.equal(body.value.persistedUpdatedAt, "2026-03-01T10:00:00.002Z");
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          counsellingSession: {
+            ...body.value,
+            updatedAt: "2026-03-01T10:00:00.004Z",
+            persistedUpdatedAt: "2026-03-01T10:00:00.004Z",
+          },
+        },
+      }),
+    };
+  };
+
+  assert.equal(await flushAccountMutations(), true);
+  assert.equal(requestCount, 2);
+  assert.equal(hasPendingAccountMutations(101), false);
+});
+
+test("server-winning Guided Explorer conflict restores the full session before the next local edit", async () => {
+  reset();
+  hydrateAccountCache(emptyData(), 101);
+  setAccountMode(true, 101);
+
+  const local = {
+    id: "guided-server-wins",
+    status: "paused",
+    currentQuestionId: "Q001",
+    questionPath: ["Q001", "Q002"],
+    pathIndex: 0,
+    askedQuestionIds: ["Q001"],
+    skippedQuestionIds: [],
+    answers: [{
+      id: "local-answer",
+      questionId: "Q001",
+      originalText: "older local answer",
+      createdAt: "2026-03-01T10:00:00.001Z",
+    }],
+    updatedAt: "2026-03-01T10:00:00.001Z",
+    persistedUpdatedAt: "2026-03-01T10:00:00.001Z",
+  };
+  const server = {
+    ...local,
+    currentQuestionId: "Q002",
+    pathIndex: 1,
+    askedQuestionIds: ["Q001", "Q002"],
+    answers: [{
+      id: "server-answer",
+      questionId: "Q001",
+      originalText: "newer server answer",
+      createdAt: "2026-03-01T10:00:00.002Z",
+    }],
+    updatedAt: "2026-03-01T10:00:00.002Z",
+    persistedUpdatedAt: "2026-03-01T10:00:00.002Z",
+  };
+  sessionStorage.setItem(COUNSELLING_STORAGE_KEY, JSON.stringify(local));
+  saveAccountMutationQueue(101, [{
+    id: "guided-server-wins-1",
+    userId: 101,
+    mutation: { type: "progress.counsellingSession", value: local },
+    createdAt: 1,
+  }]);
+
+  let requestCount = 0;
+  globalThis.fetch = async (_url, options) => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      return {
+        ok: false,
+        status: 409,
+        json: async () => ({
+          error: "Guided Explorer progress changed elsewhere.",
+          data: { counsellingSession: server },
+        }),
+      };
+    }
+
+    const body = JSON.parse(options.body);
+    assert.deepEqual(body.value.answers[0], server.answers[0]);
+    assert.equal(body.value.answers[1].questionId, "Q002");
+    assert.equal(body.value.pathIndex, 1);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          counsellingSession: {
+            ...body.value,
+            updatedAt: "2026-03-01T10:00:00.004Z",
+            persistedUpdatedAt: "2026-03-01T10:00:00.004Z",
+          },
+        },
+      }),
+    };
+  };
+
+  assert.equal(await flushAccountMutations(), true);
+  const restored = JSON.parse(sessionStorage.getItem(COUNSELLING_STORAGE_KEY));
+  assert.deepEqual(restored, server);
+  assert.equal(hasPendingAccountMutations(101), false);
+
+  const nextLocalEdit = {
+    ...restored,
+    currentQuestionId: null,
+    status: "completed",
+    pathIndex: 1,
+    answers: [
+      ...restored.answers,
+      {
+        id: "local-follow-up",
+        questionId: "Q002",
+        originalText: "new local follow-up",
+        createdAt: "2026-03-01T10:00:00.003Z",
+      },
+    ],
+    updatedAt: "2026-03-01T10:00:00.003Z",
+  };
+  sessionStorage.setItem(COUNSELLING_STORAGE_KEY, JSON.stringify(nextLocalEdit));
+  enqueueAccountMutation({
+    type: "progress.counsellingSession",
+    value: nextLocalEdit,
+  });
+  assert.equal(await flushAccountMutations(), true);
+  assert.equal(requestCount, 2);
+  assert.deepEqual(
+    JSON.parse(sessionStorage.getItem(COUNSELLING_STORAGE_KEY)).answers,
+    [...server.answers, nextLocalEdit.answers[1]],
+  );
+});
+
+test("409 flush does not cross account identities", async () => {
+  reset();
+  hydrateAccountCache(emptyData(), 101);
+  setAccountMode(true, 101);
+  saveAccountMutationQueue(101, [{
+    id: "account-101-mutation",
+    userId: 101,
+    mutation: { type: "progress.educationStage", value: "class-12" },
+    createdAt: 1,
+  }]);
+
+  globalThis.fetch = async () => {
+    setAccountMode(true, 202);
+    return {
+      ok: false,
+      status: 409,
+      json: async () => ({ error: "Account session changed." }),
+    };
+  };
+
+  assert.equal(await flushAccountMutations(101), false);
+  assert.equal(hasPendingAccountMutations(101), true);
+  assert.equal(hasPendingAccountMutations(202), false);
 });

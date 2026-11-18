@@ -131,12 +131,19 @@ function resetState() {
     releasedWithError: null,
     queries: [],
     events: [],
+    reverified: false,
   });
 }
 
 resetState();
 const clerkServer = {
-  auth: async () => ({ userId: state.clerkUserId }),
+  auth: async () => ({
+    userId: state.clerkUserId,
+    has: ({ reverification }) => {
+      state.events.push(`reverification:${reverification}:${state.reverified}`);
+      return state.reverified && reverification === "strict";
+    },
+  }),
   currentUser: async () => state.clerkExists ? state.clerkUser : null,
   clerkClient: async () => ({
     users: {
@@ -213,11 +220,19 @@ test("provisioning is blocked while account deletion is pending", async () => {
   assert.equal(state.provisionCalls, 0);
 });
 
-test("authenticated account deletion does not require password verification", async () => {
+test("authenticated deletion requires fresh strict reverification and no password", async () => {
   resetState();
   state.users.set(state.clerkUserId, { id: 7, auth_provider: "clerk" });
 
-  assert.equal(await authServer.deleteAccount(), true);
+  await assert.rejects(
+    authServer.deleteAccount(state.clerkUserId),
+    authServer.AccountReverificationRequiredError,
+  );
+  assert.equal(state.users.size, 1);
+  assert.equal(state.events.includes("mark-deletion"), false);
+
+  state.reverified = true;
+  assert.equal(await authServer.deleteAccount(state.clerkUserId), true);
   assert.equal(state.users.size, 0);
   assert.equal(state.clerkExists, false);
   assert.equal(state.events.includes("verify-password"), false);
@@ -225,20 +240,45 @@ test("authenticated account deletion does not require password verification", as
   assert.equal(state.events.includes("delete-clerk-user"), true);
 });
 
+test("fresh email-code verification can satisfy the strict Clerk server check", async () => {
+  resetState();
+  state.users.set(state.clerkUserId, { id: 7, auth_provider: "clerk" });
+  state.reverified = true;
+
+  assert.equal(await authServer.deleteAccount(state.clerkUserId), true);
+  assert.equal(state.users.size, 0);
+  assert.ok(state.events.includes("reverification:strict:true"));
+});
+
+test("a stale expected identity cannot delete the currently authenticated account", async () => {
+  resetState();
+  state.users.set(state.clerkUserId, { id: 7, auth_provider: "clerk" });
+  state.reverified = true;
+
+  await assert.rejects(
+    authServer.deleteAccount("user_account_a"),
+    authServer.AccountSessionChangedError,
+  );
+  assert.equal(state.users.size, 1);
+  assert.equal(state.clerkExists, true);
+  assert.equal(state.events.includes("mark-deletion"), false);
+});
+
 test("database failure keeps Clerk active and a retry finishes deletion", async () => {
   resetState();
   state.users.set(state.clerkUserId, { id: 7, auth_provider: "clerk" });
   state.failDeleteOnce = true;
+  state.reverified = true;
 
   await assert.rejects(
-    authServer.deleteAccount(),
+    authServer.deleteAccount(state.clerkUserId),
     authServer.AccountDeletionPartialError,
   );
   assert.equal(state.users.size, 1);
   assert.equal(state.clerkExists, true);
   assert.equal(state.clerkUser.privateMetadata.careerbridgeDeletionPending, true);
 
-  assert.equal(await authServer.deleteAccount(), true);
+  assert.equal(await authServer.deleteAccount(state.clerkUserId), true);
   assert.equal(state.users.size, 0);
   assert.equal(state.clerkExists, false);
   assert.ok(state.events.indexOf("commit") < state.events.indexOf("delete-clerk-user"));
@@ -248,16 +288,17 @@ test("Clerk failure after database commit can be retried without a user row", as
   resetState();
   state.users.set(state.clerkUserId, { id: 7, auth_provider: "clerk" });
   state.failClerkDeleteOnce = true;
+  state.reverified = true;
 
   await assert.rejects(
-    authServer.deleteAccount(),
+    authServer.deleteAccount(state.clerkUserId),
     authServer.AccountDeletionPartialError,
   );
   assert.equal(state.users.size, 0);
   assert.equal(state.clerkExists, true);
   assert.equal(state.clerkUser.privateMetadata.careerbridgeDeletionPending, true);
 
-  assert.equal(await authServer.deleteAccount(), true);
+  assert.equal(await authServer.deleteAccount(state.clerkUserId), true);
   assert.equal(state.users.size, 0);
   assert.equal(state.clerkExists, false);
   assert.equal(
@@ -270,9 +311,10 @@ test("restrictive catalogue references preserve the user and clear deletion stat
   resetState();
   state.users.set(state.clerkUserId, { id: 7, auth_provider: "clerk" });
   state.failForeignKey = true;
+  state.reverified = true;
 
   await assert.rejects(
-    authServer.deleteAccount(),
+    authServer.deleteAccount(state.clerkUserId),
     authServer.AccountDeletionBlockedError,
   );
   assert.equal(state.users.size, 1);

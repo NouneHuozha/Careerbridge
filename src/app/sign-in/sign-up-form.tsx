@@ -1,11 +1,15 @@
 "use client";
 
-import { useSignUp, useAuth } from "@clerk/nextjs";
+import { useReverification, useSignUp, useAuth, useUser } from "@clerk/nextjs";
 import { Eye, EyeOff, LockKeyhole, Mail, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useAccount } from "../account-provider";
+import {
+  finishCareerBridgeAccountDeletion,
+  requestCareerBridgeAccountDeletion,
+} from "../account-deletion";
 
 type AgeAttestation = "adult" | "minor-guardian" | "";
 type SignUpStage = "credentials" | "verify-email";
@@ -32,7 +36,15 @@ export default function SignUpForm({
 }) {
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const { signUp } = useSignUp();
+  const { user } = useUser();
   const account = useAccount();
+  const requestDeletionWithReverification = useReverification(async (
+    confirmation: string,
+    expectedUserId: string,
+  ) => {
+    const response = await requestCareerBridgeAccountDeletion(account, confirmation, expectedUserId);
+    return response.json();
+  });
   const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -120,23 +132,19 @@ export default function SignUpForm({
   }
 
   async function retryAccountDeletion() {
-    if (deletionConfirmation !== "DELETE") {
-      setError("Type DELETE to retry account deletion.");
+    if (deletionConfirmation !== "DELETE" || !user?.id) {
+      setError("Type DELETE and refresh your sign-in before retrying account deletion.");
       return;
     }
 
-    const response = await fetch("/api/account", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ confirmation: deletionConfirmation }),
-    });
-    let result: unknown = null;
+    let result: unknown;
     try {
-      result = await response.json();
+      result = await requestDeletionWithReverification(deletionConfirmation, user.id);
     } catch {
-      result = null;
+      setError("Identity verification was cancelled or failed. No changes were made.");
+      return;
     }
-    if (!response.ok) {
+    if (typeof result !== "object" || result === null || !("ok" in result) || result.ok !== true) {
       if (typeof result === "object" && result !== null && "deletionBlocked" in result && result.deletionBlocked === true) {
         setDeletionPending(false);
         setDeletionBlocked(true);
@@ -145,8 +153,9 @@ export default function SignUpForm({
       return;
     }
 
-    if (!(await account.finishAccountDeletion())) {
-      setError("Your account was removed, but this tab could not clear its sign-in state. Close all CareerBridge tabs.");
+    const finished = await finishCareerBridgeAccountDeletion(account);
+    if (!finished.ok) {
+      setError(finished.error);
       return;
     }
     router.replace("/explore");

@@ -3,8 +3,10 @@ import {
   AccountDeletionPendingError,
   AccountIdentityConflictError,
   AccountProvisioningRequiredError,
+  CatalogueItemReferenceError,
   getAccountData,
   getCurrentUser,
+  StudentDataConflictError,
   updateAccountData,
 } from "../../../auth-server";
 import { isPersonalDataMutation } from "../../../personal-data-validation";
@@ -28,6 +30,12 @@ export async function GET() {
     return NextResponse.json({ data }, { headers: noStore });
   } catch (error) {
     if (error instanceof AccountDeletionPendingError) {
+      return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
+    }
+    if (error instanceof CatalogueItemReferenceError) {
+      return NextResponse.json({ error: error.message }, { status: 422, headers: noStore });
+    }
+    if (error instanceof StudentDataConflictError) {
       return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
     }
     if (error instanceof AccountProvisioningRequiredError || error instanceof AccountIdentityConflictError) {
@@ -66,11 +74,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "This account update is invalid." }, { status: 422, headers: noStore });
   }
 
+  let authenticatedUserId: number | undefined;
   try {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "Sign in to update account data." }, { status: 401, headers: noStore });
     }
+    authenticatedUserId = user.id;
 
     const url = new URL(request.url);
     const queryUserIdRaw = url.searchParams.get("expectedUserId") ?? url.searchParams.get("userId");
@@ -103,6 +113,23 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof AccountDeletionPendingError) {
       return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
+    }
+    if (error instanceof CatalogueItemReferenceError) {
+      return NextResponse.json({ error: error.message }, { status: 422, headers: noStore });
+    }
+    if (error instanceof StudentDataConflictError) {
+      try {
+        if (authenticatedUserId === undefined) {
+          return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
+        }
+        const data = await getAccountData(authenticatedUserId);
+        return NextResponse.json(
+          { error: error.message, data },
+          { status: 409, headers: noStore },
+        );
+      } catch {
+        return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
+      }
     }
     if (error instanceof AccountProvisioningRequiredError || error instanceof AccountIdentityConflictError) {
       return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });

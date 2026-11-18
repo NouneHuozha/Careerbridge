@@ -5,16 +5,19 @@ import { isReverificationCancelledError } from "@clerk/nextjs/errors";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Eye, EyeOff, LoaderCircle, Trash2 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import {
   accountSettingsErrorMessage,
   updateAccountPassword,
   verifyAndPromoteEmail,
 } from "../../account-email-change";
 import { useAccount } from "../../account-provider";
-import { deleteCareerBridgeAccount } from "../../account-deletion";
 import { saveEducationStage, useEducationStage } from "../../education-stage";
 import type { EducationStage } from "../../education-stage";
+import {
+  finishCareerBridgeAccountDeletion,
+  requestCareerBridgeAccountDeletion,
+} from "../../account-deletion";
 
 type ClerkUser = NonNullable<ReturnType<typeof useUser>["user"]>;
 type ClerkEmailAddress = Awaited<ReturnType<ClerkUser["createEmailAddress"]>>;
@@ -46,6 +49,13 @@ export default function SettingsPage() {
     if (!user) throw new Error("No authenticated user is available.");
     return updateAccountPassword(user, newPassword, currentPassword);
   });
+  const requestDeletionWithReverification = useReverification(async (
+    confirmation: string,
+    expectedUserId: string,
+  ) => {
+    const response = await requestCareerBridgeAccountDeletion(account, confirmation, expectedUserId);
+    return response.json();
+  });
   const [pendingStage, setPendingStage] = useState<EducationStage | null>(null);
   const [stageMessage, setStageMessage] = useState("");
   const [stageError, setStageError] = useState("");
@@ -68,8 +78,10 @@ export default function SettingsPage() {
   const [passwordError, setPasswordError] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteExpectedUserId, setDeleteExpectedUserId] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const deleteDialogRef = useRef<HTMLDialogElement>(null);
   const savedStage = education.status === "saved" ? education.stage : "";
   const selectedStage = pendingStage ?? savedStage;
 
@@ -229,16 +241,28 @@ export default function SettingsPage() {
 
   async function deleteAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (deleteBusy || deleteConfirmation !== "DELETE") return;
+    if (deleteBusy || deleteConfirmation !== "DELETE" || !deleteExpectedUserId) return;
     setDeleteBusy(true);
     setDeleteError("");
     try {
-      const result = await deleteCareerBridgeAccount(account, deleteConfirmation);
-      if (!result.ok) {
-        setDeleteError(result.error);
+      const result = await requestDeletionWithReverification(deleteConfirmation, deleteExpectedUserId);
+      if (typeof result !== "object" || result === null || !("ok" in result) || result.ok !== true) {
+        setDeleteError(
+          typeof result === "object" && result !== null && "error" in result && typeof result.error === "string"
+            ? result.error
+            : "We couldn't delete your account. Please try again.",
+        );
         return;
       }
+      const finished = await finishCareerBridgeAccountDeletion(account);
+      if (!finished.ok) {
+        setDeleteError(finished.error);
+        return;
+      }
+      deleteDialogRef.current?.close();
       router.replace("/explore");
+    } catch (error) {
+      setDeleteError(clerkError(error, "We couldn't delete your account. Please try again."));
     } finally {
       setDeleteBusy(false);
     }
@@ -482,33 +506,82 @@ export default function SettingsPage() {
         </section>
 
         <section aria-labelledby="settings-delete-title" className="rounded-2xl border border-[#eadbd8] bg-white p-5 sm:p-7">
-          <h2 id="settings-delete-title" className="text-lg font-semibold text-[#8b3529]">Delete account</h2>
-          <p className="mt-2 text-sm leading-6 text-[#59675f]">
-            Permanently delete your account, saved items, exploration history and account progress. This cannot be undone.
-          </p>
-          <form onSubmit={deleteAccount} className="mt-4 max-w-lg space-y-3">
-            <label htmlFor="settings-delete-confirmation" className="block text-sm font-medium text-[#273d34]">
-              Type DELETE to confirm
-              <input
-                id="settings-delete-confirmation"
-                type="text"
-                required
-                maxLength={6}
-                autoComplete="off"
-                spellCheck={false}
-                value={deleteConfirmation}
-                onChange={(event) => {
-                  setDeleteConfirmation(event.target.value);
-                  setDeleteError("");
-                }}
-                className="mt-1.5 min-h-11 w-full rounded-xl border border-[#d5dfd8] px-3 text-base outline-none focus:border-[#145543] focus:ring-2 focus:ring-[#e2f0e7]"
-              />
-            </label>
-            {deleteError && <p role="alert" className="text-sm text-[#8b3529]">{deleteError}</p>}
-            <button type="submit" disabled={deleteBusy || deleteConfirmation !== "DELETE"} className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#9b5148] px-5 text-sm font-semibold text-white hover:bg-[#843d35] disabled:cursor-not-allowed disabled:opacity-50">
-              {deleteBusy ? <><LoaderCircle aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />Deleting account…</> : <><Trash2 aria-hidden="true" className="mr-2 h-4 w-4" />Delete account</>}
-            </button>
-          </form>
+          <h2 id="settings-delete-title" className="sr-only">Delete account</h2>
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteConfirmation("");
+              setDeleteExpectedUserId(user.id);
+              setDeleteError("");
+              deleteDialogRef.current?.showModal();
+            }}
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#9b5148] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#843d35] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9b5148]"
+          >
+            <Trash2 aria-hidden="true" className="mr-2 h-4 w-4" />
+            Delete account
+          </button>
+          <dialog
+            ref={deleteDialogRef}
+            aria-labelledby="settings-delete-dialog-title"
+            aria-describedby="settings-delete-dialog-description"
+            onCancel={(event) => {
+              if (deleteBusy) event.preventDefault();
+            }}
+            onClick={(event) => {
+              if (event.target === event.currentTarget && !deleteBusy) deleteDialogRef.current?.close();
+            }}
+            onClose={() => {
+              if (!deleteBusy) {
+                setDeleteConfirmation("");
+                setDeleteExpectedUserId("");
+                setDeleteError("");
+              }
+            }}
+            className="fixed inset-0 m-auto max-h-[calc(100%-2rem)] w-[calc(100%-2rem)] max-w-lg rounded-3xl border border-[#eadbd8] bg-white p-0 text-[#18352d] shadow-[0_24px_80px_rgba(16,45,36,0.3)] backdrop:bg-[#102d26]/50 backdrop:backdrop-blur-sm"
+          >
+            <form onSubmit={deleteAccount} className="p-6 sm:p-7">
+              <span className="grid h-12 w-12 place-items-center rounded-full bg-[#fff0ed] text-[#9b5148]">
+                <Trash2 aria-hidden="true" className="h-5 w-5" />
+              </span>
+              <h2 id="settings-delete-dialog-title" className="mt-5 font-serif text-2xl font-semibold">
+                Permanently delete your account?
+              </h2>
+              <p id="settings-delete-dialog-description" className="mt-2 text-sm leading-relaxed text-[#59665e]">
+                This removes your account, saved items, exploration history and progress. This cannot be undone. You’ll be asked to verify your identity before deletion.
+              </p>
+              <label htmlFor="settings-delete-confirmation" className="mt-4 block text-sm font-semibold">
+                Type DELETE to confirm
+                <input
+                  id="settings-delete-confirmation"
+                  type="text"
+                  required
+                  maxLength={6}
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={deleteConfirmation}
+                  onChange={(event) => {
+                    setDeleteConfirmation(event.target.value);
+                    setDeleteError("");
+                  }}
+                  className="mt-1.5 min-h-11 w-full rounded-xl border border-[#d5dfd8] px-3 text-base outline-none focus:border-[#145543] focus:ring-2 focus:ring-[#e2f0e7]"
+                />
+              </label>
+              {deleteError && <p role="alert" className="mt-3 text-sm text-[#8b3529]">{deleteError}</p>}
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  disabled={deleteBusy}
+                  onClick={() => deleteDialogRef.current?.close()}
+                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#dce7df] px-5 text-sm font-semibold text-[#52645a] hover:bg-[#f4f7f3] disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button type="submit" disabled={deleteBusy || deleteConfirmation !== "DELETE" || !deleteExpectedUserId} className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#9b5148] px-5 text-sm font-semibold text-white hover:bg-[#843d35] disabled:cursor-not-allowed disabled:opacity-50">
+                  {deleteBusy ? <><LoaderCircle aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />Verifying and deleting…</> : <><Trash2 aria-hidden="true" className="mr-2 h-4 w-4" />Delete account</>}
+                </button>
+              </div>
+            </form>
+          </dialog>
         </section>
       </div>
     </main>

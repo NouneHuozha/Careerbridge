@@ -158,7 +158,10 @@ export const guidedExplorerAnswers = pgTable(
     editedAt: timestamp("edited_at", { withTimezone: true }),
   },
   (table) => [
-    index("guided_explorer_answers_session_question_idx").on(table.sessionId, table.questionId),
+    unique("guided_explorer_answers_session_question_unique").on(
+      table.sessionId,
+      table.questionId,
+    ),
     check("guided_explorer_answers_id_check", sql`${table.id} <> ''`),
     check(
       "guided_explorer_answers_option_ids_check",
