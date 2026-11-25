@@ -8,9 +8,7 @@ Official NIOS course/admissions page: https://www.nios.ac.in/online-course-mater
 
 The page states that NIOS Senior Secondary is designed for learners who have passed Class X or equivalent from a recognised board and want to continue toward a Senior Secondary certification equivalent to Class XII. It says learners choose from the course subject scheme and must successfully complete at least five subjects for certification. This source supports the basic open-schooling route, its Class X entry relationship, subject selection, and qualification description. The page contains additional admission details; avoid importing fees, current seat availability, or time-sensitive application details into this pathway.
 
-Official NIOS FAQ: https://sdmis.nios.ac.in/home/faqs
-
-This FAQ describes online admission options and confirms that a recognized Secondary certificate is needed for NIOS Senior Secondary admission. It is corroborating evidence for the route’s admission caveat.
+The NIOS FAQ at https://sdmis.nios.ac.in/home/faqs describes online admission options and separately lists Class VIII eligibility for the Secondary Course. That Secondary Course eligibility item does not support Senior Secondary eligibility and is not associated with the Senior Secondary considerations claim.
 
 ## Directorate General of Training (DGT), Craftsmen Training Scheme
 

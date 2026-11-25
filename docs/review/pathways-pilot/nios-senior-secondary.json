@@ -56,10 +56,6 @@
         {
           "title": "Subject availability is programme-specific",
           "description": "Choose from the subjects and scheme currently offered by NIOS; do not assume every subject combination is available."
-        },
-        {
-          "title": "Further-course eligibility still applies",
-          "description": "Check the recognition, subject and admission requirements of any later course or institution you are considering."
         }
       ]
     },
@@ -74,8 +70,7 @@
       { "claimKey": "pathway.steps", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
       { "claimKey": "pathway.progression", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
       { "claimKey": "pathway.qualification", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
-      { "claimKey": "pathway.considerations", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
-      { "claimKey": "pathway.considerations", "sourceKey": "nios-faq", "sourceUrl": "https://sdmis.nios.ac.in/home/faqs", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" }
+      { "claimKey": "pathway.considerations", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" }
     ]
   },
   "sources": [
@@ -89,18 +84,6 @@
       "dataTypes": ["Senior Secondary entry relationship", "subject scheme", "qualification", "completion requirements"],
       "termsNotes": "Official NIOS information. Do not use this source to assert current fees, seat availability, or application dates without a fresh check.",
       "expectedUpdateBehavior": "Recheck against current NIOS admission and course information before review or publication.",
-      "status": "active"
-    },
-    {
-      "sourceKey": "nios-faq",
-      "sourceName": "NIOS online admission FAQs",
-      "authority": "National Institute of Open Schooling",
-      "canonicalUrl": "https://sdmis.nios.ac.in/home/faqs",
-      "category": "pathway",
-      "sourceType": "official_public_web_page",
-      "dataTypes": ["admission options", "recognised Secondary certificate"],
-      "termsNotes": "Official NIOS FAQ used as corroboration for the admission caveat; it does not replace the current admission notice.",
-      "expectedUpdateBehavior": "Recheck the FAQ and linked current admission guidance during review.",
       "status": "active"
     }
   ]

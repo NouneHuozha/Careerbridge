@@ -18,7 +18,7 @@
   "revision": {
     "title": "Explore apprenticeship training options",
     "summary": "Compare apprenticeship categories and current entry rules; eligibility varies by category and opportunity.",
-    "description": "DGT describes apprenticeship training as workplace learning that supplements institutional training. Its overview gives trade-apprentice qualifications ranging from Class VIII through Class XII and describes a contract requirement. After Class 10, check the specific category and opportunity; this pathway does not promise eligibility, a place, employment or a stipend.",
+    "description": "DGT describes apprenticeship training as workplace learning that supplements institutional training. For trade apprentices, its overview gives qualifications from Class VIII through Class XII and requires an apprenticeship contract. Check the category and terms of a specific opportunity with the responsible employer or authority.",
     "publicationStatus": "draft",
     "dataClassification": "real",
     "verificationStatus": "pending_review",
@@ -46,7 +46,7 @@
       ],
       "qualification": {
         "title": "Apprenticeship training arrangement",
-        "description": "DGT's overview describes a category-dependent training arrangement that includes a contract. It does not establish one universal qualification award, job outcome or stipend for every apprentice."
+        "description": "DGT describes five apprenticeship categories. For trade apprentices, it describes basic and practical training with related instruction, and says those who pass the All India Trade Test receive a National Apprenticeship Certificate."
       },
       "considerations": [
         {
@@ -58,8 +58,8 @@
           "description": "DGT describes the apprenticeship contract as required. Read the contract terms before accepting an opportunity."
         },
         {
-          "title": "Training does not guarantee employment",
-          "description": "The DGT overview describes training, not a guaranteed placement, job, stipend amount or selection outcome. Confirm any such terms in the specific opportunity."
+          "title": "Employer training arrangements vary",
+          "description": "DGT says employers decide which apprentice categories and trades to engage based on facilities available for workplace training. Confirm the specific arrangement with the employer or responsible authority."
         }
       ]
     },

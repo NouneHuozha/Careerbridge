@@ -1,5 +1,4 @@
 import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import nextEnv from "@next/env";
@@ -212,8 +211,15 @@ async function preflightRecord(client, pathwayId, revisionId) {
 
 async function requireReviewer(client, reviewerUserId) {
   if (!Number.isInteger(reviewerUserId) || reviewerUserId < 1) throw new Error("reviewerUserId must be a positive existing CareerBridge user ID.");
-  const user = await client.query("SELECT id FROM public.users WHERE id=$1", [reviewerUserId]);
-  if (user.rowCount !== 1) throw new Error(`CareerBridge reviewer user ${reviewerUserId} does not exist.`);
+  const user = await client.query(
+    `SELECT id FROM public.users
+      WHERE id=$1 AND role='admin' AND auth_provider='clerk' AND external_id IS NOT NULL
+      FOR SHARE`,
+    [reviewerUserId],
+  );
+  if (user.rowCount !== 1) {
+    throw new Error("Pathway lifecycle actions require an existing Clerk-backed CareerBridge administrator.");
+  }
 }
 
 export async function preflightRealPathwayDraft(client, { pathwayId, revisionId }) {
@@ -233,7 +239,7 @@ export async function submitRealPathwayDraftForReview(client, { pathwayId, revis
         WHERE id=$1 AND catalog_item_id=$2 AND publication_status='draft'
           AND data_classification='real' AND published_at IS NULL
         RETURNING id`,
-      [revisionId, preflight.pathwayItemId, reviewerUserId],
+      [revisionId, preflight.pathwayItemId],
     );
     if (update.rowCount !== 1) throw new Error("Pathway draft changed while submission for review was in progress.");
     await client.query("COMMIT");
@@ -320,7 +326,7 @@ export async function approveRealPathwayDraft(client, { pathwayId, revisionId, r
           AND data_classification='real' AND verification_status='verified'
           AND published_at IS NULL
         RETURNING id`,
-      [revisionId, preflight.pathwayItemId, reviewerUserId],
+      [revisionId, preflight.pathwayItemId],
     );
     if (update.rowCount !== 1) throw new Error("Pathway review changed while approval was in progress.");
     await client.query("COMMIT");
@@ -411,20 +417,6 @@ export async function publishApprovedRealPathway(client, {
   }
 }
 
-async function loadReviewFile(path) {
-  let parsed;
-  try {
-    parsed = JSON.parse(await readFile(path, "utf8"));
-  } catch {
-    throw new Error("Review decision file must be readable valid JSON.");
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) ||
-      Object.keys(parsed).some((key) => !["reviewerUserId", "claims"].includes(key))) {
-    throw new Error("Review decision must contain only reviewerUserId and claims.");
-  }
-  return parsed;
-}
-
 async function runCli() {
   loadEnvConfig(process.cwd());
   assertDevelopmentTarget({
@@ -437,33 +429,16 @@ async function runCli() {
   });
   verifyNeonDevelopmentEndpoint();
   const [action, pathwayId, revisionId, fourth, fifth] = process.argv.slice(2);
-  if (!action || !pathwayId || !revisionId || !["preflight", "submit", "review", "approve", "publish"].includes(action)) {
-    throw new Error("Usage: node scripts/publish-real-pathway.mjs <preflight|submit|review|approve|publish> <pathway-id> <revision-id> [reviewer-id|review-file|expected-pointer] [publisher-id]");
+  if (action !== "preflight" || !pathwayId || !revisionId || fourth || fifth) {
+    throw new Error("Usage: node scripts/publish-real-pathway.mjs preflight <pathway-id> <revision-id>. Write actions require an authenticated CareerBridge administrator through POST /api/admin/pathways/lifecycle.");
   }
-  if (action === "submit" && !fourth) throw new Error("submit requires a reviewer user ID.");
-  if (action === "review" && !fourth) throw new Error("review requires a review-decision JSON file.");
-  if (action === "approve" && !fourth) throw new Error("approve requires a reviewer user ID.");
-  if (action === "publish" && (fourth === undefined || !fifth)) throw new Error("publish requires <expected-pointer|none> and a publisher user ID.");
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL_UNPOOLED, connectionTimeoutMillis: 10000, max: 1 });
   const client = await pool.connect();
   try {
     const database = await client.query("SELECT current_database() AS database_name");
     if (database.rows[0].database_name !== "neondb") throw new Error("Refusing Pathways lifecycle operation: connected database is not the verified development database.");
-    const result = action === "preflight"
-      ? await preflightRealPathwayDraft(client, { pathwayId, revisionId })
-      : action === "submit"
-        ? await submitRealPathwayDraftForReview(client, { pathwayId, revisionId, reviewerUserId: Number(fourth) })
-        : action === "review"
-          ? await recordRealPathwayEvidenceReview(client, { pathwayId, revisionId, review: await loadReviewFile(resolve(fourth)) })
-          : action === "approve"
-            ? await approveRealPathwayDraft(client, { pathwayId, revisionId, reviewerUserId: Number(fourth) })
-            : await publishApprovedRealPathway(client, {
-                pathwayId,
-                revisionId,
-                expectedPublishedRevisionId: fourth === "none" ? null : fourth,
-                publisherUserId: Number(fifth),
-              });
+    const result = await preflightRealPathwayDraft(client, { pathwayId, revisionId });
     console.log(JSON.stringify({ target: { projectId: expectedProjectId, branchId: expectedBranchId, endpointHost: expectedHost }, ...result }, null, 2));
   } finally {
     client.release();

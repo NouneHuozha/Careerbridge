@@ -1,0 +1,9 @@
+# Real Pathway publication workflow
+
+Run `node scripts/publish-real-pathway.mjs preflight <pathway-id> <revision-id>` before any lifecycle transition. The CLI is read-only; `ready_for_review` is not evidence approval. Lifecycle writes go through same-origin `POST /api/admin/pathways/lifecycle` requests made with an active Clerk session.
+
+The API derives the actor from the active Clerk session and requires the mapped `public.users` row to have `role='admin'`, `auth_provider='clerk'`, and a non-null Clerk external ID. User IDs supplied by the request are not accepted. The same role check is repeated inside each write transaction and locks the user row for the duration of that action. Student or local-auth users are rejected.
+
+The one-time first-admin operation is `npm run pathways:bootstrap-admin`. Before running it, the project owner must set private Clerk user metadata `careerbridgeOwner: true` on their own Clerk account and set `CAREERBRIDGE_OWNER_CLERK_ID` in the local, untracked `.env.local`. The script verifies that marker through Clerk's server API, confirms the exact existing Clerk-to-CareerBridge mapping, requires an interactive confirmation, targets Neon development only, and refuses to run if any admin already exists. It never accepts a user ID as a command-line argument and never assigns roles based on registration order or email domain. The marker must be set by the person who controls the Clerk project; do not mark another account.
+
+All requests retain the verified Neon development-target guard. Review must cover every required claim and exactly match that revision's registered source URLs. Unsupported or ambiguous claims must remain unverified; approval and publication remain blocked until every required claim has direct evidence. Publication requires an explicit expected current pointer and verifies the final typed revision, provenance, and pointer before commit.

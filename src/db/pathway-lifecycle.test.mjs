@@ -72,7 +72,7 @@ function makeState({ classification = "real", status = "draft", verificationStat
   };
 }
 
-function fakeClient(initial = {}) {
+function fakeClient(initial = {}, userRoles = { 7: "admin", 8: "admin", 9: "admin" }) {
   const state = makeState(initial);
   const calls = [];
   const client = {
@@ -80,7 +80,11 @@ function fakeClient(initial = {}) {
       calls.push({ sql: String(sql), params });
       if (["BEGIN", "COMMIT", "ROLLBACK"].includes(String(sql))) return { rowCount: 0, rows: [] };
       if (String(sql).includes("pg_advisory_xact_lock")) return { rowCount: 1, rows: [] };
-      if (String(sql).startsWith("SELECT id FROM public.users")) return [7, 8, 9].includes(params[0]) ? { rowCount: 1, rows: [{ id: params[0] }] } : { rowCount: 0, rows: [] };
+      if (String(sql).includes("FROM public.users")) {
+        return userRoles[params[0]] === "admin"
+          ? { rowCount: 1, rows: [{ id: params[0] }] }
+          : { rowCount: 0, rows: [] };
+      }
       if (String(sql).includes("a.source_system='careerbridge'") && String(sql).includes("r.id=$2")) {
         return params[0] === pathwayId && params[1] === revisionId ? { rowCount: 1, rows: [{ ...state.row }] } : { rowCount: 0, rows: [] };
       }
@@ -96,8 +100,13 @@ function fakeClient(initial = {}) {
       }
       if (String(sql).startsWith("UPDATE public.catalog_item_revisions")) {
         const statement = String(sql);
-        if (statement.includes("SET publication_status='in_review'")) state.row.publication_status = "in_review";
-        else if (statement.includes("SET publication_status='approved'")) state.row.publication_status = "approved";
+        if (statement.includes("SET publication_status='in_review'")) {
+          assert.equal(params.length, 2);
+          state.row.publication_status = "in_review";
+        } else if (statement.includes("SET publication_status='approved'")) {
+          assert.equal(params.length, 2);
+          state.row.publication_status = "approved";
+        }
         else if (statement.includes("SET publication_status='published'")) {
           state.row.publication_status = "published";
           state.row.published_at = new Date(params[2]);
@@ -149,6 +158,12 @@ test("pilot payloads are structurally valid, source-backed, and explicitly left 
     assert.equal(value.revision.verificationStatus, "pending_review");
     assert.ok(value.revision.provenance.every((entry) => entry.verificationStatus === "pending_review" && !entry.verifiedAt));
   }
+
+  const nios = JSON.parse(await readFile(join(root, "docs/review/pathways-pilot/nios-senior-secondary.json"), "utf8"));
+  assert.equal(nios.revision.routeContent.considerations.length, 2);
+  assert.ok(nios.revision.provenance
+    .filter((entry) => entry.claimKey === "pathway.considerations")
+    .every((entry) => entry.sourceKey === "nios-senior-secondary"));
 });
 
 test("development target guard refuses absent credentials, incorrect endpoints, and hosted execution", () => {
@@ -185,6 +200,41 @@ test("demo revisions cannot enter review, approval, or publication", async () =>
   await assert.rejects(publisher.submitRealPathwayDraftForReview(mock.client, { pathwayId, revisionId, reviewerUserId: 7 }), /Only real pathway revisions/);
 });
 
+test("student users cannot submit, review, approve, or publish pathways", async () => {
+  const denied = new Error("Pathway lifecycle actions require an existing Clerk-backed CareerBridge administrator.");
+  const student = { 7: "student" };
+
+  await assert.rejects(
+    publisher.submitRealPathwayDraftForReview(fakeClient({}, student).client, { pathwayId, revisionId, reviewerUserId: 7 }),
+    denied,
+  );
+  await assert.rejects(
+    publisher.recordRealPathwayEvidenceReview(
+      fakeClient({ status: "in_review" }, student).client,
+      { pathwayId, revisionId, review: reviewDecision() },
+    ),
+    denied,
+  );
+  await assert.rejects(
+    publisher.approveRealPathwayDraft(
+      fakeClient({ status: "in_review" }, student).client,
+      { pathwayId, revisionId, reviewerUserId: 7 },
+    ),
+    denied,
+  );
+  const publishMock = fakeClient({ status: "approved", verificationStatus: "verified" }, student);
+  await assert.rejects(
+    publisher.publishApprovedRealPathway(publishMock.client, {
+      pathwayId,
+      revisionId,
+      expectedPublishedRevisionId: null,
+      publisherUserId: 7,
+    }),
+    denied,
+  );
+  assert.equal(publishMock.state.row.published_revision_id, null);
+});
+
 test("reviewer attestation, approval, and expected-pointer publication operate as separate transitions", async () => {
   const mock = fakeClient();
   const submitted = await publisher.submitRealPathwayDraftForReview(mock.client, { pathwayId, revisionId, reviewerUserId: 7 });
@@ -204,6 +254,11 @@ test("reviewer attestation, approval, and expected-pointer publication operate a
   assert.equal(mock.state.row.updated_by, 7);
   assert.ok(mock.state.provenance.every((entry) => entry.verification_status === "verified" && entry.verified_at));
   const approved = await publisher.approveRealPathwayDraft(mock.client, { pathwayId, revisionId, reviewerUserId: 8 });
+  const actorCheck = mock.calls.find((call) => call.sql.includes("FROM public.users"));
+  assert.match(actorCheck.sql, /role='admin'/);
+  assert.match(actorCheck.sql, /auth_provider='clerk'/);
+  assert.match(actorCheck.sql, /external_id IS NOT NULL/);
+  assert.match(actorCheck.sql, /FOR SHARE/);
   assert.equal(approved.action, "approved");
   assert.equal(mock.state.row.publication_status, "approved");
   assert.equal(approved.approverUserId, 8);

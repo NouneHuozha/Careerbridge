@@ -156,7 +156,8 @@ async function listPathwayRevisions(client, itemId) {
   if (!itemId) return [];
   const result = await client.query(
     `SELECT r.id, r.revision_number, r.publication_status, r.data_classification,
-            r.title, r.summary, r.description, r.verification_status, r.published_at,
+            r.verification_status, r.updated_by,
+            r.title, r.summary, r.description, r.published_at,
             p.revision_id AS typed_revision_id, p.stage, p.course_stage,
             p.catalogue_group, p.category, p.route_content
        FROM public.catalog_item_revisions r
@@ -275,7 +276,11 @@ async function mapProvenanceToSources(client, record, reconciled, preview) {
   return result;
 }
 
-export async function importOneRealPathwayDraft(client, payload, { preview = false } = {}) {
+export async function importOneRealPathwayDraft(
+  client,
+  payload,
+  { preview = false, supersedeUnreviewedDraft = false } = {},
+) {
   const record = requireExactlyOneRecord(payload);
   validateRealPathwayImportRecord(record);
   await client.query(preview ? "BEGIN READ ONLY" : "BEGIN");
@@ -312,6 +317,26 @@ export async function importOneRealPathwayDraft(client, payload, { preview = fal
         publicationStatus: latest.publication_status,
         dataClassification: latest.data_classification,
       });
+      if (
+        decision.action === "conflict" &&
+        supersedeUnreviewedDraft &&
+        latest.publication_status === "draft" &&
+        latest.verification_status === "pending_review" &&
+        latest.updated_by === null &&
+        latest.published_at === null &&
+        identity.publishedRevisionId === null &&
+        existingPayload.revision.provenance.length > 0 &&
+        existingPayload.revision.provenance.every((entry) =>
+          entry.verificationStatus === "pending_review" && !entry.verifiedAt,
+        ) &&
+        record.revision.verificationStatus === "pending_review" &&
+        record.revision.provenance.every((entry) =>
+          entry.verificationStatus === "pending_review" && !entry.verifiedAt,
+        )
+      ) {
+        validateRealPathwayImportRecord(existingPayload);
+        decision = { action: "create_revision", revisionNumber: latest.revision_number + 1 };
+      }
     }
 
     if (decision.action === "unchanged") {
@@ -419,7 +444,7 @@ export async function importOneRealPathwayDraft(client, payload, { preview = fal
 export function verifyNeonDevelopmentEndpoint() {
   let endpointMetadata;
   try {
-    endpointMetadata = JSON.parse(execFileSync("neon", ["api", `/projects/${expectedProjectId}/endpoints`], { encoding: "utf8" }));
+    endpointMetadata = JSON.parse(execFileSync("neon", ["api", `/projects/${expectedProjectId}/endpoints`], { encoding: "utf8", shell: true }));
   } catch (error) {
     throw new Error(`Refusing Pathways import: Neon endpoint metadata could not be verified. ${error.message}`);
   }
@@ -430,7 +455,14 @@ export function verifyNeonDevelopmentEndpoint() {
   return { projectId: expectedProjectId, branchId: expectedBranchId, endpointHost: expectedHost };
 }
 
-export async function runRealPathwayDraftImport({ payloadPath, directUrl, pooledUrl, env, preview = false }) {
+export async function runRealPathwayDraftImport({
+  payloadPath,
+  directUrl,
+  pooledUrl,
+  env,
+  preview = false,
+  supersedeUnreviewedDraft = false,
+}) {
   const target = assertDevelopmentTarget({
     directUrl,
     pooledUrl,
@@ -457,7 +489,7 @@ export async function runRealPathwayDraftImport({ payloadPath, directUrl, pooled
       throw new Error("Refusing Pathways import: connected database name differs from the guarded database URL.");
     }
     if (database.rows[0].database_name !== "neondb") throw new Error("Refusing Pathways import: connected database is not the verified development database.");
-    return await importOneRealPathwayDraft(client, record, { preview });
+    return await importOneRealPathwayDraft(client, record, { preview, supersedeUnreviewedDraft });
   } finally {
     client.release();
     await pool.end();
@@ -469,8 +501,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const args = process.argv.slice(2);
   const preview = args[0] === "--preview";
   if (preview) args.shift();
-  if (args.length !== 1) {
-    console.error("Usage: node scripts/import-real-pathway-draft.mjs [--preview] <one-pathway-payload.json>");
+  const supersedeUnreviewedDraft = args[0] === "--supersede-unreviewed-draft";
+  if (supersedeUnreviewedDraft) args.shift();
+  if (args.length !== 1 || args[0].startsWith("--")) {
+    console.error("Usage: node scripts/import-real-pathway-draft.mjs [--preview] [--supersede-unreviewed-draft] <one-pathway-payload.json>");
     process.exitCode = 1;
   } else {
     runRealPathwayDraftImport({
@@ -479,6 +513,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       pooledUrl: process.env.DATABASE_URL,
       env: process.env,
       preview,
+      supersedeUnreviewedDraft,
     })
       .then((result) => console.log(JSON.stringify(result, null, 2)))
       .catch((error) => {

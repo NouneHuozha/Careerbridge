@@ -12,6 +12,7 @@
     "test:institutions:postgres": "node --test src/db/institutions-postgres.integration.test.mjs",
     "test:real-course-draft:postgres": "node --test src/db/real-course-draft-import.integration.test.mjs",
     "test:student-data:postgres": "node --test src/app/student-data-postgres.integration.test.mjs",
+    "pathways:bootstrap-admin": "node scripts/bootstrap-pathway-admin.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },
