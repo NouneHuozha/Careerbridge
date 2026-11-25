@@ -1,0 +1,94 @@
+{
+  "kind": "pathway",
+  "id": "apprenticeship-class-10",
+  "aliases": [
+    {
+      "sourceSystem": "careerbridge",
+      "externalType": "pathway",
+      "externalKey": "apprenticeship-class-10",
+      "externalContextKey": ""
+    }
+  ],
+  "route": {
+    "stage": "class-10",
+    "courseStage": "class-10",
+    "catalogueGroup": "Technical and vocational qualifications",
+    "category": "Work-based learning"
+  },
+  "revision": {
+    "title": "Explore apprenticeship training options",
+    "summary": "Compare apprenticeship categories and current entry rules; eligibility varies by category and opportunity.",
+    "description": "DGT describes apprenticeship training as workplace learning that supplements institutional training. Its overview gives trade-apprentice qualifications ranging from Class VIII through Class XII and describes a contract requirement. After Class 10, check the specific category and opportunity; this pathway does not promise eligibility, a place, employment or a stipend.",
+    "publicationStatus": "draft",
+    "dataClassification": "real",
+    "verificationStatus": "pending_review",
+    "routeContent": {
+      "steps": [
+        "Compare the apprenticeship category and its current eligibility rules",
+        "Check the training arrangement and contract details",
+        "Confirm the terms of a specific opportunity with the responsible employer or authority"
+      ],
+      "progression": [
+        {
+          "title": "Identify the relevant apprenticeship category",
+          "description": "DGT describes several apprentice categories. Requirements vary; use the current rules for the category and opportunity you are considering.",
+          "nextStage": "Check eligibility and opportunity details"
+        },
+        {
+          "title": "Review the training and contract",
+          "description": "DGT describes trade apprenticeship training as basic training and practical training with related instruction, and says an apprenticeship contract is required.",
+          "nextStage": "Workplace and related training"
+        },
+        {
+          "title": "Confirm the specific opportunity",
+          "description": "Check the current conditions with the responsible employer or authority. The overview does not establish that a particular place is available or that an applicant will be selected."
+        }
+      ],
+      "qualification": {
+        "title": "Apprenticeship training arrangement",
+        "description": "DGT's overview describes a category-dependent training arrangement that includes a contract. It does not establish one universal qualification award, job outcome or stipend for every apprentice."
+      },
+      "considerations": [
+        {
+          "title": "Eligibility depends on category and opportunity",
+          "description": "DGT states that trade-apprentice qualifications range from Class VIII through Class XII. Check the current rules for the specific category and opening."
+        },
+        {
+          "title": "A contract is part of the arrangement",
+          "description": "DGT describes the apprenticeship contract as required. Read the contract terms before accepting an opportunity."
+        },
+        {
+          "title": "Training does not guarantee employment",
+          "description": "The DGT overview describes training, not a guaranteed placement, job, stipend amount or selection outcome. Confirm any such terms in the specific opportunity."
+        }
+      ]
+    },
+    "provenance": [
+      { "claimKey": "pathway.title", "sourceKey": "dgt-apprenticeship-overview", "sourceUrl": "https://dgt.gov.in/en/Apprenticeship_Training", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.summary", "sourceKey": "dgt-apprenticeship-overview", "sourceUrl": "https://dgt.gov.in/en/Apprenticeship_Training", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.description", "sourceKey": "dgt-apprenticeship-overview", "sourceUrl": "https://dgt.gov.in/en/Apprenticeship_Training", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.stage", "sourceKey": "dgt-apprenticeship-overview", "sourceUrl": "https://dgt.gov.in/en/Apprenticeship_Training", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.course_stage", "sourceKey": "dgt-apprenticeship-overview", "sourceUrl": "https://dgt.gov.in/en/Apprenticeship_Training", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.catalogue_group", "sourceKey": "dgt-apprenticeship-overview", "sourceUrl": "https://dgt.gov.in/en/Apprenticeship_Training", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.category", "sourceKey": "dgt-apprenticeship-overview", "sourceUrl": "https://dgt.gov.in/en/Apprenticeship_Training", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.steps", "sourceKey": "dgt-apprenticeship-overview", "sourceUrl": "https://dgt.gov.in/en/Apprenticeship_Training", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.progression", "sourceKey": "dgt-apprenticeship-overview", "sourceUrl": "https://dgt.gov.in/en/Apprenticeship_Training", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.qualification", "sourceKey": "dgt-apprenticeship-overview", "sourceUrl": "https://dgt.gov.in/en/Apprenticeship_Training", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.considerations", "sourceKey": "dgt-apprenticeship-overview", "sourceUrl": "https://dgt.gov.in/en/Apprenticeship_Training", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" }
+    ]
+  },
+  "sources": [
+    {
+      "sourceKey": "dgt-apprenticeship-overview",
+      "sourceName": "DGT Apprenticeship Training overview",
+      "authority": "Directorate General of Training, Ministry of Skill Development and Entrepreneurship, Government of India",
+      "canonicalUrl": "https://dgt.gov.in/en/Apprenticeship_Training",
+      "category": "pathway",
+      "sourceType": "official_public_web_page",
+      "dataTypes": ["apprentice categories", "qualification range", "training components", "contract requirement"],
+      "termsNotes": "Official DGT overview. It does not establish that a specific apprenticeship is open, that a learner is eligible for it, or that placement, employment or a stipend is guaranteed.",
+      "expectedUpdateBehavior": "Recheck current category-specific rules and opportunity terms during review.",
+      "status": "active"
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "kind": "pathway",
+  "id": "trade-training",
+  "aliases": [
+    {
+      "sourceSystem": "careerbridge",
+      "externalType": "pathway",
+      "externalKey": "trade-training",
+      "externalContextKey": ""
+    }
+  ],
+  "route": {
+    "stage": "class-10",
+    "courseStage": "class-10",
+    "catalogueGroup": "Technical and vocational qualifications",
+    "category": "Vocational training"
+  },
+  "revision": {
+    "title": "Explore DGT Craftsmen Training Scheme trades",
+    "summary": "Compare CTS trades delivered through ITIs; entry qualifications and durations vary by trade.",
+    "description": "The Directorate General of Training describes the Craftsmen Training Scheme as vocational training delivered through ITIs. If you have completed Class 10, check the minimum qualification, subjects and duration for each named trade; do not assume every trade has the same entry rules.",
+    "publicationStatus": "draft",
+    "dataClassification": "real",
+    "verificationStatus": "pending_review",
+    "routeContent": {
+      "steps": [
+        "Check the current minimum qualification for a specific trade",
+        "Compare the trade and available ITI options",
+        "Confirm the trade duration and admission process with the responsible authority"
+      ],
+      "progression": [
+        {
+          "title": "Check trade-specific entry conditions",
+          "description": "DGT's trade list gives different minimum qualifications for different trades. Confirm the current requirement and any subject conditions for the trade you choose.",
+          "nextStage": "Trade and ITI selection"
+        },
+        {
+          "title": "Check the ITI and admission route",
+          "description": "CTS is delivered through ITIs. DGT describes national policy, standards, examinations and certification as central responsibilities, while day-to-day ITI administration and admissions sit with States/UTs.",
+          "nextStage": "Trade training"
+        },
+        {
+          "title": "Complete the named trade programme",
+          "description": "DGT describes CTS trade/course durations as one or two years, but the duration depends on the specific trade. Confirm current details with the relevant ITI or State/UT authority."
+        }
+      ],
+      "qualification": {
+        "title": "CTS trade qualification",
+        "description": "The scheme includes trade-specific training and certification. Confirm the current certificate and awarding arrangements for the selected trade with DGT and the responsible State/UT authority."
+      },
+      "considerations": [
+        {
+          "title": "Entry rules vary by trade",
+          "description": "DGT's list includes different minimum qualifications, including Class 8 and Class 10 requirements. Check the current rules for the exact trade; this route does not guarantee eligibility."
+        },
+        {
+          "title": "Duration depends on the trade",
+          "description": "DGT describes CTS courses as one or two years. Confirm the duration of the specific trade before making a decision."
+        },
+        {
+          "title": "Admission administration is local",
+          "description": "DGT distinguishes national scheme functions from State/UT day-to-day administration and ITI admissions. Use the current State/UT process for applications."
+        }
+      ]
+    },
+    "provenance": [
+      { "claimKey": "pathway.title", "sourceKey": "dgt-cts-overview", "sourceUrl": "https://dgt.gov.in/en/CTS", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.summary", "sourceKey": "dgt-cts-overview", "sourceUrl": "https://dgt.gov.in/en/CTS", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.description", "sourceKey": "dgt-cts-overview", "sourceUrl": "https://dgt.gov.in/en/CTS", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.stage", "sourceKey": "dgt-cts-trade-list", "sourceUrl": "https://dgt.gov.in/en/cts-details", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.course_stage", "sourceKey": "dgt-cts-trade-list", "sourceUrl": "https://dgt.gov.in/en/cts-details", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.catalogue_group", "sourceKey": "dgt-cts-overview", "sourceUrl": "https://dgt.gov.in/en/CTS", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.category", "sourceKey": "dgt-cts-overview", "sourceUrl": "https://dgt.gov.in/en/CTS", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.steps", "sourceKey": "dgt-cts-trade-list", "sourceUrl": "https://dgt.gov.in/en/cts-details", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.progression", "sourceKey": "dgt-cts-overview", "sourceUrl": "https://dgt.gov.in/en/CTS", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.progression", "sourceKey": "dgt-cts-trade-list", "sourceUrl": "https://dgt.gov.in/en/cts-details", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.qualification", "sourceKey": "dgt-cts-overview", "sourceUrl": "https://dgt.gov.in/en/CTS", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.considerations", "sourceKey": "dgt-cts-overview", "sourceUrl": "https://dgt.gov.in/en/CTS", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.considerations", "sourceKey": "dgt-cts-trade-list", "sourceUrl": "https://dgt.gov.in/en/cts-details", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" }
+    ]
+  },
+  "sources": [
+    {
+      "sourceKey": "dgt-cts-overview",
+      "sourceName": "DGT Craftsmen Training Scheme overview",
+      "authority": "Directorate General of Training, Ministry of Skill Development and Entrepreneurship, Government of India",
+      "canonicalUrl": "https://dgt.gov.in/en/CTS",
+      "category": "pathway",
+      "sourceType": "official_public_web_page",
+      "dataTypes": ["scheme overview", "ITI delivery", "administrative responsibilities", "course durations"],
+      "termsNotes": "Official DGT scheme page. Do not state the page's trade count as a timeless fact; it may change.",
+      "expectedUpdateBehavior": "Recheck the current DGT scheme page and State/UT admission process during review.",
+      "status": "active"
+    },
+    {
+      "sourceKey": "dgt-cts-trade-list",
+      "sourceName": "DGT Craftsmen Training Scheme trade details",
+      "authority": "Directorate General of Training, Ministry of Skill Development and Entrepreneurship, Government of India",
+      "canonicalUrl": "https://dgt.gov.in/en/cts-details",
+      "category": "pathway",
+      "sourceType": "official_public_web_page",
+      "dataTypes": ["trade minimum qualifications", "trade durations"],
+      "termsNotes": "Official trade-by-trade list. Requirements differ between trades; this source must not be generalized into universal Class 10 eligibility.",
+      "expectedUpdateBehavior": "Check the specific trade's current minimum qualification and duration before review or publication.",
+      "status": "active"
+    }
+  ]
+}

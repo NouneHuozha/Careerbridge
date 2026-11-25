@@ -1,0 +1,107 @@
+{
+  "kind": "pathway",
+  "id": "open-schooling",
+  "aliases": [
+    {
+      "sourceSystem": "careerbridge",
+      "externalType": "pathway",
+      "externalKey": "open-schooling",
+      "externalContextKey": ""
+    }
+  ],
+  "route": {
+    "stage": "class-10",
+    "courseStage": "class-12",
+    "catalogueGroup": "Continue secondary education",
+    "category": "Alternative study mode"
+  },
+  "revision": {
+    "title": "NIOS Senior Secondary through open schooling",
+    "summary": "Study towards Senior Secondary through NIOS if you meet its current admission requirements.",
+    "description": "NIOS describes its Senior Secondary programme for learners who have passed Class X or an equivalent examination from a recognised board. Confirm current admission and subject options directly with NIOS.",
+    "publicationStatus": "draft",
+    "dataClassification": "real",
+    "verificationStatus": "pending_review",
+    "routeContent": {
+      "steps": [
+        "Check NIOS Senior Secondary admission requirements",
+        "Choose from the currently available subjects",
+        "Complete the required study and assessments"
+      ],
+      "progression": [
+        {
+          "title": "Confirm the entry qualification",
+          "description": "NIOS identifies a passed Class X or equivalent examination from a recognised board as the entry relationship for Senior Secondary. Check the current admission rules before applying.",
+          "nextStage": "Admission and subject selection"
+        },
+        {
+          "title": "Select available subjects",
+          "description": "Use the current NIOS subject scheme to confirm which subjects are offered and the requirements that apply to your programme.",
+          "nextStage": "Study and assessment"
+        },
+        {
+          "title": "Meet the completion requirements",
+          "description": "NIOS states that learners must successfully complete at least five subjects for Senior Secondary certification. Confirm current assessment and completion rules with NIOS."
+        }
+      ],
+      "qualification": {
+        "title": "NIOS Senior Secondary certification",
+        "description": "NIOS describes the qualification as equivalent to Senior Secondary/Class XII. Certification depends on meeting the current programme requirements, including successful completion of at least five subjects."
+      },
+      "considerations": [
+        {
+          "title": "Entry depends on recognised prior study",
+          "description": "NIOS specifies a passed Class X or equivalent examination from a recognised board. Check the current admission notice for the exact rules."
+        },
+        {
+          "title": "Subject availability is programme-specific",
+          "description": "Choose from the subjects and scheme currently offered by NIOS; do not assume every subject combination is available."
+        },
+        {
+          "title": "Further-course eligibility still applies",
+          "description": "Check the recognition, subject and admission requirements of any later course or institution you are considering."
+        }
+      ]
+    },
+    "provenance": [
+      { "claimKey": "pathway.title", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.summary", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.description", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.stage", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.course_stage", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.catalogue_group", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.category", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.steps", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.progression", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.qualification", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.considerations", "sourceKey": "nios-senior-secondary", "sourceUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" },
+      { "claimKey": "pathway.considerations", "sourceKey": "nios-faq", "sourceUrl": "https://sdmis.nios.ac.in/home/faqs", "checkedAt": "2026-11-25", "verificationStatus": "pending_review" }
+    ]
+  },
+  "sources": [
+    {
+      "sourceKey": "nios-senior-secondary",
+      "sourceName": "NIOS Senior Secondary course and admission information",
+      "authority": "National Institute of Open Schooling",
+      "canonicalUrl": "https://www.nios.ac.in/online-course-material/secondary-courses/admission-detail-for-various-courses.aspx",
+      "category": "pathway",
+      "sourceType": "official_public_web_page",
+      "dataTypes": ["Senior Secondary entry relationship", "subject scheme", "qualification", "completion requirements"],
+      "termsNotes": "Official NIOS information. Do not use this source to assert current fees, seat availability, or application dates without a fresh check.",
+      "expectedUpdateBehavior": "Recheck against current NIOS admission and course information before review or publication.",
+      "status": "active"
+    },
+    {
+      "sourceKey": "nios-faq",
+      "sourceName": "NIOS online admission FAQs",
+      "authority": "National Institute of Open Schooling",
+      "canonicalUrl": "https://sdmis.nios.ac.in/home/faqs",
+      "category": "pathway",
+      "sourceType": "official_public_web_page",
+      "dataTypes": ["admission options", "recognised Secondary certificate"],
+      "termsNotes": "Official NIOS FAQ used as corroboration for the admission caveat; it does not replace the current admission notice.",
+      "expectedUpdateBehavior": "Recheck the FAQ and linked current admission guidance during review.",
+      "status": "active"
+    }
+  ]
+}

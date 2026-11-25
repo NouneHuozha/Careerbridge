@@ -1,16 +1,15 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { ArrowRight, BookOpen, CheckCircle2 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "../../../breadcrumbs";
 import { SavedItemButton } from "../../saved-item-button";
 import { HistoryVisit } from "../../history-visit";
+import { PageLoadingSkeleton } from "../../../page-loading-skeleton";
 import { possibilityFields } from "../../../discover/possibility-fields";
-import {
-  getStageLabel,
-  getStudyRoute,
-  studyRoutes,
-} from "../route-data";
+import { getPathwayForUi } from "../pathway-page-data";
+import { getStageLabel } from "../route-data";
 
 export const instant = false;
 
@@ -19,15 +18,11 @@ type RoutePageProps = {
   searchParams: Promise<{ field?: string }>;
 };
 
-export function generateStaticParams() {
-  return studyRoutes.map(({ id }) => ({ routeId: id }));
-}
-
 export async function generateMetadata({
   params,
 }: RoutePageProps): Promise<Metadata> {
   const { routeId } = await params;
-  const route = getStudyRoute(routeId);
+  const route = await getPathwayForUi(routeId);
 
   return route
     ? {
@@ -37,12 +32,12 @@ export async function generateMetadata({
     : { title: "Study route | CareerBridge" };
 }
 
-export default async function StudyRouteDetailsPage({
+async function StudyRouteDetailsContent({
   params,
   searchParams,
 }: RoutePageProps) {
   const [{ routeId }, query] = await Promise.all([params, searchParams]);
-  const route = getStudyRoute(routeId);
+  const route = await getPathwayForUi(routeId);
   if (!route) notFound();
 
   const field = possibilityFields.find((item) => item.id === query.field);
@@ -88,6 +83,11 @@ export default async function StudyRouteDetailsPage({
             <p className="mt-5 max-w-[64ch] text-lg leading-relaxed text-[#354b40] sm:text-xl">
               {route.introduction}
             </p>
+            {route.dataClassification === "demo" && (
+              <p className="mt-4 max-w-[64ch] rounded-xl border border-[#e7d6a8] bg-[#fff8e8] px-4 py-3 text-sm leading-relaxed text-[#594c32]">
+                Development demo content: illustrative only, unverified, and not a published real pathway.
+              </p>
+            )}
             <div className="mt-5">
               <SavedItemButton
                 type="pathway"
@@ -263,23 +263,53 @@ export default async function StudyRouteDetailsPage({
                 Sources and verification
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-[#52645a]">
-                This is a general illustrative overview, not checked against a
-                specific programme, institution or current admission notice.
-                {route.references?.length
-                  ? " The following references were named in the supplied content; their links and relevance have not been independently verified."
-                  : " No named reference or last-checked date is available for this overview."}
+                Source evidence is attached to individual catalogue claims. “Checked” records a source review date; it does not by itself mean that the claim has been verified.
               </p>
-              {route.references && route.references.length > 0 && (
-                <ul className="mt-3 flex flex-wrap gap-2">
-                  {route.references.map((reference) => (
+              {route.sources?.length ? (
+                <ul className="mt-4 space-y-3">
+                  {route.sources.map((source) => (
                     <li
-                      key={reference}
-                      className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-[#52645a]"
+                      key={`${source.sourceId}:${source.claimKey}`}
+                      className="rounded-xl border border-[#e5ebe5] bg-white p-4"
                     >
-                      {reference}
+                      <p className="text-xs font-semibold uppercase tracking-[.08em] text-[#52715f]">
+                        Supports: {source.claimKey.replace(/^pathway\./, "").replaceAll("_", " ")}
+                      </p>
+                      <p className="mt-1 font-semibold text-[#18352d]">{source.sourceName}</p>
+                      {source.authority && (
+                        <p className="mt-1 text-sm text-[#59665e]">{source.authority}</p>
+                      )}
+                      {source.canonicalUrl && (
+                        <a
+                          href={source.canonicalUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-2 inline-flex break-all text-sm font-medium text-[#145543] underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+                        >
+                          Open official source
+                        </a>
+                      )}
+                      <p className="mt-2 text-xs leading-relaxed text-[#718078]">
+                        Evidence status: {(source.verificationStatus ?? "not collected").replaceAll("_", " ")}
+                        {source.checkedAt ? ` · Checked ${source.checkedAt.slice(0, 10)}` : " · Not checked"}
+                        {source.verifiedAt ? ` · Verified ${source.verifiedAt.slice(0, 10)}` : ""}
+                      </p>
                     </li>
                   ))}
                 </ul>
+              ) : route.references?.length ? (
+                <div className="mt-4">
+                  <p className="text-sm text-[#718078]">Demo references only; these labels are not linked to reviewed claim-level evidence.</p>
+                  <ul className="mt-3 flex flex-wrap gap-2">
+                    {route.references.map((reference) => (
+                      <li key={reference} className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-[#52645a]">
+                        {reference}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-[#718078]">No claim-level source evidence is available for this route.</p>
               )}
             </div>
           </div>
@@ -294,5 +324,13 @@ export default async function StudyRouteDetailsPage({
         </Link>
       </div>
     </main>
+  );
+}
+
+export default function StudyRouteDetailsPage(props: RoutePageProps) {
+  return (
+    <Suspense fallback={<PageLoadingSkeleton variant="detail" showHeader={false} />}>
+      <StudyRouteDetailsContent {...props} />
+    </Suspense>
   );
 }

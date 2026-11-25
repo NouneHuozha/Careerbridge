@@ -17,9 +17,9 @@ import { useEducationStage } from "../../education-stage";
 import { SavedItemButton } from "../saved-item-button";
 import {
   getStageLabel,
-  getStudyRoutes,
   type EducationStage,
 } from "./route-data";
+import type { StudyRoute } from "../../../db/pathway-types";
 
 const routeIcons: Record<string, LucideIcon> = {
   "higher-secondary": School,
@@ -39,7 +39,7 @@ function isEducationStage(value: string | null): value is EducationStage {
   return value === "class-10" || value === "class-12";
 }
 
-export default function PathwaysExplorer() {
+export default function PathwaysExplorer({ pathways }: { pathways: StudyRoute[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const savedEducation = useEducationStage();
@@ -69,7 +69,7 @@ export default function PathwaysExplorer() {
     : "/explore/courses";
   const stageLabel = stage ? getStageLabel(stage) : "";
   const routes = stage
-    ? getStudyRoutes(stage).map((route) => ({
+    ? pathways.filter((route) => route.stage === stage).map((route) => ({
         ...route,
         Icon: routeIcons[route.id] ?? BookOpen,
         href: `/explore/pathways/${route.id}?${new URLSearchParams({

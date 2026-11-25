@@ -28,7 +28,7 @@ import {
 import { fieldGuideData } from "../fields/field-data";
 import { courseCatalog } from "../courses/catalog/course-catalog-data";
 import { institutionProfilePages } from "../institution-directory/institution-profile-data";
-import { studyRoutes } from "../pathways/route-data";
+import type { StudyRoute } from "../../../db/pathway-types";
 import { examinations } from "../examinations/examination-data";
 import { scholarships } from "../scholarships/scholarship-data";
 import { resolvedInstitutionCampusOfferings } from "../institutions/institution-data";
@@ -64,7 +64,7 @@ type ResolvedSavedItem = {
   href?: string;
 };
 
-function resolveItem(item: SavedItem): ResolvedSavedItem {
+function resolveItem(item: SavedItem, pathways: StudyRoute[]): ResolvedSavedItem {
   if (item.type === "field") {
     const field = fieldGuideData[item.id as keyof typeof fieldGuideData];
     if (field) {
@@ -133,7 +133,7 @@ function resolveItem(item: SavedItem): ResolvedSavedItem {
   }
 
   if (item.type === "pathway") {
-    const route = studyRoutes.find((entry) => entry.id === item.id);
+    const route = pathways.find((entry) => entry.id === item.id);
     if (route) {
       const params = new URLSearchParams({ stage: route.stage });
       if (item.context?.fieldId) params.set("field", item.context.fieldId);
@@ -203,7 +203,7 @@ function savedDate(timestamp: number) {
   })}`;
 }
 
-export default function SavedItemsPage() {
+export default function SavedItemsPage({ pathways }: { pathways: StudyRoute[] }) {
   const pathname = usePathname();
   const account = useAccount();
   const saved = useSavedItems();
@@ -224,8 +224,8 @@ export default function SavedItemsPage() {
     };
   }, [pendingRemoval]);
   const resolved = useMemo(
-    () => saved.status === "saved" ? saved.items.map(resolveItem) : [],
-    [saved],
+    () => saved.status === "saved" ? saved.items.map((item) => resolveItem(item, pathways)) : [],
+    [saved, pathways],
   );
   const query = search.trim().toLocaleLowerCase();
   const matchingItems = resolved
@@ -530,7 +530,7 @@ export default function SavedItemsPage() {
             </h2>
             <p id="saved-remove-description" className="mt-2 text-sm leading-relaxed text-[#59665e]">
               {pendingRemoval
-                ? `“${resolveItem(pendingRemoval).title}” will be removed from your Saved list. You can save it again later.`
+                ? `“${resolveItem(pendingRemoval, pathways).title}” will be removed from your Saved list. You can save it again later.`
                 : ""}
             </p>
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

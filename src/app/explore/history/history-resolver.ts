@@ -1,7 +1,7 @@
 import { fieldGuideData } from "../fields/field-data";
 import { courseCatalog } from "../courses/catalog/course-catalog-data";
 import { institutionProfilePages } from "../institution-directory/institution-profile-data";
-import { studyRoutes } from "../pathways/route-data";
+import type { StudyRoute } from "../../../db/pathway-types";
 import { examinations } from "../examinations/examination-data";
 import { scholarships } from "../scholarships/scholarship-data";
 import { resolvedInstitutionCampusOfferings } from "../institutions/institution-data";
@@ -17,7 +17,7 @@ export type ResolvedHistoryItem = {
   href: string;
 };
 
-export function resolveHistoryItem(item: ExplorationHistoryItem): ResolvedHistoryItem {
+export function resolveHistoryItem(item: ExplorationHistoryItem, pathways: StudyRoute[]): ResolvedHistoryItem {
   if (item.type === "field") {
     const field = fieldGuideData[item.id as keyof typeof fieldGuideData];
     if (field) {
@@ -86,7 +86,7 @@ export function resolveHistoryItem(item: ExplorationHistoryItem): ResolvedHistor
   }
 
   if (item.type === "pathway") {
-    const route = studyRoutes.find((entry) => entry.id === item.id);
+    const route = pathways.find((entry) => entry.id === item.id);
     if (route) {
       const params = new URLSearchParams({ stage: route.stage });
       if (item.context?.fieldId) params.set("field", item.context.fieldId);

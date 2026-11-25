@@ -27,6 +27,7 @@ import {
 import { SavedItemButton } from "../saved-item-button";
 import type { SavedItemType } from "../saved-items";
 import { resolveHistoryItem, type ResolvedHistoryItem } from "./history-resolver";
+import type { StudyRoute } from "../../../db/pathway-types";
 
 type Category = Exclude<SavedItemType, "institution-offering">;
 
@@ -143,7 +144,7 @@ function HistoryCard({
   );
 }
 
-export default function ExplorationHistoryPage() {
+export default function ExplorationHistoryPage({ pathways }: { pathways: StudyRoute[] }) {
   const pathname = usePathname();
   const account = useAccount();
   const history = useExplorationHistory();
@@ -168,10 +169,10 @@ export default function ExplorationHistoryPage() {
   const resolved = useMemo(
     () => history.status === "saved"
       ? history.items
-          .map(resolveHistoryItem)
+          .map((item) => resolveHistoryItem(item, pathways))
           .sort((a, b) => b.item.lastVisitedAt - a.item.lastVisitedAt)
       : [],
-    [history],
+    [history, pathways],
   );
   const counts = useMemo(() => ({
     all: resolved.length,

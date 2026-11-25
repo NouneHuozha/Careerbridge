@@ -1,31 +1,6 @@
-export type EducationStage = "class-10" | "class-12";
+import type { EducationStage, StudyRoute } from "../../../db/pathway-types";
 
-export type StudyRoute = {
-  id: string;
-  stage: EducationStage;
-  catalogueGroup: string;
-  category: string;
-  title: string;
-  description: string;
-  steps: string[];
-  introduction: string;
-  progression: {
-    title: string;
-    description: string;
-    nextStage?: string;
-  }[];
-  qualification: {
-    title: string;
-    description: string;
-  };
-  considerations: {
-    title: string;
-    description: string;
-  }[];
-  furtherProgression?: string;
-  references?: string[];
-  courseStage: EducationStage;
-};
+export type { EducationStage, StudyRoute };
 
 export const studyRoutes: StudyRoute[] = [
   {
