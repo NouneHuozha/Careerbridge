@@ -35,6 +35,7 @@ function emptyData() {
     history: [],
     educationStage: null,
     counsellingSession: null,
+    latestCompletedCounsellingSession: null,
     discoveryAnswers: null,
   };
 }
@@ -149,6 +150,7 @@ function resetState() {
   state.clerkDeleteTargets = [];
   state.statements = [];
   state.reverified = true;
+  state.emailSyncUpdates = [];
 };
 
 function normalize(statement) {
@@ -398,6 +400,17 @@ const client = {
     if (query.startsWith("SELECT pg_advisory_lock") || query.startsWith("SELECT pg_advisory_unlock")) {
       return { rows: [{ unlocked: true }] };
     }
+    if (query.startsWith("SELECT id, email, full_name, auth_provider FROM users WHERE external_id = $1")) {
+      const user = state.users.get(values[0]);
+      return { rows: user ? [user] : [] };
+    }
+    if (query.startsWith("UPDATE users SET email = $2")) {
+      const user = state.users.get(values[0]);
+      if (!user || user.auth_provider !== "clerk") return { rows: [] };
+      user.email = values[1];
+      state.emailSyncUpdates.push({ externalId: values[0], email: values[1] });
+      return { rows: [user] };
+    }
     if (query === "BEGIN" || query === "COMMIT" || query === "ROLLBACK") {
       return { rows: [] };
     }
@@ -460,6 +473,11 @@ const pool = {
     return client;
   },
 };
+const identityLockPool = {
+  async connect() {
+    return client;
+  },
+};
 
 const clerkServer = {
   auth: async () => ({
@@ -495,7 +513,7 @@ const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === "@clerk/nextjs/server") return clerkServer;
   if (request === "../db/pool" && parent?.filename.endsWith("auth-server.ts")) {
-    return { getPool: () => pool };
+    return { getPool: () => pool, getIdentityLockPool: () => identityLockPool };
   }
   if (request === "../db/client" && parent?.filename.endsWith("auth-server.ts")) {
     return { getDb: () => database };
@@ -1389,10 +1407,11 @@ test("Guided Explorer preserves question order, skipped questions, answer states
   );
   const cleared = await responseBody(clearResponse);
   assert.equal(clearResponse.status, 200);
-  assert.equal(cleared.data.counsellingSession, null);
-  assert.equal(state.guidedExplorerSessions.size, 0);
-  assert.equal(state.guidedExplorerSessionQuestions.size, 0);
-  assert.equal(state.guidedExplorerAnswers.size, 0);
+  assert.equal(cleared.data.counsellingSession.id, "guided-a");
+  assert.equal(cleared.data.counsellingSession.status, "completed");
+  assert.equal(state.guidedExplorerSessions.size, 1);
+  assert.equal(state.guidedExplorerSessionQuestions.size, 3);
+  assert.equal(state.guidedExplorerAnswers.size, 1);
 });
 
 test("stale Guided Explorer snapshots conflict instead of replacing newer answers", async () => {

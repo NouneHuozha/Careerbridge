@@ -1,11 +1,13 @@
 import { connection, NextRequest, NextResponse } from "next/server";
 import {
   AccountDeletionPendingError,
+  AccountEmailConflictError,
   AccountIdentityConflictError,
   AccountProvisioningRequiredError,
   CatalogueItemReferenceError,
   getAccountData,
   getCurrentUser,
+  GuidedExplorerConflictError,
   StudentDataConflictError,
   updateAccountData,
 } from "../../../auth-server";
@@ -38,7 +40,11 @@ export async function GET() {
     if (error instanceof StudentDataConflictError) {
       return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
     }
-    if (error instanceof AccountProvisioningRequiredError || error instanceof AccountIdentityConflictError) {
+    if (
+      error instanceof AccountEmailConflictError ||
+      error instanceof AccountProvisioningRequiredError ||
+      error instanceof AccountIdentityConflictError
+    ) {
       return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
     }
     console.error("[careerbridge-next] account data lookup failed", error);
@@ -111,6 +117,20 @@ export async function POST(request: NextRequest) {
     const data = await updateAccountData(user.id, input);
     return NextResponse.json({ data }, { headers: noStore });
   } catch (error) {
+    if (error instanceof GuidedExplorerConflictError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          conflict: {
+            type: "guided-explorer",
+            code: error.code,
+            operationId: error.operationId,
+            authoritativeSession: error.authoritativeSession,
+          },
+        },
+        { status: 409, headers: noStore },
+      );
+    }
     if (error instanceof AccountDeletionPendingError) {
       return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
     }
@@ -131,7 +151,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
       }
     }
-    if (error instanceof AccountProvisioningRequiredError || error instanceof AccountIdentityConflictError) {
+    if (
+      error instanceof AccountEmailConflictError ||
+      error instanceof AccountProvisioningRequiredError ||
+      error instanceof AccountIdentityConflictError
+    ) {
       return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
     }
     console.error("[careerbridge-next] account data update failed", error);

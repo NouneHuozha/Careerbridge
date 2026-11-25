@@ -6,6 +6,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -22,6 +23,7 @@ import {
   getAccountCacheUserId,
   hasPendingAccountMutations,
   hydrateAccountCache,
+  commitPersonalDataIdentityTransition,
   lockPersonalData,
   migrateLegacyPersonalDataToSession,
   preserveGuestDataCache,
@@ -94,6 +96,9 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const [migrationError, setMigrationError] = useState("");
   const accountData = useRef<PersonalDataSnapshot>(emptyPersonalData());
   const requestId = useRef(0);
+  const identityVersion = useRef(0);
+  const lastFlushSyncError = useRef<string | null>(null);
+  const committedClerkUserId = useRef<string | null | undefined>(undefined);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const statusRef = useRef<AccountStatus>(status);
   const [prevClerkUserId, setPrevClerkUserId] = useState<string | null | undefined>(undefined);
@@ -103,14 +108,26 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   if (clerkLoaded && prevClerkUserId !== clerkUserId) {
     setPrevClerkUserId(clerkUserId);
     if (prevClerkUserId !== undefined) {
-      lockPersonalData();
       if (status !== "loading") setStatus("loading");
       if (user !== null) setUser(null);
       if (error !== null) setError(null);
       if (syncError !== null) setSyncError(null);
       if (migration !== null) setMigration(null);
+      if (migrationBusy) setMigrationBusy(false);
+      if (migrationError) setMigrationError("");
     }
   }
+
+  useLayoutEffect(() => {
+    if (!clerkLoaded) return;
+    const previousUserId = committedClerkUserId.current;
+    committedClerkUserId.current = clerkUserId;
+    commitPersonalDataIdentityTransition(previousUserId, clerkUserId, () => {
+      requestId.current += 1;
+      identityVersion.current += 1;
+      accountData.current = emptyPersonalData();
+    });
+  }, [clerkLoaded, clerkUserId]);
 
   useEffect(() => {
     statusRef.current = status;
@@ -175,10 +192,27 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         accountData.current = emptyPersonalData();
       }
 
+      const flushWithFallback = async (userId: number) => {
+        lastFlushSyncError.current = null;
+        const ok = await flushAccountMutations(userId);
+        if (
+          !ok &&
+          hasPendingAccountMutations(userId) &&
+          lastFlushSyncError.current === null &&
+          currentRequest === requestId.current &&
+          getAccountCacheUserId() === userId
+        ) {
+          const message = "We couldn't sync your latest account change. Your tab still has it; retry to save it to your account.";
+          lastFlushSyncError.current = message;
+          setSyncError(message);
+        }
+        return ok;
+      };
+
       let flushedBeforeGet = false;
       if (existingCacheUserId === sessionUser.id && hasPendingAccountMutations(sessionUser.id)) {
         setAccountMode(true, sessionUser.id);
-        await flushAccountMutations(sessionUser.id);
+        await flushWithFallback(sessionUser.id);
         flushedBeforeGet = true;
       }
 
@@ -209,28 +243,12 @@ export function AccountProvider({ children }: { children: ReactNode }) {
           JSON.stringify({ userId: sessionUser.id }),
         );
         setAccountMode(true, sessionUser.id);
-        if (flushedBeforeGet) {
-          setSyncError("We couldn't sync your latest account change. Your tab still has it; retry to save it to your account.");
-        } else {
-          void (async () => {
-            const ok = await flushAccountMutations(sessionUser.id);
-            if (!ok && hasPendingAccountMutations(sessionUser.id)) {
-              setSyncError("We couldn't sync your latest account change. Your tab still has it; retry to save it to your account.");
-            }
-          })();
-        }
+        if (!flushedBeforeGet) void flushWithFallback(sessionUser.id);
       } else {
         accountData.current = accountSnapshot;
         hydrateAccountCache(accountSnapshot, sessionUser.id, !guestChoice?.unreadable);
         setAccountMode(true, sessionUser.id);
-        if (stillHasPending) {
-          void (async () => {
-            const ok = await flushAccountMutations(sessionUser.id);
-            if (!ok && hasPendingAccountMutations(sessionUser.id)) {
-              setSyncError("We couldn't sync your latest account change. Your tab still has it; retry to save it to your account.");
-            }
-          })();
-        }
+        if (stillHasPending) void flushWithFallback(sessionUser.id);
       }
 
       setUser(sessionUser);
@@ -300,7 +318,9 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     function syncErrorChanged(event: Event) {
       const detail = (event as CustomEvent<{ message: string | null }>).detail;
-      setSyncError(detail?.message ?? null);
+      const message = detail?.message ?? null;
+      lastFlushSyncError.current = message;
+      setSyncError(message);
     }
     window.addEventListener(ACCOUNT_SYNC_EVENT, syncErrorChanged);
     const onFocus = () => {
@@ -428,6 +448,8 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
   async function chooseMigration(keep: boolean) {
     if (!migration || !user || migrationBusy) return;
+    const operationIdentity = identityVersion.current;
+    const isCurrentIdentity = () => identityVersion.current === operationIdentity;
     setMigrationBusy(true);
     setMigrationError("");
     try {
@@ -447,6 +469,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
           }),
         });
         const result: unknown = await response.json();
+        if (!isCurrentIdentity()) return;
         if (!response.ok || !isRecord(result) || !isPersonalDataSnapshot(result.data)) {
           setMigrationError(accountError(result, "Your exploration wasn't transferred. Your account data is unchanged."));
           return;
@@ -457,9 +480,11 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       hydrateAccountCache(nextData, user.id, !migration.unreadable);
       setMigration(null);
     } catch {
-      setMigrationError("Your exploration couldn't be updated. Nothing was transferred; please try again.");
+      if (isCurrentIdentity()) {
+        setMigrationError("Your exploration couldn't be updated. Nothing was transferred; please try again.");
+      }
     } finally {
-      setMigrationBusy(false);
+      if (isCurrentIdentity()) setMigrationBusy(false);
     }
   }
 

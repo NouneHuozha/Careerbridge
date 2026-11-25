@@ -7,7 +7,7 @@ import { possibilityFields } from "../../../discover/possibility-fields";
 export const metadata: Metadata = {
   title: "Explore courses | CareerBridge",
   description:
-    "Explore illustrative course options by study stage, field and qualification type.",
+    "Explore published courses by study stage, field and qualification type.",
 };
 
 type PageProps = {

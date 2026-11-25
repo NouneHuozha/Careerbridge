@@ -2,7 +2,10 @@
 
 import { useSyncExternalStore } from "react";
 import { enqueueAccountMutation, isPersonalDataReady } from "../account-data-sync";
-import { COUNSELLING_STORAGE_KEY } from "../personal-data-storage-keys";
+import {
+  COMPLETED_COUNSELLING_STORAGE_KEY,
+  COUNSELLING_STORAGE_KEY,
+} from "../personal-data-storage-keys";
 import {
   allCounsellingQuestions,
   allowsMultipleCounsellingSelections,
@@ -63,6 +66,7 @@ export type CounsellingSession = {
   answers: CounsellingAnswer[];
   updatedAt: string;
   persistedUpdatedAt?: string;
+  persistedRevision?: number;
 };
 
 export type SessionRead =
@@ -209,12 +213,61 @@ export function useCounsellingSession(): SessionRead {
   return parseSnapshot(useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot));
 }
 
+export function useLatestCompletedCounsellingSession(): SessionRead {
+  return parseSnapshot(useSyncExternalStore(
+    subscribe,
+    () => {
+      if (!isPersonalDataReady()) return LOADING_SNAPSHOT;
+      try {
+        return window.sessionStorage.getItem(COMPLETED_COUNSELLING_STORAGE_KEY) ?? "";
+      } catch {
+        return UNAVAILABLE_SNAPSHOT;
+      }
+    },
+    getServerSnapshot,
+  ));
+}
+
+function repairCounsellingSessionPath(session: CounsellingSession): CounsellingSession {
+  const referencedIds = [
+    ...session.askedQuestionIds,
+    ...session.skippedQuestionIds,
+    ...session.answers.map((answer) => answer.questionId),
+  ];
+  if (referencedIds.every((id) => session.questionPath.includes(id))) return session;
+
+  const questionPath = [...new Set([...referencedIds, ...session.questionPath])];
+  const fallbackCurrentQuestionId = session.currentQuestionId ??
+    session.questionPath[session.pathIndex] ??
+    questionPath.at(-1) ??
+    null;
+  return {
+    ...session,
+    questionPath,
+    pathIndex: fallbackCurrentQuestionId
+      ? questionPath.indexOf(fallbackCurrentQuestionId)
+      : questionPath.length - 1,
+    currentQuestionId: fallbackCurrentQuestionId,
+  };
+}
+
 function persist(session: CounsellingSession): SaveResult {
   try {
-    window.sessionStorage.setItem(COUNSELLING_STORAGE_KEY, JSON.stringify(session));
+    const repaired = repairCounsellingSessionPath(session);
+    window.sessionStorage.setItem(COUNSELLING_STORAGE_KEY, JSON.stringify(repaired));
+    if (repaired.status === "completed") {
+      window.sessionStorage.setItem(COMPLETED_COUNSELLING_STORAGE_KEY, JSON.stringify(repaired));
+    }
     window.dispatchEvent(new Event(CHANGE_EVENT));
-    enqueueAccountMutation({ type: "progress.counsellingSession", value: session });
-    return { ok: true, session };
+    enqueueAccountMutation({
+      type: "progress.counsellingOperation",
+      operation: {
+        operationId: crypto.randomUUID(),
+        baseRevision: repaired.persistedRevision ?? null,
+        session: repaired,
+      },
+    });
+    return { ok: true, session: repaired };
   } catch {
     return { ok: false, reason: "unavailable" };
   }
@@ -560,10 +613,7 @@ function saveNextQuestion(
   const existingPathIndex = questionId
     ? session.questionPath.indexOf(questionId, session.pathIndex + 1)
     : -1;
-  const path =
-    existingPathIndex >= 0
-      ? session.questionPath
-      : session.questionPath.slice(0, session.pathIndex + 1);
+  const path = [...session.questionPath];
   if (questionId && existingPathIndex < 0) path.push(questionId);
   const nextSession = {
     ...session,

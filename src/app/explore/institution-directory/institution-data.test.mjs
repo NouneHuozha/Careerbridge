@@ -77,10 +77,41 @@ test("institution and campus identities are unique and every offering reference 
 });
 
 test("general institution profiles and course offerings reference the shared course catalogue", () => {
-  assert.equal(institutionProfilePages.length, institutionProfiles.length);
+  const realProfilePages = institutionProfilePages.filter(
+    (profile) => !profile.isDemo,
+  );
+  const sampleProfilePages = institutionProfilePages.filter(
+    (profile) => profile.isDemo,
+  );
+
+  assert.deepEqual(
+    institutionProfilePages.map((profile) => profile.id).sort(),
+    institutionRecords.map((institution) => institution.id).sort(),
+  );
+  assert.equal(
+    new Set(institutionProfilePages.map((profile) => profile.slug)).size,
+    institutionProfilePages.length,
+  );
+  assert.deepEqual(
+    realProfilePages.map((profile) => profile.institutionId).sort(),
+    institutionProfiles.map((profile) => profile.institutionId).sort(),
+  );
+  assert.deepEqual(
+    sampleProfilePages.map((profile) => profile.id).sort(),
+    institutionRecords
+      .filter((institution) => institution.isDemo)
+      .map((institution) => institution.id)
+      .sort(),
+  );
 
   for (const profile of institutionProfiles) {
     assert.ok(institutionRecordsById.has(profile.institutionId));
+    const page = realProfilePages.find(
+      (entry) => entry.institutionId === profile.institutionId,
+    );
+    assert.ok(page, `Missing profile page for ${profile.institutionId}`);
+    assert.deepEqual(page.programmes, profile.programmes);
+
     for (const programme of profile.programmes ?? []) {
       if (programme.courseId) {
         assert.ok(
@@ -90,6 +121,12 @@ test("general institution profiles and course offerings reference the shared cou
       }
     }
   }
+
+  assert.ok(
+    sampleProfilePages.every((profile) =>
+      profile.limitedInfo?.includes("fictional"),
+    ),
+  );
 });
 
 test("reported, recorded, and individually verified programme counts stay distinct", () => {

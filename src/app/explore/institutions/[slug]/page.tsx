@@ -4,7 +4,6 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { PageLoadingSkeleton } from "../../../page-loading-skeleton";
 import {
-  AlertTriangle,
   ArrowLeft,
   ArrowUpRight,
   CalendarDays,
@@ -19,10 +18,8 @@ import { SavedItemButton } from "../../saved-item-button";
 import { HistoryVisit } from "../../history-visit";
 import { possibilityFields } from "../../../discover/possibility-fields";
 import { courseCatalog } from "../../courses/catalog/course-catalog-data";
-import {
-  resolvedInstitutionCampusOfferings,
-  type InformationFact,
-} from "../institution-data";
+import { getPublicCourseInstitutionOffering } from "../../institution-page-data";
+import type { PublicOfferingFact } from "../../institution-page-data";
 import type {
   InformationSource,
   VerificationStatus,
@@ -102,7 +99,7 @@ function Fact({
   source,
 }: {
   label: string;
-  fact: InformationFact;
+  fact: PublicOfferingFact;
   source?: InformationSource;
 }) {
   const factSource = source ?? fact.source;
@@ -144,11 +141,10 @@ async function InstitutionDetails({
   searchParams: Promise<SearchParams>;
 }) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
-  const institution = resolvedInstitutionCampusOfferings.find((item) => item.slug === slug);
+  const courseId = firstParam(query.course);
+  if (!courseId) notFound();
+  const institution = await getPublicCourseInstitutionOffering(slug, courseId);
   if (!institution) notFound();
-
-  const courseId = firstParam(query.course) ?? institution.courseId;
-  if (courseId !== institution.courseId) notFound();
   const courseName = firstParam(query.courseName) ?? (courseId === "bca" ? "Bachelor of Computer Applications (BCA)" : courseId);
   const savedCourseName =
     courseCatalog.find((course) => course.id === courseId)?.name ??
@@ -217,15 +213,6 @@ async function InstitutionDetails({
       />
       <Breadcrumbs items={breadcrumbs} className="pt-6 sm:pt-8" />
       <div className="w-full px-5 pt-7 sm:px-8 lg:px-12 lg:pt-10 2xl:px-16">
-        {institution.isDemo && (
-          <aside role="note" className="mb-6 flex gap-3 rounded-2xl border border-[#e7d6a8] bg-[#fff8e8] p-4 text-[#594c32]">
-            <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-[#9a752c]" />
-            <p className="text-sm leading-6">
-              <strong>Fictional preview profile:</strong> the institution, course, location, source links, dates and all other details on this page are sample data for UI review only. They are not verified real-world information.
-            </p>
-          </aside>
-        )}
-
         <header className="border-b border-[#e1e8e1] pb-7 sm:pb-9">
           <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#718078]">Institution details</p>
           <h1 className="mt-3 max-w-6xl font-serif text-4xl font-semibold leading-[1.05] tracking-[-.04em] sm:text-5xl lg:text-6xl">
@@ -263,11 +250,11 @@ async function InstitutionDetails({
                 <h2 className="mt-3 font-serif text-2xl font-semibold leading-tight tracking-[-.025em] sm:text-3xl">{courseName}</h2>
                 <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#725b2d]">
                   <CircleHelp aria-hidden="true" className="h-4 w-4" />
-                  {institution.isDemo ? "Sample offering · not verified" : "Course offering recorded"}
+                  Published course offering
                 </p>
                 <h3 className="mt-6 text-sm font-semibold text-[#214d3d]">About this course at this institution</h3>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[#52645a]">
-                  {offering?.description?.value ?? `This sample listing connects ${institution.institution.name} with ${courseName}. Additional course details are shown only when they are available in the record.`}
+                  {offering?.description?.value ?? "Additional course details are shown only when they are available in the published record."}
                 </p>
                 {offering?.description && (
                   <p className="mt-1 text-xs text-[#718078]">
@@ -330,7 +317,7 @@ async function InstitutionDetails({
                     <p className="text-xs font-semibold uppercase tracking-[.1em] text-[#718078]">Course fees</p>
                     <p className="mt-2 text-xl font-semibold text-[#29483a]">{offering.fees.value}</p>
                     <p className="mt-1 text-sm text-[#637168]">
-                      {offering.fees.paymentPeriod} · academic year {offering.fees.academicYear}
+                      {[offering.fees.paymentPeriod, offering.fees.academicYear && `academic year ${offering.fees.academicYear}`].filter(Boolean).join(" · ")}
                     </p>
                     {offering.fees.source && <div className="mt-2"><SourceLink source={offering.fees.source} /></div>}
                     <p className="mt-1 text-xs text-[#718078]">
@@ -370,7 +357,7 @@ async function InstitutionDetails({
                 <div className="flex flex-col gap-4 rounded-2xl bg-[#f7f8f5] p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[.1em] text-[#718078]">
-                      {institution.isDemo ? "Sample campus location" : "Campus location"}
+                      Campus location
                     </p>
                     <p className="mt-2 font-semibold text-[#29483a]">{campus.name ?? institution.institution.name}</p>
                     {fullLocation && <p className="mt-1 text-sm text-[#637168]">{fullLocation}</p>}
@@ -391,7 +378,6 @@ async function InstitutionDetails({
                     )}
                   </p>
                 )}
-                {institution.isDemo && <p className="mt-3 text-xs leading-5 text-[#718078]">Location shown is fictional sample data; no precise map pin is provided.</p>}
               </DetailSection>
             )}
 
@@ -457,11 +443,6 @@ async function InstitutionDetails({
                 <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Back to {courseName} institutions
               </Link>
             </section>
-            {institution.isDemo && (
-              <p className="rounded-2xl border border-[#e7d6a8] bg-[#fff8e8] p-4 text-xs leading-5 text-[#725b2d]">
-                Every fact and source on this preview profile is fictional. Replace with verified, fact-level sources before using institution data publicly.
-              </p>
-            )}
           </aside>
         </div>
       </div>

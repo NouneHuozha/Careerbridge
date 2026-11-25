@@ -1,14 +1,15 @@
 import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { PoolClient } from "pg";
 import type { AuthUser } from "./auth-types";
 import { getDb } from "../db/client";
-import { getPool } from "../db/pool";
+import { getIdentityLockPool, getPool } from "../db/pool";
 import { catalogItemAliases } from "../db/schema/catalog";
 import {
   discoverAnswers,
   explorationHistory,
   guidedExplorerAnswers,
+  guidedExplorerOperationReceipts,
   guidedExplorerSessionQuestions,
   guidedExplorerSessions,
   savedItems,
@@ -22,6 +23,7 @@ import {
   isPersonalDataSnapshot,
 } from "./personal-data-validation";
 import type {
+  GuidedExplorerOperation,
   PersonalDataMutation,
   PersonalDataSnapshot,
 } from "./personal-data-types";
@@ -44,6 +46,7 @@ async function ensureSchema() {
         guidedExplorerSessions: string | null;
         guidedExplorerSessionQuestions: string | null;
         guidedExplorerAnswers: string | null;
+        guidedExplorerOperationReceipts: string | null;
         savedItems: string | null;
         explorationHistory: string | null;
       }>(
@@ -55,6 +58,7 @@ async function ensureSchema() {
                 to_regclass('public.guided_explorer_sessions') AS "guidedExplorerSessions",
                 to_regclass('public.guided_explorer_session_questions') AS "guidedExplorerSessionQuestions",
                 to_regclass('public.guided_explorer_answers') AS "guidedExplorerAnswers",
+                 to_regclass('public.guided_explorer_operation_receipts') AS "guidedExplorerOperationReceipts",
                 to_regclass('public.saved_items') AS "savedItems",
                 to_regclass('public.exploration_history') AS "explorationHistory"`,
       );
@@ -76,6 +80,7 @@ function toUser(row: { id: number; email: string; full_name: string | null }): A
 export class AuthenticationRequiredError extends Error {}
 export class AccountProvisioningRequiredError extends Error {}
 export class AccountIdentityConflictError extends Error {}
+export class AccountEmailConflictError extends Error {}
 export class AccountSetupValidationError extends Error {}
 export class AccountDeletionPendingError extends Error {}
 export class AccountDeletionBlockedError extends Error {}
@@ -84,9 +89,37 @@ export class AccountReverificationRequiredError extends Error {}
 export class AccountSessionChangedError extends Error {}
 export class CatalogueItemReferenceError extends Error {}
 export class StudentDataConflictError extends Error {}
+export class GuidedExplorerConflictError extends StudentDataConflictError {
+  constructor(
+    message: string,
+    readonly operationId: string,
+    readonly code: "stale_revision" | "different_active_session",
+    readonly authoritativeSession: CounsellingSession | null,
+  ) {
+    super(message);
+  }
+}
+export class ClerkUserLookupUnavailableError extends Error {
+  constructor() {
+    super("The Clerk current-user lookup is unavailable.");
+    this.name = "ClerkUserLookupUnavailableError";
+  }
+}
+
+const CURRENT_USER_MAX_ATTEMPTS = 3;
+const CURRENT_USER_RETRY_DELAY_MS = 100;
 
 function isPostgresUniqueViolation(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
+}
+
+function getVerifiedPrimaryEmail(clerkUser: NonNullable<Awaited<ReturnType<typeof currentUser>>>) {
+  const primaryEmail = clerkUser.emailAddresses.find(
+    (email) => email.id === clerkUser.primaryEmailAddressId,
+  );
+  if (!primaryEmail || primaryEmail.verification?.status !== "verified") return null;
+  const email = primaryEmail.emailAddress.trim().toLowerCase();
+  return email.length > 0 && email.length <= 191 ? email : null;
 }
 
 function errorStatus(error: unknown) {
@@ -98,54 +131,204 @@ function errorStatus(error: unknown) {
     : null;
 }
 
+function clerkErrorDetail(error: unknown) {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("errors" in error) ||
+    !Array.isArray(error.errors)
+  ) {
+    return null;
+  }
+  return error.errors.find((detail) => typeof detail === "object" && detail !== null) ?? null;
+}
+
+function safeClerkErrorCode(error: unknown) {
+  const detail = clerkErrorDetail(error);
+  if (!detail || !("code" in detail) || typeof detail.code !== "string") return null;
+  return /^[a-z0-9_]{1,64}$/i.test(detail.code) ? detail.code : null;
+}
+
+function isClerkTransportFailure(error: unknown) {
+  if (error instanceof TypeError && error.message === "fetch failed") return true;
+  const detail = clerkErrorDetail(error);
+  return Boolean(
+    detail &&
+    "code" in detail &&
+    detail.code === "unexpected_error" &&
+    "message" in detail &&
+    detail.message === "fetch failed",
+  );
+}
+
+function currentUserFailureCategory(error: unknown) {
+  const status = errorStatus(error);
+  if (status !== null) return status >= 500 && status <= 599 ? "server" : "non_retryable";
+  return isClerkTransportFailure(error) ? "transport" : "non_retryable";
+}
+
+async function currentUserWithRetry() {
+  for (let attempt = 1; attempt <= CURRENT_USER_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await currentUser();
+    } catch (error) {
+      const failureCategory = currentUserFailureCategory(error);
+      const retrying =
+        (failureCategory === "transport" || failureCategory === "server") &&
+        attempt < CURRENT_USER_MAX_ATTEMPTS;
+      const diagnostics = {
+        failureCategory,
+        attempt,
+        maxAttempts: CURRENT_USER_MAX_ATTEMPTS,
+        status: errorStatus(error),
+        clerkErrorCode: safeClerkErrorCode(error),
+        retrying,
+      };
+
+      if (retrying) {
+        console.warn("[careerbridge-next] Clerk current-user lookup failed", diagnostics);
+        await new Promise((resolve) =>
+          setTimeout(resolve, CURRENT_USER_RETRY_DELAY_MS * attempt),
+        );
+        continue;
+      }
+
+      console.error("[careerbridge-next] Clerk current-user lookup failed", diagnostics);
+      throw new ClerkUserLookupUnavailableError();
+    }
+  }
+  throw new ClerkUserLookupUnavailableError();
+}
+
 async function withClerkIdentityLock<T>(
   clerkUserId: string,
   operation: (client: PoolClient) => Promise<T>,
 ) {
-  const client = await getPool().connect();
+  const client = await getIdentityLockPool().connect();
   let locked = false;
   let operationFailed = false;
+  let lockAcquisitionFailed = false;
+  let operationError: unknown;
+  let result!: T;
   try {
     await client.query("SELECT pg_advisory_lock(hashtext($1))", [clerkUserId]);
     locked = true;
-    return await operation(client);
+    result = await operation(client);
   } catch (error) {
     operationFailed = true;
-    throw error;
-  } finally {
-    let unlockError: unknown;
-    if (locked) {
-      try {
-        const result = await client.query<{ unlocked: boolean }>(
-          "SELECT pg_advisory_unlock(hashtext($1)) AS unlocked",
-          [clerkUserId],
-        );
-        if (result.rows[0]?.unlocked !== true) {
-          throw new Error("The Clerk identity lock could not be released.");
-        }
-      } catch (error) {
-        unlockError = error;
-      }
-    }
+    operationError = error;
+    lockAcquisitionFailed = !locked;
+  }
 
-    if (unlockError) {
-      client.release(unlockError instanceof Error ? unlockError : new Error("Identity lock release failed."));
-      if (operationFailed) {
-        console.error("[careerbridge-next] Clerk identity lock release failed", unlockError);
-      } else {
-        throw unlockError;
+  const cleanupErrors: unknown[] = [];
+  if (locked) {
+    try {
+      const unlockResult = await client.query<{ unlocked: boolean }>(
+        "SELECT pg_advisory_unlock(hashtext($1)) AS unlocked",
+        [clerkUserId],
+      );
+      if (unlockResult.rows[0]?.unlocked !== true) {
+        throw new Error("The Clerk identity lock could not be released.");
       }
-    } else {
-      client.release();
+    } catch (error) {
+      cleanupErrors.push(error);
     }
   }
+
+  try {
+    const discardReason = cleanupErrors[0] ??
+      (lockAcquisitionFailed ? operationError : undefined);
+    client.release(
+      discardReason === undefined
+        ? undefined
+        : discardReason instanceof Error
+          ? discardReason
+          : new Error("The identity-lock connection could not be reused safely."),
+    );
+  } catch (error) {
+    cleanupErrors.push(error);
+  }
+
+  if (operationFailed) {
+    if (cleanupErrors.length > 0) {
+      console.error("[careerbridge-next] Clerk identity lock cleanup failed", cleanupErrors);
+    }
+    throw operationError;
+  }
+
+  if (cleanupErrors.length > 0) throw cleanupErrors[0];
+  return result;
+}
+
+async function syncClerkPrimaryEmail(clerkUserId: string) {
+  return withClerkIdentityLock(clerkUserId, async (client) => {
+    const clerkUser = await currentUserWithRetry();
+    if (!clerkUser || clerkUser.id !== clerkUserId) {
+      throw new AuthenticationRequiredError("Sign in again before syncing your email address.");
+    }
+    if (clerkUser.privateMetadata.careerbridgeDeletionPending === true) {
+      throw new AccountDeletionPendingError("Account deletion is in progress. Finish deleting your account instead.");
+    }
+
+    const email = getVerifiedPrimaryEmail(clerkUser);
+    if (!email) {
+      throw new AccountSetupValidationError("A verified primary email address is required to sync your account.");
+    }
+
+    const existing = await client.query<{
+      id: number;
+      email: string;
+      full_name: string | null;
+      auth_provider: string;
+    }>(
+      "SELECT id, email, full_name, auth_provider FROM users WHERE external_id = $1 LIMIT 1",
+      [clerkUserId],
+    );
+    const record = existing.rows[0];
+    if (!record) {
+      throw new AccountProvisioningRequiredError("Finish setting up your CareerBridge account.");
+    }
+    if (record.auth_provider !== "clerk") {
+      throw new AccountIdentityConflictError("This identity is not linked to a CareerBridge account.");
+    }
+    if (record.email === email) return toUser(record);
+
+    try {
+      const updated = await client.query<{
+        id: number;
+        email: string;
+        full_name: string | null;
+        auth_provider: string;
+      }>(
+        `UPDATE users SET email = $2
+         WHERE external_id = $1 AND auth_provider = 'clerk'
+         RETURNING id, email, full_name, auth_provider`,
+        [clerkUserId, email],
+      );
+      if (!updated.rows[0]) {
+        throw new AccountProvisioningRequiredError("Finish setting up your CareerBridge account.");
+      }
+      return toUser(updated.rows[0]);
+    } catch (error) {
+      if (error instanceof AccountProvisioningRequiredError) throw error;
+      if (isPostgresUniqueViolation(error)) {
+        throw new AccountEmailConflictError(
+          "That verified email address is already associated with another CareerBridge account.",
+        );
+      }
+      throw error;
+    }
+  });
 }
 
 export async function getCurrentUser() {
   const { userId: clerkUserId } = await auth();
   if (!clerkUserId) return null;
-  const clerkUser = await currentUser();
-  if (clerkUser?.id === clerkUserId && clerkUser.privateMetadata.careerbridgeDeletionPending === true) {
+  const clerkUser = await currentUserWithRetry();
+  if (!clerkUser || clerkUser.id !== clerkUserId) {
+    throw new AuthenticationRequiredError("Sign in again to continue.");
+  }
+  if (clerkUser.privateMetadata.careerbridgeDeletionPending === true) {
     throw new AccountDeletionPendingError("Account deletion is in progress. Finish deleting your account to continue.");
   }
   await ensureSchema();
@@ -163,7 +346,23 @@ export async function getCurrentUser() {
   if (record.auth_provider !== "clerk") {
     throw new AccountIdentityConflictError("This identity is not linked to a CareerBridge account.");
   }
+  const primaryEmail = getVerifiedPrimaryEmail(clerkUser);
+  if (primaryEmail && primaryEmail !== record.email) {
+    return syncClerkPrimaryEmail(clerkUserId);
+  }
   return toUser(record);
+}
+
+export async function syncCurrentUserPrimaryEmail(expectedUserId: string) {
+  const { userId: clerkUserId } = await auth();
+  if (!clerkUserId) {
+    throw new AuthenticationRequiredError("Sign in before syncing your email address.");
+  }
+  if (expectedUserId !== clerkUserId) {
+    throw new AccountSessionChangedError("Your account changed. Refresh the page before retrying email synchronization.");
+  }
+  await ensureSchema();
+  return syncClerkPrimaryEmail(clerkUserId);
 }
 
 export async function provisionCurrentUser(input: {
@@ -181,7 +380,7 @@ export async function provisionCurrentUser(input: {
   if (!clerkUserId) throw new AuthenticationRequiredError("Sign in to finish account setup.");
   await ensureSchema();
   return withClerkIdentityLock(clerkUserId, async (client) => {
-    const clerkUser = await currentUser();
+    const clerkUser = await currentUserWithRetry();
     if (!clerkUser || clerkUser.id !== clerkUserId) {
       throw new AuthenticationRequiredError("Sign in to finish account setup.");
     }
@@ -597,6 +796,7 @@ async function readCounsellingSession(
     })),
     updatedAt: row.updatedAt.toISOString(),
     persistedUpdatedAt: row.updatedAt.toISOString(),
+    persistedRevision: row.revision,
   };
 }
 
@@ -608,6 +808,41 @@ function currentSessionRow(rows: (typeof guidedExplorerSessions.$inferSelect)[])
   })[0];
 }
 
+function sameCompletedCounsellingProgress(
+  left: CounsellingSession,
+  right: CounsellingSession,
+) {
+  const answers = (session: CounsellingSession) =>
+    [...session.answers]
+      .sort((a, b) => a.questionId.localeCompare(b.questionId))
+      .map((answer) => ({
+        id: answer.id,
+        questionId: answer.questionId,
+        optionIds: answer.optionIds,
+        originalText: answer.originalText,
+        interpretationStatus: answer.interpretationStatus,
+        responseState: answer.responseState,
+        contextOptionId: answer.contextOptionId ?? null,
+        createdAt: answer.createdAt,
+        editedAt: answer.editedAt ?? null,
+      }));
+
+  return (
+    left.id === right.id &&
+    left.version === right.version &&
+    left.questionBankVersion === right.questionBankVersion &&
+    left.status === "completed" &&
+    right.status === "completed" &&
+    left.completionReason === right.completionReason &&
+    left.currentQuestionId === right.currentQuestionId &&
+    left.pathIndex === right.pathIndex &&
+    JSON.stringify(left.questionPath) === JSON.stringify(right.questionPath) &&
+    JSON.stringify(left.askedQuestionIds) === JSON.stringify(right.askedQuestionIds) &&
+    JSON.stringify(left.skippedQuestionIds) === JSON.stringify(right.skippedQuestionIds) &&
+    JSON.stringify(answers(left)) === JSON.stringify(answers(right))
+  );
+}
+
 async function loadCounsellingSession(tx: DatabaseTransaction, userId: number) {
   const rows = await tx
     .select()
@@ -617,10 +852,23 @@ async function loadCounsellingSession(tx: DatabaseTransaction, userId: number) {
   return row ? readCounsellingSession(tx, row) : null;
 }
 
+async function loadLatestCompletedCounsellingSession(tx: DatabaseTransaction, userId: number) {
+  const rows = await tx
+    .select()
+    .from(guidedExplorerSessions)
+    .where(eq(guidedExplorerSessions.userId, userId));
+  const row = [...rows]
+    .filter((session) => session.status === "completed")
+    .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())[0];
+  return row ? readCounsellingSession(tx, row) : null;
+}
+
 async function persistCounsellingSession(
   tx: DatabaseTransaction,
   userId: number,
   source: CounsellingSession,
+  enforceTimestamp = true,
+  allowHistoricalCompletion = false,
 ) {
   const session = normalizeCounsellingSession(source);
   const [sameId] = await tx
@@ -631,7 +879,14 @@ async function persistCounsellingSession(
   if (sameId && sameId.userId !== userId) {
     throw new StudentDataConflictError("This Guided Explorer session belongs to another account.");
   }
+  if (sameId && session.status === "completed" && sameId.status === "completed") {
+    const storedSession = await readCounsellingSession(tx, sameId);
+    if (sameCompletedCounsellingProgress(session, storedSession)) {
+      return storedSession;
+    }
+  }
   if (
+    enforceTimestamp &&
     (sameId && session.persistedUpdatedAt !== sameId.updatedAt.toISOString()) ||
     (!sameId && session.persistedUpdatedAt !== undefined)
   ) {
@@ -645,9 +900,18 @@ async function persistCounsellingSession(
     .from(guidedExplorerSessions)
     .where(eq(guidedExplorerSessions.userId, userId));
   const current = currentSessionRow(userSessions);
+  const isHistoricalCompletedSnapshot =
+    !sameId &&
+    current !== undefined &&
+    current.id !== session.id &&
+    (current.status === "active" || current.status === "paused") &&
+    session.status === "completed" &&
+    Date.parse(session.updatedAt) < current.updatedAt.getTime();
   if (
     current &&
     current.id !== session.id &&
+    !isHistoricalCompletedSnapshot &&
+    !(allowHistoricalCompletion && session.status === "completed") &&
     !(
       current.status === "completed" &&
       session.status === "active"
@@ -667,6 +931,7 @@ async function persistCounsellingSession(
       id: session.id,
       userId,
       version: 1,
+      revision: (sameId?.revision ?? 0) + 1,
       questionBankVersion: session.questionBankVersion,
       status: session.status,
       completionReason: completedEarly ? "finished_early" : null,
@@ -680,6 +945,7 @@ async function persistCounsellingSession(
       target: guidedExplorerSessions.id,
       set: {
         questionBankVersion: session.questionBankVersion,
+        revision: (sameId?.revision ?? 0) + 1,
         status: session.status,
         completionReason: completedEarly ? "finished_early" : null,
         currentQuestionId: session.status === "completed" ? null : session.currentQuestionId,
@@ -734,6 +1000,81 @@ async function persistCounsellingSession(
     );
   }
   return readCounsellingSession(tx, persisted);
+}
+
+async function persistCounsellingOperation(
+  tx: DatabaseTransaction,
+  userId: number,
+  operation: GuidedExplorerOperation,
+) {
+  const [receipt] = await tx
+    .select()
+    .from(guidedExplorerOperationReceipts)
+    .where(and(
+      eq(guidedExplorerOperationReceipts.userId, userId),
+      eq(guidedExplorerOperationReceipts.operationId, operation.operationId),
+    ))
+    .limit(1);
+  if (receipt) {
+    const [stored] = await tx
+      .select()
+      .from(guidedExplorerSessions)
+      .where(eq(guidedExplorerSessions.id, receipt.sessionId))
+      .limit(1);
+    if (!stored || stored.userId !== userId) {
+      throw new Error("A stored Guided Explorer operation receipt is invalid.");
+    }
+    return readCounsellingSession(tx, stored);
+  }
+
+  const [sameId] = await tx
+    .select()
+    .from(guidedExplorerSessions)
+    .where(eq(guidedExplorerSessions.id, operation.session.id))
+    .limit(1);
+  if (sameId && sameId.userId !== userId) {
+    throw new StudentDataConflictError("This Guided Explorer session belongs to another account.");
+  }
+  const current = await loadCounsellingSession(tx, userId);
+  if (sameId && operation.baseRevision !== sameId.revision) {
+    throw new GuidedExplorerConflictError(
+      "Guided Explorer progress changed elsewhere. Refresh before saving again.",
+      operation.operationId,
+      "stale_revision",
+      current,
+    );
+  }
+  if (!sameId && operation.baseRevision !== null) {
+    throw new GuidedExplorerConflictError(
+      "Guided Explorer progress changed elsewhere. Refresh before saving again.",
+      operation.operationId,
+      "stale_revision",
+      current,
+    );
+  }
+  if (
+    !sameId &&
+    current &&
+    current.id !== operation.session.id &&
+    (current.status === "active" || current.status === "paused") &&
+    operation.session.status !== "completed"
+  ) {
+    throw new GuidedExplorerConflictError(
+      "A newer Guided Explorer session is active. Your earlier progress was retained for review.",
+      operation.operationId,
+      "different_active_session",
+      current,
+    );
+  }
+
+  const persisted = await persistCounsellingSession(tx, userId, operation.session, false, true);
+  await tx.insert(guidedExplorerOperationReceipts).values({
+    userId,
+    operationId: operation.operationId,
+    sessionId: persisted.id,
+    revision: persisted.persistedRevision ?? 1,
+  });
+  return persisted;
 }
 
 function applyPersonalDataMutation(
@@ -802,6 +1143,8 @@ function applyPersonalDataMutation(
       return { ...current, educationStage: mutation.value };
     case "progress.counsellingSession":
       return { ...current, counsellingSession: mutation.value };
+    case "progress.counsellingOperation":
+      return { ...current, counsellingSession: mutation.operation.session };
     case "progress.discoveryAnswers":
       return { ...current, discoveryAnswers: mutation.value };
     case "migration.keep":
@@ -835,13 +1178,18 @@ function serializeAccountData(
   removedLegacySavedItemKeys: string[],
 ) {
   const counsellingSession = snapshot.counsellingSession
-    ? { ...snapshot.counsellingSession, persistedUpdatedAt: undefined }
+    ? {
+        ...snapshot.counsellingSession,
+        persistedUpdatedAt: undefined,
+        persistedRevision: undefined,
+      }
     : null;
   const serialized = JSON.stringify({
     ...snapshot,
     educationStage: undefined,
     discoveryAnswers: undefined,
     counsellingSession,
+    latestCompletedCounsellingSession: undefined,
     removedLegacySavedItemKeys:
       removedLegacySavedItemKeys.length > 0 ? removedLegacySavedItemKeys : undefined,
   });
@@ -981,11 +1329,13 @@ async function loadAccountSnapshot(
     await persistCounsellingSession(tx, userId, initialSnapshot.counsellingSession);
     counsellingSession = await loadCounsellingSession(tx, userId);
   }
+  const latestCompletedCounsellingSession = await loadLatestCompletedCounsellingSession(tx, userId);
 
   const snapshot = snapshotFromStoredData(
     {
       ...storedData,
       counsellingSession: counsellingSession ?? initialSnapshot.counsellingSession,
+      latestCompletedCounsellingSession,
       savedItems: mergeSavedItems(
         savedRows.map((row) => savedItemFromRow(row, aliases)),
         initialSnapshot.savedItems,
@@ -1168,21 +1518,24 @@ export async function updateAccountData(
           .select()
           .from(guidedExplorerSessions)
           .where(eq(guidedExplorerSessions.userId, userId));
-        const sessionIds = sessions.map((session) => session.id);
-        if (sessionIds.length) {
+        const current = currentSessionRow(sessions);
+        if (current && (current.status === "active" || current.status === "paused")) {
           await tx.delete(guidedExplorerAnswers).where(
-            inArray(guidedExplorerAnswers.sessionId, sessionIds),
+            eq(guidedExplorerAnswers.sessionId, current.id),
           );
           await tx.delete(guidedExplorerSessionQuestions).where(
-            inArray(guidedExplorerSessionQuestions.sessionId, sessionIds),
+            eq(guidedExplorerSessionQuestions.sessionId, current.id),
           );
           await tx.delete(guidedExplorerSessions).where(
-            eq(guidedExplorerSessions.userId, userId),
+            eq(guidedExplorerSessions.id, current.id),
           );
         }
+        next.counsellingSession = await loadCounsellingSession(tx, userId);
       } else {
         next.counsellingSession = await persistCounsellingSession(tx, userId, mutation.value);
       }
+    } else if (mutation.type === "progress.counsellingOperation") {
+      next.counsellingSession = await persistCounsellingOperation(tx, userId, mutation.operation);
     } else if (effectiveMutation.type === "migration.keep") {
       const guestData = effectiveMutation.data;
       if (current.educationStage === null && mutation.data.educationStage !== null) {
@@ -1222,6 +1575,13 @@ export async function updateAccountData(
       );
     }
 
+    if (
+      mutation.type === "progress.counsellingSession" ||
+      mutation.type === "progress.counsellingOperation"
+    ) {
+      next.latestCompletedCounsellingSession = await loadLatestCompletedCounsellingSession(tx, userId);
+    }
+
     await writeAccountData(tx, userId, next, [...removedLegacySavedItemKeys]);
     return next;
   });
@@ -1239,7 +1599,7 @@ export async function deleteAccount(expectedUserId: string) {
 
   await ensureSchema();
   return withClerkIdentityLock(clerkUserId, async (client) => {
-    const clerkUser = await currentUser();
+    const clerkUser = await currentUserWithRetry();
     if (!clerkUser || clerkUser.id !== clerkUserId) {
       throw new AuthenticationRequiredError("Sign in again before deleting your account.");
     }

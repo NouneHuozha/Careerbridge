@@ -17,7 +17,10 @@ import Link from "next/link";
 import { possibilityFields } from "../discover/possibility-fields";
 import { Breadcrumbs } from "../breadcrumbs";
 import { getGuidedExploreStartingPoints } from "./explore-data";
-import { useCounsellingSession } from "../counselling/counselling-engine";
+import {
+  useCounsellingSession,
+  useLatestCompletedCounsellingSession,
+} from "../counselling/counselling-engine";
 
 const featuredFields = [
   possibilityFields.find((field) => field.id === "technology")!,
@@ -85,13 +88,14 @@ const supportDestinations = [
 
 export default function ExplorePage() {
   const stored = useCounsellingSession();
-  const guidedStartingPoints = getGuidedExploreStartingPoints(stored);
+  const latestCompleted = useLatestCompletedCounsellingSession();
+  const guidedStartingPoints = getGuidedExploreStartingPoints(latestCompleted);
   const afterGuidedExplorer = guidedStartingPoints !== null;
   const startingPoints = guidedStartingPoints ?? [];
   const completedEarly =
-    stored.status === "saved" &&
-    stored.session.status === "completed" &&
-    stored.session.completionReason === "finished_early";
+    latestCompleted.status === "saved" &&
+    latestCompleted.session.status === "completed" &&
+    latestCompleted.session.completionReason === "finished_early";
   const unfinishedGuidedExplorer =
     stored.status === "saved" &&
     (stored.session.status === "active" || stored.session.status === "paused");

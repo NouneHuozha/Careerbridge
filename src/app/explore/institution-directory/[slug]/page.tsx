@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { PageLoadingSkeleton } from "../../../page-loading-skeleton";
 import { HistoryVisit } from "../../history-visit";
 import InstitutionProfile from "./institution-profile";
-import { institutionProfilePages } from "../institution-profile-data";
+import { getPublicInstitutionProfile } from "../../institution-page-data";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -16,24 +16,17 @@ export const metadata: Metadata = {
     "Explore institution information, programmes and official sources.",
 };
 
-export default function InstitutionProfilePage({ params }: PageProps) {
-  return (
-    <Suspense fallback={<PageLoadingSkeleton variant="detail" showHeader={false} />}>
-      <InstitutionProfileRoute params={params} />
-    </Suspense>
-  );
-}
-
-async function InstitutionProfileRoute({ params }: PageProps) {
+export default async function InstitutionProfilePage({ params }: PageProps) {
   const { slug } = await params;
-  const institution = institutionProfilePages.find((item) => item.slug === slug);
-
+  const institution = await getPublicInstitutionProfile(slug);
   if (!institution) notFound();
 
   return (
-    <>
-      <HistoryVisit type="institution" id={institution.slug} />
-      <InstitutionProfile institution={institution} />
-    </>
+    <Suspense fallback={<PageLoadingSkeleton variant="detail" showHeader={false} />}>
+      <>
+        <HistoryVisit type="institution" id={institution.slug} />
+        <InstitutionProfile institution={institution} />
+      </>
+    </Suspense>
   );
 }

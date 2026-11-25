@@ -86,6 +86,14 @@ const hooks = {
       activeHarness.effects.push(effect);
     }
   },
+  useLayoutEffect(effect, dependencies) {
+    const index = activeHarness.cursor++;
+    const prior = activeHarness.slots[index];
+    if (!prior || !sameDependencies(prior.dependencies, dependencies)) {
+      activeHarness.slots[index] = { kind: "layout-effect", dependencies };
+      activeHarness.layoutEffects.push(effect);
+    }
+  },
   useContext(context) {
     return context.defaultValue;
   },
@@ -153,6 +161,11 @@ function createStorage() {
 let sessionStorage;
 let localStorage;
 let windowListeners;
+let personalDataReadyListeners;
+let accountSyncListeners;
+let renderingProvider = false;
+let personalDataReadyDuringRender;
+let personalDataReadyCount;
 
 class TestBroadcastChannel {
   postMessage() {}
@@ -163,6 +176,11 @@ function setupBrowser() {
   sessionStorage = createStorage();
   localStorage = createStorage();
   windowListeners = new Map();
+  personalDataReadyListeners = new Set();
+  accountSyncListeners = new Set();
+  renderingProvider = false;
+  personalDataReadyDuringRender = false;
+  personalDataReadyCount = 0;
   globalThis.window = {
     sessionStorage,
     localStorage,
@@ -170,11 +188,33 @@ function setupBrowser() {
     BroadcastChannel: TestBroadcastChannel,
     addEventListener(name, callback) {
       windowListeners.set(name, callback);
+      if (name === sync.PERSONAL_DATA_READY_EVENT) {
+        personalDataReadyListeners.add(callback);
+      }
+      if (name === sync.ACCOUNT_SYNC_EVENT) {
+        accountSyncListeners.add(callback);
+      }
     },
     removeEventListener(name) {
       windowListeners.delete(name);
+      if (name === sync.PERSONAL_DATA_READY_EVENT) {
+        personalDataReadyListeners.clear();
+      }
+      if (name === sync.ACCOUNT_SYNC_EVENT) {
+        accountSyncListeners.clear();
+      }
     },
-    dispatchEvent() {},
+    dispatchEvent(event) {
+      if (event.type === sync.PERSONAL_DATA_READY_EVENT) {
+        personalDataReadyCount += 1;
+        if (renderingProvider) personalDataReadyDuringRender = true;
+        for (const listener of personalDataReadyListeners) listener(event);
+      }
+      if (event.type === sync.ACCOUNT_SYNC_EVENT) {
+        for (const listener of accountSyncListeners) listener(event);
+      }
+      return true;
+    },
   };
   globalThis.BroadcastChannel = TestBroadcastChannel;
 }
@@ -206,7 +246,7 @@ function response(status, value) {
 
 function reset() {
   setupBrowser();
-  activeHarness = { cursor: 0, slots: [], effects: [] };
+  activeHarness = { cursor: 0, slots: [], effects: [], layoutEffects: [] };
   clerkUserId = null;
   signOutCalls = 0;
   testState.dataForUser = () => emptyData();
@@ -267,15 +307,27 @@ function reset() {
   };
 }
 
-function render(harness) {
+function render(harness, { deferLayoutEffects = false } = {}) {
   harness.cursor = 0;
   harness.effects = [];
+  harness.layoutEffects = [];
   activeHarness = harness;
+  renderingProvider = true;
+  let tree;
   try {
-    return AccountProvider({ children: { type: "test-child", props: {} } });
+    tree = AccountProvider({ children: { type: "test-child", props: {} } });
   } finally {
     activeHarness = null;
+    renderingProvider = false;
   }
+  if (!deferLayoutEffects) runLayoutEffects(harness);
+  return tree;
+}
+
+function runLayoutEffects(harness) {
+  const effects = harness.layoutEffects;
+  harness.layoutEffects = [];
+  for (const effect of effects) effect();
 }
 
 function runEffects(harness) {
@@ -319,7 +371,7 @@ async function waitFor(predicate) {
     if (predicate()) return;
     await new Promise((resolve) => setImmediate(resolve));
   }
-  assert.fail("Timed out waiting for account provider state.");
+  assert.fail(`Timed out waiting for account provider state: ${JSON.stringify(testState.requests)}`);
 }
 
 function useDiscoverHooks() {
@@ -601,6 +653,36 @@ test("failed writes do not overwrite browser snapshot on refresh or focus", asyn
   assert.deepEqual(useDiscoverHooks().stage, { status: "saved", stage: "class-12" });
 });
 
+test("refresh preserves a specific queued mutation conflict instead of replacing it with the generic warning", async () => {
+  reset();
+  clerkUserId = "clerk-a";
+
+  const harness = activeHarness;
+  render(harness);
+  runEffects(harness);
+  await waitFor(() => providerValue(harness).status === "authenticated");
+
+  const specificError = "This Guided Explorer update conflicts with a newer saved session.";
+  const fetchWithoutConflict = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (url === "/api/account/data" && init.method === "POST") {
+      return response(409, { error: specificError });
+    }
+    return fetchWithoutConflict(url, init);
+  };
+  sync.saveAccountMutationQueue(101, [{
+    id: "specific-conflict",
+    userId: 101,
+    mutation: { type: "progress.educationStage", value: "class-12" },
+    createdAt: 1,
+  }]);
+
+  await providerValue(harness).refresh();
+
+  assert.equal(providerValue(harness).syncError, specificError);
+  assert.equal(sync.hasPendingAccountMutations(101), true);
+});
+
 test("synchronous identity isolation prevents rendering previous account data during transition and rejects stale clicks", async () => {
   reset();
   clerkUserId = "clerk-a";
@@ -619,12 +701,15 @@ test("synchronous identity isolation prevents rendering previous account data du
 
   // Identity switches to clerk-b
   clerkUserId = "clerk-b";
-  // Render BEFORE running effects: synchronous identity isolation MUST engage
-  const transitionTree = render(harness);
+  // The provider masks the identity during render, then locks stores in layout.
+  const transitionTree = render(harness, { deferLayoutEffects: true });
 
   assert.equal(transitionTree.props.value.status, "loading");
   assert.equal(transitionTree.props.value.user, null);
+  assert.equal(personalDataReadyDuringRender, false);
+  runLayoutEffects(harness);
   assert.equal(sync.isPersonalDataReady(), false);
+  assert.equal(personalDataReadyDuringRender, false);
   assert.deepEqual(useDiscoverHooks(), {
     stage: { status: "loading" },
     answers: { status: "loading" },
@@ -643,6 +728,96 @@ test("synchronous identity isolation prevents rendering previous account data du
     stage: { status: "saved", stage: "class-12" },
     answers: { status: "saved", answers: { activityIds: ["computers"] } },
   });
+});
+
+test("Account A refresh completing after an A-to-B transition cannot restore A data", async () => {
+  reset();
+  clerkUserId = "clerk-a";
+  testState.dataForUser = (id) => id === 101
+    ? accountSnapshot("class-10", ["fixing"])
+    : accountSnapshot("class-12", ["computers"]);
+
+  const harness = activeHarness;
+  render(harness);
+  runEffects(harness);
+  await waitFor(() => providerValue(harness).status === "authenticated");
+
+  testState.pendingAccountData = {};
+  const staleRefresh = providerValue(harness).refresh();
+  await waitFor(() => testState.pendingAccountData.resolve !== undefined);
+
+  let subscriberUpdates = 0;
+  window.addEventListener(sync.PERSONAL_DATA_READY_EVENT, () => {
+    subscriberUpdates += 1;
+    assert.equal(renderingProvider, false);
+    if (subscriberUpdates === 1) assert.equal(sync.isPersonalDataReady(), false);
+  });
+  const eventsBeforeTransition = personalDataReadyCount;
+  clerkUserId = "clerk-b";
+  const transitionTree = render(harness, { deferLayoutEffects: true });
+
+  assert.equal(transitionTree.props.value.status, "loading");
+  assert.equal(transitionTree.props.value.user, null);
+  assert.equal(personalDataReadyCount, eventsBeforeTransition);
+  assert.equal(personalDataReadyDuringRender, false);
+
+  runLayoutEffects(harness);
+  assert.equal(personalDataReadyCount, eventsBeforeTransition + 1);
+  assert.equal(subscriberUpdates, 1);
+  assert.deepEqual(useDiscoverHooks(), {
+    stage: { status: "loading" },
+    answers: { status: "loading" },
+  });
+
+  const resolveStaleAccountData = testState.pendingAccountData.resolve;
+  testState.pendingAccountData = null;
+  runEffects(harness);
+  await waitFor(() => providerValue(harness).status === "authenticated");
+  assert.equal(sync.getAccountCacheUserId(), 202);
+
+  resolveStaleAccountData(response(200, {
+    data: accountSnapshot("class-10", ["fixing"]),
+  }));
+  await staleRefresh;
+  assert.deepEqual(useDiscoverHooks(), {
+    stage: { status: "saved", stage: "class-12" },
+    answers: { status: "saved", answers: { activityIds: ["computers"] } },
+  });
+});
+
+test("guest-to-account transition locks guest data and notifies subscribers after render", async () => {
+  reset();
+  clerkUserId = null;
+  const harness = activeHarness;
+  render(harness);
+  runEffects(harness);
+  await waitFor(() => providerValue(harness).status === "guest");
+
+  saveEducationStage("class-10");
+  assert.deepEqual(useEducationStage(), { status: "saved", stage: "class-10" });
+  let subscriberUpdates = 0;
+  window.addEventListener(sync.PERSONAL_DATA_READY_EVENT, () => {
+    subscriberUpdates += 1;
+    assert.equal(renderingProvider, false);
+    if (subscriberUpdates === 1) assert.equal(sync.isPersonalDataReady(), false);
+  });
+  const eventsBeforeTransition = personalDataReadyCount;
+
+  clerkUserId = "clerk-a";
+  const transitionTree = render(harness, { deferLayoutEffects: true });
+  assert.equal(transitionTree.props.value.status, "loading");
+  assert.equal(transitionTree.props.value.user, null);
+  assert.equal(personalDataReadyCount, eventsBeforeTransition);
+  assert.equal(personalDataReadyDuringRender, false);
+
+  runLayoutEffects(harness);
+  assert.equal(personalDataReadyCount, eventsBeforeTransition + 1);
+  assert.equal(subscriberUpdates, 1);
+  assert.deepEqual(useEducationStage(), { status: "loading" });
+
+  runEffects(harness);
+  await waitFor(() => providerValue(harness).status === "authenticated");
+  assert.equal(sync.getAccountCacheUserId(), 101);
 });
 
 after(() => {

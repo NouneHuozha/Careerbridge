@@ -15,6 +15,13 @@
       "when": 1794976910310,
       "tag": "0001_unique_guided_explorer_answer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795063310000,
+      "tag": "0002_guided_explorer_operations",
+      "breakpoints": true
     }
   ]
 }

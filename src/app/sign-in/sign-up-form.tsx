@@ -7,8 +7,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useAccount } from "../account-provider";
 import {
+  createCareerBridgeAccountDeletionFetcher,
   finishCareerBridgeAccountDeletion,
-  requestCareerBridgeAccountDeletion,
 } from "../account-deletion";
 
 type AgeAttestation = "adult" | "minor-guardian" | "";
@@ -38,13 +38,9 @@ export default function SignUpForm({
   const { signUp } = useSignUp();
   const { user } = useUser();
   const account = useAccount();
-  const requestDeletionWithReverification = useReverification(async (
-    confirmation: string,
-    expectedUserId: string,
-  ) => {
-    const response = await requestCareerBridgeAccountDeletion(account, confirmation, expectedUserId);
-    return response.json();
-  });
+  const requestDeletionWithReverification = useReverification(
+    createCareerBridgeAccountDeletionFetcher(account),
+  );
   const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -137,14 +133,25 @@ export default function SignUpForm({
       return;
     }
 
+    let response: Response;
     let result: unknown;
     try {
-      result = await requestDeletionWithReverification(deletionConfirmation, user.id);
+      response = await requestDeletionWithReverification(deletionConfirmation, user.id);
+      result = await response.json();
     } catch {
       setError("Identity verification was cancelled or failed. No changes were made.");
       return;
     }
-    if (typeof result !== "object" || result === null || !("ok" in result) || result.ok !== true) {
+    if (response.ok && typeof result === "object" && result !== null && "ok" in result && result.ok === true) {
+      const finished = await finishCareerBridgeAccountDeletion(account);
+      if (!finished.ok) {
+        setError(finished.error);
+        return;
+      }
+      router.replace("/explore");
+      return;
+    }
+    if (!response.ok || typeof result !== "object" || result === null || !("ok" in result) || result.ok !== true) {
       if (typeof result === "object" && result !== null && "deletionBlocked" in result && result.deletionBlocked === true) {
         setDeletionPending(false);
         setDeletionBlocked(true);
@@ -152,13 +159,6 @@ export default function SignUpForm({
       setError(responseError(result, "Account deletion is incomplete. Retry to finish removing your account."));
       return;
     }
-
-    const finished = await finishCareerBridgeAccountDeletion(account);
-    if (!finished.ok) {
-      setError(finished.error);
-      return;
-    }
-    router.replace("/explore");
   }
 
   async function resendVerificationCode() {

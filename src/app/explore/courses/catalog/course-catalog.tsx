@@ -15,14 +15,9 @@ import { Breadcrumbs } from "../../../breadcrumbs";
 import { useEducationStage } from "../../../education-stage";
 import { SavedItemButton } from "../../saved-item-button";
 import { possibilityFields } from "../../../discover/possibility-fields";
-import {
-  courseCatalog,
-  type CourseCatalogItem,
-  type CourseCatalogStage,
-  type CourseQualification,
-} from "./course-catalog-data";
+import type { Course, CourseQualification, CourseStage } from "../../../../db/courses";
 
-type StudyStage = CourseCatalogStage | "all";
+type StudyStage = CourseStage | "all";
 
 const qualifications: CourseQualification[] = [
   "Degree",
@@ -87,7 +82,7 @@ const qualificationColors: Record<
   },
 };
 
-export default function CourseCatalog() {
+export default function CourseCatalog({ courses }: { courses: Course[] }) {
   const searchParams = useSearchParams();
   const queryContext = searchParams.toString();
   const requestedStage = searchParams.get("stage");
@@ -128,7 +123,7 @@ export default function CourseCatalog() {
 
   const filteredCourses = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase();
-    return courseCatalog.filter((course) => {
+    return courses.filter((course) => {
       const matchesStage = stage === "all" || course.stages.includes(stage);
       const courseField = possibilityFields.find(
         (item) => item.id === course.fieldId,
@@ -145,7 +140,7 @@ export default function CourseCatalog() {
         (qualification === "all" || course.qualification === qualification)
       );
     });
-  }, [field, qualification, search, stage]);
+  }, [courses, field, qualification, search, stage]);
 
   const visibleCourses = filteredCourses.slice(0, visibleCount);
   const hasFilters =
@@ -404,7 +399,29 @@ export default function CourseCatalog() {
             </span>
           </div>
 
-          {filteredCourses.length === 0 ? (
+          {courses.length === 0 ? (
+            <div
+              role="status"
+              className="mt-5 rounded-2xl border border-dashed border-[#c5d5cc] bg-white p-6 text-center sm:p-10"
+            >
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f0f6f2]">
+                <BookOpen aria-hidden="true" className="h-5 w-5 text-[#77b996]" />
+              </div>
+              <h3 className="mt-4 font-serif text-xl font-semibold">
+                No published course listings yet
+              </h3>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[#59665e]">
+                Course information will appear here when it is ready for students. You can explore fields in the meantime.
+              </p>
+              <Link
+                href="/explore/fields"
+                className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full border border-[#b8d5c2] bg-[#f7fbf8] px-5 text-sm font-semibold text-[#145543] transition-colors hover:bg-[#eaf2ed]"
+              >
+                Explore fields
+                <ArrowRight aria-hidden="true" className="h-4 w-4" />
+              </Link>
+            </div>
+          ) : filteredCourses.length === 0 ? (
             <div className="mt-5 rounded-2xl border border-dashed border-[#c5d5cc] bg-white p-6 text-center sm:p-10">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f0f6f2]">
                 <Search aria-hidden="true" className="h-5 w-5 text-[#77b996]" />
@@ -471,8 +488,7 @@ export default function CourseCatalog() {
           )}
 
           <p className="mt-6 text-xs leading-relaxed text-[#9eada5]">
-            Illustrative course options, not a verified live catalogue. Entry
-            requirements and qualifications vary by programme and provider.
+            Course details and entry requirements can vary by programme and provider. Confirm current requirements before applying.
           </p>
         </section>
       </div>
@@ -482,7 +498,7 @@ export default function CourseCatalog() {
 
 /* ── Helpers ── */
 
-function getEntryLabel(course: CourseCatalogItem, stage: StudyStage) {
+function getEntryLabel(course: Course, stage: StudyStage) {
   if (stage === "all") return "Entry requirements vary by programme";
   return stage === "class-10"
     ? course.entryAfterClass10
@@ -494,7 +510,7 @@ function CourseCard({
   stage,
   index,
 }: {
-  course: (typeof courseCatalog)[number];
+  course: Course;
   stage: StudyStage;
   index: number;
 }) {
@@ -558,11 +574,11 @@ function CourseCard({
           </div>
         </div>
 
-        {/* Illustrative note */}
+        {/* Course guidance */}
         <p className="mt-2.5 text-[11px] italic text-[#b0bdb5]">
           {course.isExplorationCategory
             ? "Exploration category"
-            : "Illustrative example — not a verified listing"}
+            : "Check provider for exact requirements"}
         </p>
 
         {/* CTA */}

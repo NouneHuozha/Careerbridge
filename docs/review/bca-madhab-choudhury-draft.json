@@ -1,0 +1,179 @@
+{
+  "kind": "course",
+  "id": "bca",
+  "aliases": [
+    {
+      "sourceSystem": "careerbridge",
+      "externalType": "course",
+      "externalKey": "bca",
+      "externalContextKey": ""
+    }
+  ],
+  "field": {
+    "id": "technology",
+    "catalogItemId": "4b67cf01-e856-32d0-5679-dd3a6896dba5",
+    "revisionId": "8ee3b1d6-249d-451a-b416-358bed56273f",
+    "itemType": "field",
+    "publicationStatus": "published",
+    "dataClassification": "real"
+  },
+  "revision": {
+    "title": "Bachelor of Computer Applications (BCA)",
+    "summary": "A three-year undergraduate computer applications programme offered by Madhab Choudhury College, Barpeta.",
+    "description": "Madhab Choudhury College states that its Computer Science Department offers BCA as a Degree in a Discipline under NEP-2020.",
+    "publicationStatus": "draft",
+    "dataClassification": "real",
+    "verificationStatus": "pending_review",
+    "qualification": "Degree",
+    "stages": [
+      "class-12"
+    ],
+    "entryAfterClass10": "",
+    "entryAfterClass12": "The college states that applicants must pass H.S. or an equivalent examination and have Mathematics as one subject.",
+    "isExplorationCategory": false,
+    "courseContent": {
+      "learningAreas": [
+        {
+          "title": "Computer applications",
+          "description": "The college programme is offered through its Computer Science Department."
+        },
+        {
+          "title": "Programme structure",
+          "description": "The college describes BCA as a three-year, six-semester programme."
+        },
+        {
+          "title": "Reviewed syllabus areas",
+          "description": "The official FYUGP BCA syllabus lists Computer Fundamentals, C Programming, Mathematics, Data Structures, Digital Logic, Computer Organization, System Software, C++, Database Management, Operating Systems, Automata, Python, Software Engineering, Web Technologies, Java, Computer Networks, approved electives and a project."
+        }
+      ],
+      "admission": "The 2026-27 FYUGP admission notice identifies BCA among the college's admitted programmes; BCA-specific current-cycle details should be checked in that notice.",
+      "providerDescription": "Madhab Choudhury College identifies BCA as a self-financed course."
+    },
+    "provenance": [
+      {
+        "claimKey": "course.entry_after_class12",
+        "sourceKey": "mcc-bca-offering",
+        "sourceUrl": "https://www.mccollege.edu.in/it.php",
+        "checkedAt": "2026-11-24",
+        "verificationStatus": "verified",
+        "verifiedAt": "2026-11-24"
+      },
+      {
+        "claimKey": "course.qualification",
+        "sourceKey": "mcc-bca-offering",
+        "sourceUrl": "https://www.mccollege.edu.in/it.php",
+        "checkedAt": "2026-11-24",
+        "verificationStatus": "verified",
+        "verifiedAt": "2026-11-24"
+      },
+      {
+        "claimKey": "course.duration",
+        "sourceKey": "mcc-bca-offering",
+        "sourceUrl": "https://www.mccollege.edu.in/it.php",
+        "checkedAt": "2026-11-24",
+        "verificationStatus": "verified",
+        "verifiedAt": "2026-11-24"
+      },
+      {
+        "claimKey": "course.curriculum",
+        "sourceKey": "mcc-bca-syllabus",
+        "sourceUrl": "https://mccollege.edu.in/upload/dept_syllabus/1753895593.pdf",
+        "checkedAt": "2026-11-24",
+        "verificationStatus": "verified",
+        "verifiedAt": "2026-11-24"
+      },
+      {
+        "claimKey": "course.provider_description",
+        "sourceKey": "mcc-bca-admission-2026",
+        "sourceUrl": "https://www.mccollege.edu.in/upload/notice/1778644317.pdf",
+        "checkedAt": "2026-11-24",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "course.admission",
+        "sourceKey": "mcc-bca-admission-2026",
+        "sourceUrl": "https://www.mccollege.edu.in/upload/notice/1778644317.pdf",
+        "checkedAt": "2026-11-24",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "course.fees",
+        "sourceKey": "mcc-bca-offering",
+        "sourceUrl": "https://www.mccollege.edu.in/it.php",
+        "checkedAt": "2026-11-24",
+        "verificationStatus": "verified",
+        "verifiedAt": "2026-11-24"
+      },
+      {
+        "claimKey": "course.fees",
+        "sourceKey": "mcc-bca-admission-2026",
+        "sourceUrl": "https://www.mccollege.edu.in/upload/notice/1778644317.pdf",
+        "checkedAt": "2026-11-24",
+        "verificationStatus": "pending_review"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceKey": "mcc-bca-offering",
+      "sourceName": "Madhab Choudhury College — Bachelor of Computer Application",
+      "authority": "Madhab Choudhury College",
+      "canonicalUrl": "https://www.mccollege.edu.in/it.php",
+      "normalizedUrl": "https://www.mccollege.edu.in/it.php",
+      "category": "course_offering",
+      "sourceType": "official_public_web_page",
+      "dataTypes": [
+        "course-offering",
+        "eligibility",
+        "duration",
+        "fee",
+        "admission"
+      ],
+      "status": "active"
+    },
+    {
+      "sourceKey": "mcc-bca-admission-2026",
+      "sourceName": "Madhab Choudhury College — FYUGP Admission Notice 2026-27",
+      "authority": "Madhab Choudhury College",
+      "canonicalUrl": "https://www.mccollege.edu.in/upload/notice/1778644317.pdf",
+      "normalizedUrl": "https://www.mccollege.edu.in/upload/notice/1778644317.pdf",
+      "category": "admission_notice",
+      "sourceType": "official_download",
+      "dataTypes": [
+        "admission",
+        "BCA",
+        "fee",
+        "self-financed"
+      ],
+      "status": "active"
+    },
+    {
+      "sourceKey": "mcc-bca-syllabus",
+      "sourceName": "Madhab Choudhury College — Syllabus for FYUGP BCA course",
+      "authority": "Madhab Choudhury College",
+      "canonicalUrl": "https://mccollege.edu.in/upload/dept_syllabus/1753895593.pdf",
+      "normalizedUrl": "https://mccollege.edu.in/upload/dept_syllabus/1753895593.pdf",
+      "category": "course_syllabus",
+      "sourceType": "official_download",
+      "dataTypes": [
+        "curriculum",
+        "course-syllabus"
+      ],
+      "status": "active"
+    },
+    {
+      "sourceKey": "mcc-bca-notice-listing",
+      "sourceName": "Madhab Choudhury College — All News and Notice",
+      "authority": "Madhab Choudhury College",
+      "canonicalUrl": "https://www.mccollege.edu.in/notice.php",
+      "normalizedUrl": "https://www.mccollege.edu.in/notice.php",
+      "category": "notice_listing",
+      "sourceType": "official_public_web_page",
+      "dataTypes": [
+        "notice-date",
+        "notice-location"
+      ],
+      "status": "active"
+    }
+  ]
+}

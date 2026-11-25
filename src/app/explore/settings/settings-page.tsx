@@ -8,19 +8,25 @@ import { CheckCircle2, Eye, EyeOff, LoaderCircle, Trash2 } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 import {
   accountSettingsErrorMessage,
+  requestPrimaryEmailSync,
   updateAccountPassword,
-  verifyAndPromoteEmail,
+  verifyPromoteAndSyncEmail,
 } from "../../account-email-change";
 import { useAccount } from "../../account-provider";
 import { saveEducationStage, useEducationStage } from "../../education-stage";
 import type { EducationStage } from "../../education-stage";
 import {
+  createCareerBridgeAccountDeletionFetcher,
   finishCareerBridgeAccountDeletion,
-  requestCareerBridgeAccountDeletion,
 } from "../../account-deletion";
 
 type ClerkUser = NonNullable<ReturnType<typeof useUser>["user"]>;
 type ClerkEmailAddress = Awaited<ReturnType<ClerkUser["createEmailAddress"]>>;
+
+function emailSyncFailureMessage(error: unknown) {
+  const detail = error instanceof Error ? error.message : "The request could not be completed.";
+  return `Your email was updated in Clerk, but CareerBridge couldn't sync it. ${detail} Retry synchronization; you won't need to verify again.`;
+}
 
 export default function SettingsPage() {
   const account = useAccount();
@@ -49,13 +55,9 @@ export default function SettingsPage() {
     if (!user) throw new Error("No authenticated user is available.");
     return updateAccountPassword(user, newPassword, currentPassword);
   });
-  const requestDeletionWithReverification = useReverification(async (
-    confirmation: string,
-    expectedUserId: string,
-  ) => {
-    const response = await requestCareerBridgeAccountDeletion(account, confirmation, expectedUserId);
-    return response.json();
-  });
+  const requestDeletionWithReverification = useReverification(
+    createCareerBridgeAccountDeletionFetcher(account),
+  );
   const [pendingStage, setPendingStage] = useState<EducationStage | null>(null);
   const [stageMessage, setStageMessage] = useState("");
   const [stageError, setStageError] = useState("");
@@ -66,6 +68,8 @@ export default function SettingsPage() {
   const [emailCode, setEmailCode] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
   const [emailError, setEmailError] = useState("");
+  const [emailSyncError, setEmailSyncError] = useState("");
+  const [emailSyncUserId, setEmailSyncUserId] = useState<string | null>(null);
   const [emailBusy, setEmailBusy] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -120,6 +124,7 @@ export default function SettingsPage() {
     setEmailBusy(true);
     setEmailError("");
     setEmailMessage("");
+    setEmailSyncError("");
     try {
       const address = await createEmailAddress(email);
       setPendingEmail(address);
@@ -137,6 +142,7 @@ export default function SettingsPage() {
     setEmailBusy(true);
     setEmailError("");
     setEmailMessage("");
+    setEmailSyncError("");
     try {
       await prepareEmailAddressVerification(pendingEmail);
       setEmailMessage("A new verification code has been sent.");
@@ -179,17 +185,20 @@ export default function SettingsPage() {
     setEmailBusy(true);
     setEmailError("");
     setEmailMessage("");
+    setEmailSyncError("");
     try {
-      if (!(await verifyAndPromoteEmail(
+      const result = await verifyPromoteAndSyncEmail(
         pendingEmail,
         emailCode.trim(),
         attemptEmailAddressVerification,
         promotePrimaryEmailAddress,
+        user.id,
         (verifiedAddress) => {
           setPendingEmail(verifiedAddress);
           setEmailCode("");
         },
-      ))) {
+      );
+      if (!result.promoted) {
         setEmailError("That code wasn't accepted. Check it or request another code.");
         return;
       }
@@ -197,9 +206,32 @@ export default function SettingsPage() {
       setEmailCode("");
       setNewEmail("");
       setEmailEditorOpen(false);
+      if (!result.synced) {
+        setEmailSyncUserId(user.id);
+        setEmailSyncError(emailSyncFailureMessage(result.error));
+        return;
+      }
+      setEmailSyncUserId(null);
       setEmailMessage("Your primary email address has been updated.");
     } catch (error) {
       setEmailError(clerkError(error, "We couldn't verify that email address. Please try again."));
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
+  async function retryEmailSync() {
+    const expectedUserId = emailSyncUserId;
+    if (!expectedUserId || !user || user.id !== expectedUserId || emailBusy) return;
+    setEmailBusy(true);
+    setEmailSyncError("");
+    setEmailMessage("");
+    try {
+      await requestPrimaryEmailSync(expectedUserId);
+      setEmailSyncUserId(null);
+      setEmailMessage("Your primary email address has been updated.");
+    } catch (error) {
+      setEmailSyncError(emailSyncFailureMessage(error));
     } finally {
       setEmailBusy(false);
     }
@@ -245,8 +277,9 @@ export default function SettingsPage() {
     setDeleteBusy(true);
     setDeleteError("");
     try {
-      const result = await requestDeletionWithReverification(deleteConfirmation, deleteExpectedUserId);
-      if (typeof result !== "object" || result === null || !("ok" in result) || result.ok !== true) {
+      const response = await requestDeletionWithReverification(deleteConfirmation, deleteExpectedUserId);
+      const result: unknown = await response.json();
+      if (!response.ok || typeof result !== "object" || result === null || !("ok" in result) || result.ok !== true) {
         setDeleteError(
           typeof result === "object" && result !== null && "error" in result && typeof result.error === "string"
             ? result.error
@@ -322,12 +355,13 @@ export default function SettingsPage() {
             {!emailEditorOpen && (
               <button
                 type="button"
+                disabled={emailSyncUserId === user.id}
                 onClick={() => {
                   setEmailError("");
                   setEmailMessage("");
                   setEmailEditorOpen(true);
                 }}
-                className="inline-flex min-h-10 items-center rounded-full border border-[#d5dfd8] px-4 text-sm font-semibold text-[#145543] hover:bg-[#f3f7f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
+                className="inline-flex min-h-10 items-center rounded-full border border-[#d5dfd8] px-4 text-sm font-semibold text-[#145543] hover:bg-[#f3f7f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543] disabled:opacity-60"
               >
                 Change email
               </button>
@@ -386,6 +420,19 @@ export default function SettingsPage() {
             </p>
           )}
           {emailError && <p role="alert" className="mt-3 text-sm text-[#8b3529]">{emailError}</p>}
+          {emailSyncUserId === user.id && emailSyncError && (
+            <div className="mt-3 space-y-2">
+              <p role="alert" className="text-sm text-[#8b3529]">{emailSyncError}</p>
+              <button
+                type="button"
+                disabled={emailBusy}
+                onClick={() => void retryEmailSync()}
+                className="inline-flex min-h-10 items-center rounded-full border border-[#d5dfd8] px-4 text-sm font-semibold text-[#145543] hover:bg-[#f3f7f3] disabled:opacity-60"
+              >
+                {emailBusy ? "Retrying synchronization…" : "Retry synchronization"}
+              </button>
+            </div>
+          )}
           <div className="mt-6 border-t border-[#e7ece8] pt-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-sm font-semibold text-[#18352d]">Change password</h3>

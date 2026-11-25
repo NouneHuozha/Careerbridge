@@ -8,6 +8,11 @@ export type PasswordChangeUser = {
   updatePassword: (params: { newPassword: string; currentPassword?: string }) => Promise<unknown>;
 };
 
+export type PrimaryEmailChangeResult =
+  | { promoted: false; synced: false }
+  | { promoted: true; synced: true }
+  | { promoted: true; synced: false; error: unknown };
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -62,6 +67,56 @@ export async function verifyAndPromoteEmail<TAddress extends VerifiableEmailAddr
   onVerified(verified);
   await promotePrimaryEmail(verified.id);
   return true;
+}
+
+export async function requestPrimaryEmailSync(
+  expectedUserId: string,
+  fetcher: typeof fetch = fetch,
+) {
+  const response = await fetcher("/api/account/email/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ expectedUserId }),
+    cache: "no-store",
+  });
+  let result: unknown;
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error("CareerBridge returned an unreadable email synchronization response.");
+  }
+  if (!response.ok) {
+    throw new Error(
+      isRecord(result) && typeof result.error === "string"
+        ? result.error
+        : "CareerBridge couldn't synchronize your email address.",
+    );
+  }
+}
+
+export async function verifyPromoteAndSyncEmail<TAddress extends VerifiableEmailAddress>(
+  emailAddress: TAddress,
+  code: string,
+  attemptVerification: (address: TAddress, code: string) => Promise<TAddress>,
+  promotePrimaryEmail: (emailAddressId: string) => Promise<unknown>,
+  expectedUserId: string,
+  onVerified: (address: TAddress) => void = () => {},
+  fetcher: typeof fetch = fetch,
+): Promise<PrimaryEmailChangeResult> {
+  const promoted = await verifyAndPromoteEmail(
+    emailAddress,
+    code,
+    attemptVerification,
+    promotePrimaryEmail,
+    onVerified,
+  );
+  if (!promoted) return { promoted: false, synced: false };
+  try {
+    await requestPrimaryEmailSync(expectedUserId, fetcher);
+    return { promoted: true, synced: true };
+  } catch (error) {
+    return { promoted: true, synced: false, error };
+  }
 }
 
 export async function updateAccountPassword(

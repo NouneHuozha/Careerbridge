@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowRight, BookOpen, ExternalLink, MapPin, Search, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, ExternalLink, MapPin, Search, X } from "lucide-react";
 import { possibilityFields } from "../../discover/possibility-fields";
 import { Breadcrumbs } from "../../breadcrumbs";
 import { SavedItemButton } from "../saved-item-button";
 import { courseCatalog } from "../courses/catalog/course-catalog-data";
-import { resolvedInstitutionCampusOfferings } from "./institution-data";
+import type { PublicCourseInstitutionOffering } from "../institution-page-data";
+import { institutionDetailHref } from "./institution-route-params";
 
 const pageSize = 8;
 
@@ -28,7 +29,11 @@ function shortDate(value: string) {
   });
 }
 
-export default function InstitutionsExplorer() {
+export default function InstitutionsExplorer({
+  courseOfferings: publishedOfferings,
+}: {
+  courseOfferings: PublicCourseInstitutionOffering[];
+}) {
   const searchParams = useSearchParams();
   const fieldId = searchParams.get("field") ?? "";
   const courseId = searchParams.get("course") ?? "";
@@ -60,8 +65,7 @@ export default function InstitutionsExplorer() {
   const [sort, setSort] = useState(searchParams.get("sort") === "za" ? "za" : "az");
   const [page, setPage] = useState(Math.max(1, Number(searchParams.get("page")) || 1));
 
-  const courseOfferings = resolvedInstitutionCampusOfferings.filter((item) => item.courseId === courseId);
-  const showingDemoData = courseOfferings.some((item) => item.isDemo);
+  const courseOfferings = publishedOfferings.filter((item) => item.courseId === courseId);
   const states = [...new Set(courseOfferings.map((item) => item.campus.state).filter((value): value is string => Boolean(value)))].sort((a, b) => a.localeCompare(b));
   const districts = [...new Set(courseOfferings.filter((item) => !state || item.campus.state === state).map((item) => item.campus.district).filter((value): value is string => Boolean(value)))]
     .sort((a, b) => a.localeCompare(b));
@@ -91,28 +95,23 @@ export default function InstitutionsExplorer() {
   const hasFilters = Boolean(search || state || district || type || ownership);
 
   function detailHref(item: (typeof courseOfferings)[number]) {
-    const returnParams = new URLSearchParams(searchParams.toString());
-    const filterValues = {
-      q: search,
-      state,
-      district,
-      type,
-      ownership,
-      sort,
-      page: String(page),
-    };
-    for (const [key, value] of Object.entries(filterValues)) {
-      if (value) returnParams.set(key, value);
-      else returnParams.delete(key);
-    }
-    const detailParams = new URLSearchParams({
-      course: courseId,
+    return institutionDetailHref({
+      slug: item.slug,
+      searchParams: searchParams.toString(),
+      courseId,
       courseName,
-      field: fieldId,
-      returnTo: `/explore/institutions?${returnParams.toString()}`,
+      fieldId,
+      stage: stage ?? undefined,
+      filters: {
+        q: search,
+        state,
+        district,
+        type,
+        ownership,
+        sort,
+        page: String(page),
+      },
     });
-    if (stage) detailParams.set("stage", stage);
-    return `/explore/institutions/${item.slug}?${detailParams.toString()}`;
   }
 
   function clearFilters() {
@@ -155,9 +154,7 @@ export default function InstitutionsExplorer() {
             </h1>
             <p className="mt-3 max-w-[62ch] text-base leading-relaxed text-[#59665e] sm:text-lg">
               {courseId
-                ? showingDemoData
-                  ? `Explore a sample catalogue for ${courseName}. Compare institution types and locations, then confirm current offerings directly with each provider.`
-                  : `Explore institutions whose published information names ${courseName} at a listed campus. Compare location and provider details, then confirm current availability directly.`
+                ? `Explore institutions whose published information names ${courseName} at a listed campus. Compare location and provider details, then confirm current availability directly.`
                 : "Choose a specific course first to see institutions listed for that programme."}
             </p>
             {stageLabel && (
@@ -168,20 +165,7 @@ export default function InstitutionsExplorer() {
           </div>
         </section>
 
-        {showingDemoData ? (
-          <aside
-            role="note"
-            className="mt-6 flex gap-3 rounded-2xl border border-[#e7d6a8] bg-[#fff8e8] p-4 text-[#594c32] sm:p-5"
-          >
-            <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-[#9a752c]" />
-            <div>
-              <h2 className="text-sm font-semibold">Illustrative sample catalogue</h2>
-              <p className="mt-1 text-sm leading-6">
-                Institution names, locations, types and ownership labels are fictional examples for design review—not real or verified providers. Confirm course availability and admissions directly with institutions.
-              </p>
-            </div>
-          </aside>
-        ) : courseId ? (
+        {courseId ? (
           <section aria-label="Guidance" className="mt-6 flex gap-3 rounded-2xl border border-[#d6e5db] bg-[#eef5ef] p-4 sm:p-5">
             <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-[#145543]">
               <BookOpen aria-hidden="true" className="h-4 w-4" />
@@ -321,9 +305,7 @@ export default function InstitutionsExplorer() {
                         )}
                         {item.campus.name && <p className="mt-1 text-xs text-[#718078]">{item.campus.name}</p>}
                         <div className="flex flex-wrap items-center gap-3 pt-5">
-                          {item.isDemo ? (
-                            <p className="text-[11px] italic text-[#9a752c]">Illustrative sample — not a verified listing</p>
-                          ) : source ? (
+                          {source ? (
                             <a href={source.url} target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-[#145543] hover:underline">
                               {source.label} <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
                             </a>
@@ -347,7 +329,7 @@ export default function InstitutionsExplorer() {
                             }}
                           />
                         </div>
-                        {!item.isDemo && source?.checkedOn && (
+                        {source?.checkedOn && (
                           <p className="pt-3 text-xs text-[#718078]">
                             {source.verificationStatus === "verified"
                               ? `Verified ${shortDate(source.checkedOn)}`
@@ -363,11 +345,20 @@ export default function InstitutionsExplorer() {
                 </div>
               ) : (
                 <div className="mt-5 rounded-3xl border border-dashed border-[#cbd8ce] bg-white p-8 text-center">
-                  <h3 className="font-semibold text-[#29483a]">No institutions match these filters</h3>
-                  <p className="mt-1 text-sm text-[#68766e]">Try a different search or clear the selected filters.</p>
-                  <button type="button" onClick={clearFilters} className="mt-4 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full bg-[#eaf2ed] px-4 text-sm font-semibold text-[#145543] hover:bg-[#dce9e0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]">
-                    Clear filters <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                  </button>
+                  {courseOfferings.length === 0 ? (
+                    <>
+                      <h3 className="font-semibold text-[#29483a]">No published institutions are listed for this course yet</h3>
+                      <p className="mt-1 text-sm text-[#68766e]">Published course offerings will appear here when real records become available.</p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="font-semibold text-[#29483a]">No institutions match these filters</h3>
+                      <p className="mt-1 text-sm text-[#68766e]">Try a different search or clear the selected filters.</p>
+                      <button type="button" onClick={clearFilters} className="mt-4 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full bg-[#eaf2ed] px-4 text-sm font-semibold text-[#145543] hover:bg-[#dce9e0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]">
+                        Clear filters <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
 

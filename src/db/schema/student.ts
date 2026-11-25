@@ -58,6 +58,7 @@ export const guidedExplorerSessions = pgTable(
     id: text("id").primaryKey(),
     userId: integer("user_id").notNull(),
     version: integer("version").notNull().default(1),
+    revision: integer("revision").notNull().default(1),
     questionBankVersion: integer("question_bank_version").notNull(),
     status: text("status").notNull(),
     completionReason: text("completion_reason"),
@@ -75,6 +76,7 @@ export const guidedExplorerSessions = pgTable(
       .where(sql`${table.status} IN ('active', 'paused')`),
     check("guided_explorer_sessions_id_check", sql`${table.id} <> ''`),
     check("guided_explorer_sessions_version_check", sql`${table.version} = 1`),
+    check("guided_explorer_sessions_revision_check", sql`${table.revision} >= 1`),
     check(
       "guided_explorer_sessions_question_bank_version_check",
       sql`${table.questionBankVersion} >= 1`,
@@ -103,6 +105,26 @@ export const guidedExplorerSessions = pgTable(
             )
           )`,
     ),
+  ],
+);
+
+export const guidedExplorerOperationReceipts = pgTable(
+  "guided_explorer_operation_receipts",
+  {
+    userId: integer("user_id").notNull(),
+    operationId: text("operation_id").notNull(),
+    sessionId: text("session_id").notNull(),
+    revision: integer("revision").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: "guided_explorer_operation_receipts_pk",
+      columns: [table.userId, table.operationId],
+    }),
+    index("guided_explorer_operation_receipts_session_idx").on(table.userId, table.sessionId),
+    check("guided_explorer_operation_receipts_operation_id_check", sql`${table.operationId} <> ''`),
+    check("guided_explorer_operation_receipts_revision_check", sql`${table.revision} >= 1`),
   ],
 );
 

@@ -46,7 +46,16 @@ const clerkServer = {
   auth: async () => ({ userId: currentClerkUserId }),
   currentUser: async () =>
     currentClerkUserId
-      ? { id: currentClerkUserId, privateMetadata: {} }
+      ? {
+          id: currentClerkUserId,
+          primaryEmailAddressId: "synthetic-email",
+          emailAddresses: [{
+            id: "synthetic-email",
+            emailAddress: `${currentClerkUserId}@example.test`,
+            verification: { status: "verified" },
+          }],
+          privateMetadata: {},
+        }
       : null,
 };
 const originalLoad = Module._load;
@@ -145,6 +154,12 @@ async function prepareDatabase() {
     if (uniqueConstraint.rowCount === 0) {
       await applyMigration(client, "0001_unique_guided_explorer_answer.sql");
     }
+    const operationReceipts = await client.query(
+      "SELECT to_regclass('public.guided_explorer_operation_receipts') AS operation_receipts",
+    );
+    if (operationReceipts.rows[0].operation_receipts === null) {
+      await applyMigration(client, "0002_guided_explorer_operations.sql");
+    }
   } finally {
     client.release();
   }
@@ -152,7 +167,7 @@ async function prepareDatabase() {
 
 async function createUser() {
   const externalId = `student-data-postgres-test-${randomUUID()}`;
-  const email = `${randomUUID()}@example.test`;
+  const email = `${externalId}@example.test`;
   const result = await testPool.query(
     `INSERT INTO public.users (external_id, email, full_name, auth_provider)
      VALUES ($1, $2, 'Synthetic Student', 'clerk')
@@ -217,6 +232,13 @@ function counsellingSession(id, overrides = {}) {
   };
 }
 
+function counsellingOperation(session, baseRevision = null, operationId = randomUUID()) {
+  return {
+    type: "progress.counsellingOperation",
+    operation: { operationId, baseRevision, session },
+  };
+}
+
 before(async () => {
   await prepareDatabase();
   appPool = require("../db/pool.ts").getPool();
@@ -225,6 +247,10 @@ before(async () => {
 after(async () => {
   if (syntheticUserIds.length) {
     const ids = syntheticUserIds;
+    await testPool.query(
+      "DELETE FROM public.guided_explorer_operation_receipts WHERE user_id = ANY($1::integer[])",
+      [ids],
+    );
     await testPool.query(
       `DELETE FROM public.users WHERE id = ANY($1::integer[])`,
       [ids],
@@ -340,6 +366,146 @@ test("PostgreSQL rejects stale snapshots and serializes concurrent session write
   );
   const finalSession = (await getData()).counsellingSession;
   assert.ok(["parallel A", "parallel B"].includes(finalSession.answers[0].originalText));
+});
+
+test("PostgreSQL archives older completed sessions without replacing active progress", async () => {
+  const user = await createUser();
+  const currentId = `pg-current-${randomUUID()}`;
+  let result = await post({
+    type: "progress.counsellingSession",
+    value: counsellingSession(currentId),
+  });
+  assert.equal(result.response.status, 200, JSON.stringify(result.body));
+  const current = result.body.data.counsellingSession;
+
+  const historicalId = `pg-history-${randomUUID()}`;
+  const historical = counsellingSession(historicalId, {
+    status: "completed",
+    currentQuestionId: null,
+    updatedAt: new Date(Date.parse(current.updatedAt) - 1_000).toISOString(),
+  });
+  result = await post({
+    type: "progress.counsellingSession",
+    value: historical,
+  });
+  assert.equal(result.response.status, 200, JSON.stringify(result.body));
+  assert.equal(result.body.data.counsellingSession.id, historicalId);
+
+  const restored = await getData();
+  assert.equal(restored.counsellingSession.id, currentId);
+  assert.equal(restored.counsellingSession.status, "paused");
+  assert.equal(restored.latestCompletedCounsellingSession.id, historicalId);
+  assert.equal(restored.latestCompletedCounsellingSession.status, "completed");
+
+  const sessions = await testPool.query(`
+    SELECT id, status
+    FROM public.guided_explorer_sessions
+    WHERE user_id = $1
+    ORDER BY id
+  `, [user.id]);
+  assert.deepEqual(
+    sessions.rows.map((row) => [row.id, row.status]).sort(([a], [b]) => a.localeCompare(b)),
+    [[currentId, "paused"], [historicalId, "completed"]]
+      .sort(([a], [b]) => a.localeCompare(b)),
+  );
+  const historicalAnswers = await testPool.query(
+    `SELECT count(*)::int AS count
+     FROM public.guided_explorer_answers
+     WHERE session_id = $1`,
+    [historicalId],
+  );
+  assert.equal(historicalAnswers.rows[0].count, 1);
+
+  result = await post({
+    type: "progress.counsellingSession",
+    value: historical,
+  });
+  assert.equal(result.response.status, 200, JSON.stringify(result.body));
+  assert.equal(result.body.data.counsellingSession.id, historicalId);
+  assert.equal((await getData()).counsellingSession.id, currentId);
+
+  result = await post({
+    type: "progress.counsellingSession",
+    value: counsellingSession(`pg-stale-active-${randomUUID()}`, {
+      updatedAt: historical.updatedAt,
+    }),
+  });
+  assert.equal(result.response.status, 409);
+  assert.equal((await getData()).counsellingSession.id, currentId);
+});
+
+test("PostgreSQL Guided Explorer operations deduplicate retries after an uncertain 503", async () => {
+  const user = await createUser();
+  const session = counsellingSession(`pg-operation-${randomUUID()}`);
+  const operationId = randomUUID();
+  const mutation = counsellingOperation(session, null, operationId);
+
+  const first = await post(mutation);
+  assert.equal(first.response.status, 200, JSON.stringify(first.body));
+  assert.equal(first.body.data.counsellingSession.persistedRevision, 1);
+
+  // A client that received a 503 after commit retries the exact operation ID.
+  const retry = await post(mutation);
+  assert.equal(retry.response.status, 200, JSON.stringify(retry.body));
+  assert.equal(retry.body.data.counsellingSession.persistedRevision, 1);
+  const receipts = await testPool.query(
+    "SELECT count(*)::int AS count FROM public.guided_explorer_operation_receipts WHERE user_id = $1 AND operation_id = $2",
+    [user.id, operationId],
+  );
+  assert.equal(receipts.rows[0].count, 1);
+});
+
+test("PostgreSQL Guided Explorer operations serialize concurrent tabs and return typed conflicts", async () => {
+  await createUser();
+  const session = counsellingSession(`pg-tabs-${randomUUID()}`);
+  let result = await post(counsellingOperation(session));
+  assert.equal(result.response.status, 200, JSON.stringify(result.body));
+  const saved = result.body.data.counsellingSession;
+  const candidates = ["tab A", "tab B"].map((originalText) => counsellingOperation({
+    ...saved,
+    answers: saved.answers.map((answer) => ({ ...answer, originalText })),
+    updatedAt: new Date().toISOString(),
+  }, saved.persistedRevision));
+
+  const responses = await Promise.all(candidates.map((mutation) => post(mutation)));
+  assert.deepEqual(responses.map(({ response }) => response.status).sort(), [200, 409]);
+  const conflict = responses.find(({ response }) => response.status === 409).body.conflict;
+  assert.equal(conflict.type, "guided-explorer");
+  assert.equal(conflict.code, "stale_revision");
+  assert.equal(typeof conflict.operationId, "string");
+  assert.equal(typeof conflict.authoritativeSession.persistedRevision, "number");
+});
+
+test("PostgreSQL operations reject a stale active session, preserve completion history, and isolate accounts", async () => {
+  const owner = await createUser();
+  const completed = counsellingSession(`pg-completed-${randomUUID()}`, {
+    status: "completed",
+    currentQuestionId: null,
+  });
+  let result = await post(counsellingOperation(completed));
+  assert.equal(result.response.status, 200, JSON.stringify(result.body));
+
+  const active = counsellingSession(`pg-active-${randomUUID()}`, { status: "active" });
+  result = await post(counsellingOperation(active));
+  assert.equal(result.response.status, 200, JSON.stringify(result.body));
+
+  const stale = counsellingSession(`pg-stale-${randomUUID()}`);
+  result = await post(counsellingOperation(stale));
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.conflict.code, "different_active_session");
+
+  const clearer = await post({ type: "progress.counsellingSession", value: null });
+  assert.equal(clearer.response.status, 200, JSON.stringify(clearer.body));
+  const history = await getData();
+  assert.equal(history.counsellingSession.id, completed.id);
+
+  const other = await createUser();
+  result = await post(counsellingOperation({ ...completed, persistedRevision: 1 }, 1));
+  assert.equal(result.response.status, 409);
+  currentClerkUserId = owner.externalId;
+  const ownerData = await getData();
+  assert.equal(ownerData.counsellingSession.id, completed.id);
+  assert.notEqual(owner.id, other.id);
 });
 
 test("PostgreSQL rejects duplicate and traversal-inconsistent answers before persistence", async () => {

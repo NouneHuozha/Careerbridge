@@ -12,14 +12,16 @@ import {
   X,
 } from "lucide-react";
 import { SavedItemButton } from "../saved-item-button";
-import type { PossibilityField, StudyStage } from "./field-data";
+import type { StudyStage } from "./field-data";
+import type { PublishedField } from "../../../db/fields";
+import { getFieldImage } from "./field-image";
 
 export function FieldOverviewDialog({
   field,
   stage,
   onClose,
 }: {
-  field: PossibilityField;
+  field: PublishedField;
   stage?: StudyStage;
   onClose: () => void;
 }) {
@@ -36,7 +38,7 @@ export function FieldOverviewDialog({
     featured?: boolean;
   }[] = [
     {
-      title: `Explore ${field.name} deeper`,
+      title: `Explore ${field.title} deeper`,
       description: "See what people do, areas to explore, study routes and possible work.",
       action: "Open the full field guide",
       href: guideHref,
@@ -110,16 +112,16 @@ export function FieldOverviewDialog({
               id="field-overview-title"
               className="mt-2 font-serif text-4xl font-semibold tracking-[-.045em] sm:text-5xl"
             >
-              {field.name}
+              {field.title}
             </h2>
             <p className="mt-4 text-base leading-relaxed text-[#354b40] sm:text-lg">
-              {field.introduction[0]}
+              {field.content.introduction}
             </p>
           </div>
           <div className="relative h-40 overflow-hidden rounded-2xl bg-[#e6eeea] sm:h-44">
             <Image
-              src={field.image}
-              alt={field.imageAlt}
+              src={getFieldImage(field.id)}
+              alt=""
               fill
               sizes="250px"
               className="object-cover"
@@ -132,22 +134,20 @@ export function FieldOverviewDialog({
             What might people do?
           </h3>
           <ul className="mt-3 grid gap-2 sm:grid-cols-3">
-            {field.workExamples.slice(0, 3).map((activity) => (
-              <li key={activity} className="rounded-xl bg-[#eaf2ed] px-4 py-3 text-sm leading-relaxed text-[#384a3e]">
-                {activity}
-              </li>
-            ))}
+            <li className="rounded-xl bg-[#eaf2ed] px-4 py-3 text-sm leading-relaxed text-[#384a3e] sm:col-span-3">
+              {field.content.activitiesAndWorkAreas}
+            </li>
           </ul>
         </section>
 
         <section className="mt-7" aria-labelledby="field-preview-areas">
           <h3 id="field-preview-areas" className="font-serif text-2xl font-semibold">
-            A few areas within {field.name}
+            Course families to explore
           </h3>
           <ul className="mt-3 flex flex-wrap gap-2">
-            {field.areas.slice(0, 4).map((area) => (
-              <li key={area.name} className="rounded-full border border-[#cbd9cf] px-3 py-2 text-sm font-medium text-[#345b49]">
-                {area.name}
+            {[field.content.courseFamiliesToExplore].map((courseFamilies) => (
+              <li key={courseFamilies} className="rounded-full border border-[#cbd9cf] px-3 py-2 text-sm font-medium text-[#345b49]">
+                {courseFamilies}
               </li>
             ))}
           </ul>

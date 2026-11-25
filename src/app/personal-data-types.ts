@@ -4,11 +4,18 @@ import type { EducationStage } from "./education-stage";
 import type { ExplorationHistoryItem } from "./explore/exploration-history";
 import type { SavedItem } from "./explore/saved-items";
 
+export type GuidedExplorerOperation = {
+  operationId: string;
+  baseRevision: number | null;
+  session: CounsellingSession;
+};
+
 export type PersonalDataSnapshot = {
   savedItems: SavedItem[];
   history: ExplorationHistoryItem[];
   educationStage: EducationStage | null;
   counsellingSession: CounsellingSession | null;
+  latestCompletedCounsellingSession?: CounsellingSession | null;
   discoveryAnswers: DiscoveryAnswers | null;
 };
 
@@ -32,6 +39,10 @@ export type PersonalDataMutation =
   | {
       type: "progress.counsellingSession";
       value: CounsellingSession | null;
+    }
+  | {
+      type: "progress.counsellingOperation";
+      operation: GuidedExplorerOperation;
     }
   | {
       type: "progress.discoveryAnswers";

@@ -9,13 +9,13 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { Breadcrumbs } from "../../../../breadcrumbs";
 import { SavedItemButton } from "../../../saved-item-button";
 import { HistoryVisit } from "../../../history-visit";
 import { possibilityFields } from "../../../../discover/possibility-fields";
-import { courseCatalog } from "../course-catalog-data";
-import { courseDetails } from "../course-detail-data";
 import { resolvedInstitutionCampusOfferings } from "../../../institutions/institution-data";
+import { getPublishedCourse } from "../../../../../db/courses";
 
 type PageProps = {
   params: Promise<{ courseId: string }>;
@@ -24,38 +24,25 @@ type PageProps = {
 
 export const instant = false;
 
-export function generateStaticParams() {
-  return courseCatalog.map((course) => ({ courseId: course.id }));
-}
-
-export async function generateMetadata({
-  params,
-}: PageProps): Promise<Metadata> {
-  const { courseId } = await params;
-  const course = courseCatalog.find((item) => item.id === courseId);
-
-  return {
-    title: course ? `${course.name} | CareerBridge` : "Course guide | CareerBridge",
-    description: course?.description ?? "Explore course information and study options.",
-  };
-}
+export const metadata: Metadata = {
+  title: "Course guide | CareerBridge",
+  description: "Explore course information and study options.",
+};
 
 export default async function CourseDetailPage({
   params,
   searchParams,
 }: PageProps) {
   const [{ courseId }, query] = await Promise.all([params, searchParams]);
-  const course = courseCatalog.find((item) => item.id === courseId);
+  await connection();
+  const course = await getPublishedCourse(courseId);
   if (!course) notFound();
-
-  const details = courseDetails[course.id];
-  if (!details) notFound();
 
   const field = possibilityFields.find((item) => item.id === course.fieldId);
   const stage =
     query.stage === "class-10" || query.stage === "class-12" || query.stage === "all"
       ? query.stage
-      : course.stages[0];
+      : course.stages[0] ?? "all";
   const catalogHref = `/explore/courses?${new URLSearchParams({
     stage,
     field: course.fieldId,
@@ -166,12 +153,12 @@ export default async function CourseDetailPage({
               About this course
             </h2>
             <p className="mt-4 max-w-3xl text-base leading-7 text-[#53645a]">
-              {details.overview}
+              {course.overview}
             </p>
-            {details.simpleExplanation && (
+            {course.simpleExplanation && (
               <p className="mt-3 max-w-3xl text-sm leading-6 text-[#68766e]">
                 <strong className="text-[#354b40]">In simple terms: </strong>
-                {details.simpleExplanation}
+                {course.simpleExplanation}
               </p>
             )}
           </div>
@@ -186,7 +173,7 @@ export default async function CourseDetailPage({
           </aside>
         </section>
 
-        {details.learningExperience && (
+        {course.learningExperience && (
           <section
             className="cb-reveal mt-11"
             style={{ animationDelay: "100ms" }}
@@ -200,7 +187,7 @@ export default async function CourseDetailPage({
               How you may learn
             </h2>
             <div className="mt-5 grid gap-3 md:grid-cols-3">
-              {details.learningExperience.map((item) => (
+              {course.learningExperience.map((item) => (
                 <article
                   key={item.title}
                   className="rounded-2xl border border-[#dce7df] bg-white p-5 sm:p-6"
@@ -236,7 +223,7 @@ export default async function CourseDetailPage({
             <BookOpen aria-hidden="true" className="hidden h-6 w-6 text-[#6b9b7a] sm:block" />
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
-            {details.learningAreas.map((area, index) => (
+            {course.learningAreas.map((area, index) => (
               <article
                 key={area.title}
                 className="rounded-2xl border border-[#dce7df] bg-white p-5 transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-0.5 hover:border-[#9fc5ad] hover:shadow-[0_12px_28px_rgba(16,45,36,0.07)] motion-reduce:transform-none sm:p-6"
@@ -308,9 +295,9 @@ export default async function CourseDetailPage({
           <p className="mt-4 max-w-4xl text-sm leading-6 text-[#68766e]">
             Requirements can differ between institutions. Check the institution&apos;s admission criteria before applying.
           </p>
-          {details.admission && (
+          {course.admission && (
             <p className="mt-3 max-w-4xl text-sm leading-6 text-[#59665e]">
-              {details.admission}
+              {course.admission}
             </p>
           )}
         </section>
@@ -330,7 +317,7 @@ export default async function CourseDetailPage({
                 Institutions offering this course
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-[#68766e]">
-                {details.providerDescription ??
+                {course.providerDescription ??
                   "Explore institutions across Northeast India that offer this course."}
               </p>
             </div>
@@ -479,7 +466,7 @@ export default async function CourseDetailPage({
                 Information sources
               </h2>
               <p className="mt-1 text-sm leading-6 text-[#718078]">
-                Course facts still need official source links, publisher and publication date, and a last-checked date. The current catalogue is illustrative; do not use it as an admissions source.
+                This overview is general guidance, not an admission notice. Confirm current eligibility and entry requirements with the provider.
               </p>
             </div>
           </div>

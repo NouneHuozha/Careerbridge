@@ -28,8 +28,10 @@ const {
   setCounsellingStatus,
   skipCurrentQuestion,
   startNewCounselling,
+  startOrResumeCounselling,
   submitCounsellingAnswer,
 } = loadModule("./counselling-engine.ts");
+const { isPersonalDataMutation } = loadModule("../personal-data-validation.ts");
 const {
   counsellingQuestionById,
   branchQuestions,
@@ -110,6 +112,76 @@ test("asks one contextual follow-up for a clear opening interest", () => {
     reasonCode: "understand_activity_motivation",
   });
 });
+
+test("repairs the reported resumed-session path without losing answered questions", () =>
+  withBrowserStorage(() => {
+    const timestamps = {
+      createdAt: "2026-11-19T12:30:50.000Z",
+      editedAt: "2026-11-19T12:30:51.000Z",
+    };
+    const broken = session({
+      id: "15328863-18fe-48d9-aa40-475bd8463579",
+      status: "active",
+      currentQuestionId: null,
+      questionPath: ["Q001", "Q002"],
+      pathIndex: 1,
+      askedQuestionIds: ["Q001", "T01", "Q005", "B01", "Q002"],
+      answers: [
+        { ...answer("Q001", ["using-computers-or-technology"]), ...timestamps },
+        { ...answer("T01", ["creating-digital-things"]), ...timestamps },
+        { ...answer("Q005", ["business-or-money"]), ...timestamps },
+        { ...answer("B01", ["understanding-money-and-budgets"]), ...timestamps },
+        { ...answer("Q002", ["creating-something"]), ...timestamps },
+      ],
+      persistedRevision: 19,
+      persistedUpdatedAt: "2026-11-19T12:30:50.605Z",
+      updatedAt: "2026-11-19T12:30:52.922Z",
+    });
+
+    assert.equal(isPersonalDataMutation({
+      type: "progress.counsellingOperation",
+      operation: { operationId: "973d8d8e-9e85-48df-bd05-b1cf8016bd33", baseRevision: 19, session: broken },
+    }), false);
+
+    const resumed = startOrResumeCounselling({ status: "saved", session: broken });
+    assert.equal(resumed.ok, true);
+    assert.deepEqual(resumed.session.questionPath, ["Q001", "T01", "Q005", "B01", "Q002"]);
+    assert.equal(resumed.session.currentQuestionId, "Q002");
+    assert.equal(resumed.session.pathIndex, 4);
+    assert.deepEqual(resumed.session.answers.map(({ questionId }) => questionId), ["Q001", "T01", "Q005", "B01", "Q002"]);
+    assert.deepEqual(resumed.session.answers.map(({ id, createdAt, editedAt }) => ({ id, createdAt, editedAt })), broken.answers.map(({ id, createdAt, editedAt }) => ({ id, createdAt, editedAt })));
+    assert.equal(isPersonalDataMutation({
+      type: "progress.counsellingOperation",
+      operation: { operationId: "973d8d8e-9e85-48df-bd05-b1cf8016bd33", baseRevision: 19, session: resumed.session },
+    }), true);
+  }));
+
+test("revisiting an earlier answer preserves the later adaptive path", () =>
+  withBrowserStorage(() => {
+    const revisiting = session({
+      currentQuestionId: "Q001",
+      questionPath: ["Q001", "T01", "Q005", "B01", "Q002"],
+      pathIndex: 0,
+      askedQuestionIds: ["Q001", "T01", "Q005", "B01", "Q002"],
+      answers: [
+        answer("Q001", ["using-computers-or-technology"]),
+        answer("T01", ["creating-digital-things"]),
+        answer("Q005", ["business-or-money"]),
+        answer("B01", ["understanding-money-and-budgets"]),
+        answer("Q002", ["creating-something"]),
+      ],
+    });
+
+    const saved = submitCounsellingAnswer(revisiting, {
+      optionIds: ["using-computers-or-technology"],
+      originalText: "",
+    });
+    assert.equal(saved.ok, true);
+    assert.deepEqual(saved.session.questionPath, ["Q001", "T01", "Q005", "B01", "Q002"]);
+    assert.equal(saved.session.currentQuestionId, null);
+    assert.equal(saved.session.pathIndex, 4);
+    assert.deepEqual(saved.session.answers.map(({ questionId }) => questionId), ["Q001", "T01", "Q005", "B01", "Q002"]);
+  }));
 
 test("asks the distinct technology follow-up after the motivation question", () => {
   const current = session({

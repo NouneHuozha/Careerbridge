@@ -1,6 +1,7 @@
 import { connection, NextResponse } from "next/server";
 import {
   AccountDeletionPendingError,
+  AccountEmailConflictError,
   AccountIdentityConflictError,
   AccountProvisioningRequiredError,
   getCurrentUser,
@@ -31,6 +32,9 @@ export async function GET() {
         { error: error.message, provisioningRequired: false },
         { status: 409, headers: noStore },
       );
+    }
+    if (error instanceof AccountEmailConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409, headers: noStore });
     }
     console.error("[careerbridge-next] session lookup failed", error);
     return NextResponse.json(

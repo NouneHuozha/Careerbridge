@@ -194,7 +194,9 @@ function isCounsellingSession(value: unknown) {
       isValidCounsellingContext(answer, answers),
     ) &&
     isDateString(value.updatedAt) &&
-    (value.persistedUpdatedAt === undefined || isDateString(value.persistedUpdatedAt))
+    (value.persistedUpdatedAt === undefined || isDateString(value.persistedUpdatedAt)) &&
+    (value.persistedRevision === undefined ||
+      (Number.isInteger(value.persistedRevision) && (value.persistedRevision as number) >= 1))
   );
 }
 
@@ -221,6 +223,11 @@ export function isPersonalDataSnapshot(value: unknown): value is PersonalDataSna
       value.educationStage === "class-10" ||
       value.educationStage === "class-12") &&
     (value.counsellingSession === null || isCounsellingSession(value.counsellingSession)) &&
+    (value.latestCompletedCounsellingSession === undefined ||
+      value.latestCompletedCounsellingSession === null ||
+      (isRecord(value.latestCompletedCounsellingSession) &&
+        value.latestCompletedCounsellingSession.status === "completed" &&
+        isCounsellingSession(value.latestCompletedCounsellingSession))) &&
     (value.discoveryAnswers === null || isDiscoveryAnswers(value.discoveryAnswers))
   );
 }
@@ -267,6 +274,17 @@ export function isPersonalDataMutation(value: unknown): value is PersonalDataMut
       return value.value === null || value.value === "class-10" || value.value === "class-12";
     case "progress.counsellingSession":
       return value.value === null || isCounsellingSession(value.value);
+    case "progress.counsellingOperation":
+      return (
+        isRecord(value.operation) &&
+        isString(value.operation.operationId, 200) &&
+        value.operation.operationId.length > 0 &&
+        (value.operation.baseRevision === null ||
+          (typeof value.operation.baseRevision === "number" &&
+            Number.isInteger(value.operation.baseRevision) &&
+            value.operation.baseRevision >= 1)) &&
+        isCounsellingSession(value.operation.session)
+      );
     case "progress.discoveryAnswers":
       return value.value === null || isDiscoveryAnswers(value.value);
     case "migration.keep":
@@ -282,6 +300,7 @@ export function emptyPersonalData(): PersonalDataSnapshot {
     history: [],
     educationStage: null,
     counsellingSession: null,
+    latestCompletedCounsellingSession: null,
     discoveryAnswers: null,
   };
 }

@@ -6,32 +6,39 @@ import { useMemo, useRef, useState } from "react";
 import { Breadcrumbs } from "../../breadcrumbs";
 import { useEducationStage } from "../../education-stage";
 import { SavedItemButton } from "../saved-item-button";
-import { possibilityFields, type PossibilityFieldId } from "./field-data";
 import { FieldOverviewDialog } from "./field-overview-dialog";
+import type { PublishedField } from "../../../db/fields";
+import { getFieldImage } from "./field-image";
 
-export default function FieldsDirectoryPage() {
+function fieldImage(id: string) {
+  return {
+    src: getFieldImage(id),
+    alt: "",
+  };
+}
+
+export default function FieldsDirectoryPage({ fields }: { fields: PublishedField[] }) {
   const education = useEducationStage();
   const [query, setQuery] = useState("");
-  const [selectedFieldId, setSelectedFieldId] = useState<PossibilityFieldId | null>(null);
+  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const filteredFields = useMemo(() => {
-    if (!normalizedQuery) return possibilityFields;
-    return possibilityFields.filter((field) =>
+    if (!normalizedQuery) return fields;
+    return fields.filter((field) =>
       [
-        field.name,
-        field.description,
-        ...field.introduction,
-        ...field.areas.flatMap((area) => [area.name, area.description]),
-        ...field.workExamples,
+        field.title,
+        field.summary ?? "",
+        field.description ?? "",
+        ...Object.values(field.content),
       ]
         .join(" ")
         .toLocaleLowerCase()
         .includes(normalizedQuery),
     );
-  }, [normalizedQuery]);
+  }, [fields, normalizedQuery]);
   const selectedField = selectedFieldId
-    ? possibilityFields.find((field) => field.id === selectedFieldId)
+    ? fields.find((field) => field.id === selectedFieldId)
     : undefined;
   const stage = education.status === "saved" ? education.stage : undefined;
 
@@ -97,11 +104,11 @@ export default function FieldsDirectoryPage() {
                     triggerRef.current = event.currentTarget;
                     setSelectedFieldId(field.id);
                   }}
-                  aria-label={`Preview ${field.name}`}
+                  aria-label={`Preview ${field.title}`}
                   className="flex min-w-0 flex-1 items-center gap-4 rounded-sm text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
                 >
                   <Image
-                    src={field.image}
+                    src={fieldImage(field.id).src}
                     alt=""
                     width={112}
                     height={112}
@@ -109,10 +116,10 @@ export default function FieldsDirectoryPage() {
                   />
                   <span className="flex min-w-0 flex-1 flex-col self-stretch py-1">
                     <span className="font-serif text-xl font-semibold tracking-[-.025em] sm:text-2xl">
-                      {field.name}
+                      {field.title}
                     </span>
                     <span className="mt-2 text-sm leading-relaxed text-[#59665e]">
-                      {field.description}
+                      {field.summary}
                     </span>
                     <span className="cb-card-action mt-auto pt-3">
                       Preview field <ArrowRight aria-hidden="true" className="h-4 w-4" />

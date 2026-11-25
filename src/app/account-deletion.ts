@@ -42,6 +42,13 @@ export async function requestCareerBridgeAccountDeletion(
   });
 }
 
+export function createCareerBridgeAccountDeletionFetcher(
+  account: AccountDeletionActions,
+) {
+  return (confirmation: string, expectedUserId: string) =>
+    requestCareerBridgeAccountDeletion(account, confirmation, expectedUserId);
+}
+
 export async function finishCareerBridgeAccountDeletion(account: AccountDeletionActions) {
   if (!(await account.finishAccountDeletion())) {
     return {

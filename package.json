@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test:fields:postgres": "node --test src/db/fields-postgres.integration.test.mjs",
+    "test:institutions:postgres": "node --test src/db/institutions-postgres.integration.test.mjs",
+    "test:real-course-draft:postgres": "node --test src/db/real-course-draft-import.integration.test.mjs",
     "test:student-data:postgres": "node --test src/app/student-data-postgres.integration.test.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"

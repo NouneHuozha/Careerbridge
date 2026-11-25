@@ -46,3 +46,6 @@ next-env.d.ts
 # local design inspection artifacts
 /.taste-skill/
 .neon
+.playwright-mcp/
+.kilo/
+.impeccable/

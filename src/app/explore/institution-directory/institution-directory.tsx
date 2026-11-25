@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, BookOpen, MapPin, Search, X } from "lucide-react";
+import { ArrowRight, BookOpen, MapPin, Search, X } from "lucide-react";
 import { Breadcrumbs } from "../../breadcrumbs";
 import { SavedItemButton } from "../saved-item-button";
-import { institutionProfilePages } from "./institution-profile-data";
+import type { PublicInstitutionProfile } from "../institution-page-data";
 
 const states = [
   "Arunachal Pradesh",
@@ -17,25 +17,31 @@ const states = [
   "Sikkim",
   "Tripura",
 ];
-const institutionTypes = [...new Set(institutionProfilePages.map((item) => item.type))].sort();
 const ownershipTypes = ["Government", "Private", "Public"];
 const pageSize = 9;
-const sampleInstitutionCount = institutionProfilePages.filter((item) => item.isDemo).length;
 
 function districtValue(state: string, district: string) {
   return `${state}::${district}`;
 }
 
-export default function InstitutionDirectory() {
+export default function InstitutionDirectory({
+  institutions,
+}: {
+  institutions: PublicInstitutionProfile[];
+}) {
   const [search, setSearch] = useState("");
   const [state, setState] = useState("");
   const [district, setDistrict] = useState("");
   const [type, setType] = useState("");
   const [ownership, setOwnership] = useState("");
   const [visibleCount, setVisibleCount] = useState(pageSize);
+  const institutionTypes = useMemo(
+    () => [...new Set(institutions.map((item) => item.type))].sort(),
+    [institutions],
+  );
 
   const districtOptions = useMemo(() => {
-    const options = institutionProfilePages.flatMap((item) =>
+    const options = institutions.flatMap((item) =>
       item.campuses.flatMap((campus) => {
         const { district, state: campusState } = campus;
         if (!district || !campusState || (state && campusState !== state)) {
@@ -55,11 +61,11 @@ export default function InstitutionDirectory() {
 
     return [...new Map(options.map((option) => [option.value, option])).values()]
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [state]);
+  }, [institutions, state]);
 
   const filteredInstitutions = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
-    return institutionProfilePages
+    return institutions
       .filter(
         (item) =>
           !state || item.campuses.some((campus) => campus.state === state),
@@ -87,11 +93,10 @@ export default function InstitutionDirectory() {
             campus.district ?? "",
             campus.state ?? "",
           ]),
-          ...(item.programmes ?? []).map((programme) => programme.name),
         ].some((value) => value?.toLocaleLowerCase().includes(query));
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [district, ownership, search, state, type]);
+  }, [district, institutions, ownership, search, state, type]);
 
   const visibleInstitutions = filteredInstitutions.slice(0, visibleCount);
   const hasFilters = Boolean(search.trim() || state || district || type || ownership);
@@ -160,21 +165,6 @@ export default function InstitutionDirectory() {
             </p>
           </div>
         </section>
-
-        {sampleInstitutionCount > 0 && (
-          <aside
-            role="note"
-            className="mt-6 flex gap-3 rounded-2xl border border-[#e7d6a8] bg-[#fff8e8] p-4 text-[#594c32] sm:p-5"
-          >
-            <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-[#9a752c]" />
-            <div>
-              <h2 className="text-sm font-semibold">Fictional sample profiles included</h2>
-              <p className="mt-1 text-sm leading-6">
-                {sampleInstitutionCount} sample institutions are shown to demonstrate the directory. Their names and locations are fictional and are not verified providers; each sample card and profile is labeled.
-              </p>
-            </div>
-          </aside>
-        )}
 
         <section
           aria-label="Search and filter institutions"
@@ -279,19 +269,22 @@ export default function InstitutionDirectory() {
           {filteredInstitutions.length === 0 ? (
             <div className="mt-5 rounded-2xl border border-[#dce7df] bg-white p-6 sm:p-8">
               <h3 className="font-serif text-xl font-semibold">
-                No institutions match those filters.
+                {institutions.length === 0
+                  ? "No published institution profiles are available yet."
+                  : "No institutions match those filters."}
               </h3>
               <p className="mt-2 max-w-xl text-sm leading-6 text-[#59665e]">
-                Try a different name, programme or location, or clear the
-                filters to see all available institutions.
+                {institutions.length === 0
+                  ? "Published institution profiles will appear here when verified real records are available."
+                  : "Try a different name or location, or clear the filters to see all available institutions."}
               </p>
-              <button
+              {institutions.length > 0 && <button
                 type="button"
                 onClick={clearFilters}
                 className="mt-4 inline-flex min-h-11 items-center rounded-full border border-[#b8d5c2] bg-[#f7fbf8] px-4 text-sm font-semibold text-[#145543] transition-colors hover:bg-[#eaf2ed] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145543]"
               >
                 Clear filters
-              </button>
+              </button>}
             </div>
           ) : (
             <>
@@ -372,7 +365,7 @@ function InstitutionCard({
   institution,
   index,
 }: {
-  institution: (typeof institutionProfilePages)[number];
+  institution: PublicInstitutionProfile;
   index: number;
 }) {
   const campusPreviews = institution.campuses
@@ -426,12 +419,6 @@ function InstitutionCard({
               {institution.campuses.length > 2 &&
                 ` · ${institution.campuses.length - 2} more campuses`}
             </span>
-          </p>
-        )}
-
-        {institution.isDemo && (
-          <p className="mt-3 text-[11px] italic text-[#9a752c]">
-            Fictional sample — not a verified institution
           </p>
         )}
 
