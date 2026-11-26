@@ -17,13 +17,12 @@ import {
 } from "lucide-react";
 import { Breadcrumbs } from "../../breadcrumbs";
 import { SavedItemButton } from "../saved-item-button";
+import { latestEvidenceCheck } from "../catalogue-evidence";
 import {
   northeastStates,
-  scholarships,
   scholarshipStudyLevels,
-  type ScholarshipStatus,
-  type ScholarshipStudyLevel,
 } from "./scholarship-data";
+import type { Scholarship, ScholarshipStatus, ScholarshipStudyLevel } from "../../../db/scholarship-types";
 
 const statusValues = ["all", "open", "upcoming", "closed", "unknown"] as const;
 type StatusFilter = (typeof statusValues)[number];
@@ -58,21 +57,21 @@ const statusConfig: Record<
   { label: string; icon: typeof CircleCheck; bg: string; text: string; border: string }
 > = {
   open: {
-    label: "Open",
+    label: "Open (as recorded)",
     icon: CircleCheck,
     bg: "bg-[#e5f5ec]",
     text: "text-[#1a6e42]",
     border: "border-[#b5dfc8]",
   },
   upcoming: {
-    label: "Not announced",
+    label: "Upcoming (as recorded)",
     icon: Clock,
     bg: "bg-[#fef6e6]",
     text: "text-[#7a5a12]",
     border: "border-[#edd9a8]",
   },
   closed: {
-    label: "Closed",
+    label: "Closed (as recorded)",
     icon: XCircle,
     bg: "bg-[#fce9ec]",
     text: "text-[#8a2838]",
@@ -87,12 +86,18 @@ const statusConfig: Record<
   },
 };
 
-export default function ScholarshipExplorer() {
+export default function ScholarshipExplorer({
+  scholarships,
+}: {
+  scholarships: Scholarship[];
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const query = searchParams.get("q") ?? "";
   const queryLevel = searchParams.get("level");
   const level = isStudyLevel(queryLevel) ? queryLevel : "all";
+  const queryStage = searchParams.get("stage");
+  const stage = queryStage === "class-10" || queryStage === "class-12" ? queryStage : "all";
   const provider = searchParams.get("provider") ?? "all";
   const region = searchParams.get("region") ?? "all";
   const queryStatus = searchParams.get("status");
@@ -117,6 +122,10 @@ export default function ScholarshipExplorer() {
   const filteredScholarships = scholarships.filter((scholarship) => {
     const matchesLevel =
       level === "all" || scholarship.studyLevels.includes(level);
+    const stageLevels = stage === "class-10"
+      ? ["school", "higher-secondary", "diploma-iti"]
+      : ["higher-secondary", "diploma-iti", "undergraduate"];
+    const matchesStage = stage === "all" || scholarship.studyLevels.some((item) => stageLevels.includes(item));
     const matchesProvider =
       provider === "all" || scholarship.provider === provider;
     const matchesRegion = matchesEligibilityRegion(
@@ -140,6 +149,7 @@ export default function ScholarshipExplorer() {
       .toLowerCase();
     return (
       matchesLevel &&
+      matchesStage &&
       matchesProvider &&
       matchesRegion &&
       matchesStatus &&
@@ -154,6 +164,7 @@ export default function ScholarshipExplorer() {
   const hasFilters =
     query.trim().length > 0 ||
     level !== "all" ||
+    stage !== "all" ||
     provider !== "all" ||
     region !== "all" ||
     status !== "all";
@@ -297,12 +308,28 @@ export default function ScholarshipExplorer() {
                   onChange={(event) => updateParams({ level: event.target.value })}
                   className="h-11 w-full rounded-xl border border-[#d4ddd7] bg-[#f8faf8] px-3.5 text-sm text-[#29483a] outline-none transition-all duration-200 focus:border-[#2d6e56] focus:bg-white focus:shadow-[0_0_0_3px_rgba(45,110,86,0.12)]"
                 >
-                  <option value="all">All levels</option>
+                  <option value="all">All study levels</option>
                   {scholarshipStudyLevels.map((studyLevel) => (
                     <option key={studyLevel.value} value={studyLevel.value}>
                       {studyLevel.label}
                     </option>
                   ))}
+                </select>
+              </label>
+
+              <label className="flex min-w-0 flex-col gap-1.5" htmlFor="scholarship-stage-filter">
+                <span className="text-[11px] font-semibold uppercase tracking-[.1em] text-[#7a8f83]">
+                  Browse after
+                </span>
+                <select
+                  id="scholarship-stage-filter"
+                  value={stage}
+                  onChange={(event) => updateParams({ stage: event.target.value })}
+                  className="h-11 w-full rounded-xl border border-[#d4ddd7] bg-[#f8faf8] px-3.5 text-sm text-[#29483a] outline-none transition-all duration-200 focus:border-[#2d6e56] focus:bg-white focus:shadow-[0_0_0_3px_rgba(45,110,86,0.12)]"
+                >
+                  <option value="all">Class 10 and 12</option>
+                  <option value="class-10">Class 10</option>
+                  <option value="class-12">Class 12</option>
                 </select>
               </label>
 
@@ -365,10 +392,10 @@ export default function ScholarshipExplorer() {
             </div>
           </div>
 
-          <p className="mt-3 text-xs leading-relaxed text-[#9eada5]">
-            These are real scheme examples, but application status and
-            eligibility are not live verified. Check each official source for
-            current details before applying.
+          <p className="mt-3 text-xs leading-relaxed text-[#59665e]">
+            {scholarships.some((item) => item.dataClassification === "demo")
+              ? "Development preview only: demo records are illustrative and unverified, not published opportunities. Study-stage filters are for browsing and do not establish eligibility."
+              : "Study-stage filters are for browsing and do not establish eligibility. Check the official provider for current requirements and deadlines."}
           </p>
 
           {/* Cards */}
@@ -404,6 +431,11 @@ export default function ScholarshipExplorer() {
                           />
                           {sc.label}
                         </span>
+                        {scholarship.dataClassification === "demo" && (
+                          <span className="rounded-full border border-[#e7d6a8] bg-[#fff8e8] px-2.5 py-1 text-[11px] font-semibold text-[#594c32]">
+                            Development demo · unverified
+                          </span>
+                        )}
                       </div>
 
                       {/* Title */}
@@ -419,6 +451,13 @@ export default function ScholarshipExplorer() {
                       {/* Purpose */}
                       <p className="mt-2.5 line-clamp-2 text-sm leading-relaxed text-[#59665e]">
                         {scholarship.purpose}
+                      </p>
+                      <p className="mt-2 text-xs leading-relaxed text-[#718078]">
+                        {scholarship.dataClassification === "demo"
+                          ? "Illustrative demo · not verified for a current cycle"
+                          : latestEvidenceCheck(scholarship.sources)
+                            ? `Latest linked source checked ${latestEvidenceCheck(scholarship.sources)}`
+                            : "Linked source check date unavailable"}
                       </p>
 
                       {/* Info grid */}

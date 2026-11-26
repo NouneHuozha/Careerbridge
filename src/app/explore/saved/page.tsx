@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageLoadingSkeleton } from "../../page-loading-skeleton";
 import { listPathwaysForUi } from "../pathways/pathway-page-data";
+import { listExaminationsForUi } from "../examinations/examination-page-data";
+import { listScholarshipsForUi } from "../scholarships/scholarship-page-data";
 import SavedItemsPage from "./saved-items-page";
 
 export const metadata: Metadata = {
@@ -10,8 +12,12 @@ export const metadata: Metadata = {
 };
 
 async function SavedContent() {
-  const pathways = await listPathwaysForUi();
-  return <SavedItemsPage pathways={pathways} />;
+  const [pathways, examinations, scholarships] = await Promise.all([
+    listPathwaysForUi(),
+    listExaminationsForUi(),
+    listScholarshipsForUi(),
+  ]);
+  return <SavedItemsPage pathways={pathways} examinations={examinations} scholarships={scholarships} />;
 }
 
 export default function SavedPage() {

@@ -29,8 +29,8 @@ import { fieldGuideData } from "../fields/field-data";
 import { courseCatalog } from "../courses/catalog/course-catalog-data";
 import { institutionProfilePages } from "../institution-directory/institution-profile-data";
 import type { StudyRoute } from "../../../db/pathway-types";
-import { examinations } from "../examinations/examination-data";
-import { scholarships } from "../scholarships/scholarship-data";
+import type { Examination } from "../../../db/examination-types";
+import type { Scholarship } from "../../../db/scholarship-types";
 import { resolvedInstitutionCampusOfferings } from "../institutions/institution-data";
 
 type SavedCategory = Exclude<SavedItemType, "institution-offering">;
@@ -64,7 +64,12 @@ type ResolvedSavedItem = {
   href?: string;
 };
 
-function resolveItem(item: SavedItem, pathways: StudyRoute[]): ResolvedSavedItem {
+export function resolveItem(
+  item: SavedItem,
+  pathways: StudyRoute[],
+  examinations: Examination[],
+  scholarships: Scholarship[],
+): ResolvedSavedItem {
   if (item.type === "field") {
     const field = fieldGuideData[item.id as keyof typeof fieldGuideData];
     if (field) {
@@ -157,13 +162,7 @@ function resolveItem(item: SavedItem, pathways: StudyRoute[]): ResolvedSavedItem
         label: "Examination",
         title: examination.name,
         description: examination.purpose,
-        href: examination.id === "jee-main"
-          ? `/explore/examinations/${examination.id}${item.context?.stage ? `?stage=${encodeURIComponent(item.context.stage)}` : ""}`
-          : `/explore/examinations?${new URLSearchParams({
-              q: examination.name,
-              ...(item.context?.stage ? { stage: item.context.stage } : {}),
-              ...(item.context?.fieldId ? { field: item.context.fieldId } : {}),
-            }).toString()}`,
+        href: `/explore/examinations/${examination.id}${item.context?.stage ? `?stage=${encodeURIComponent(item.context.stage)}` : ""}`,
       };
     }
   }
@@ -203,7 +202,15 @@ function savedDate(timestamp: number) {
   })}`;
 }
 
-export default function SavedItemsPage({ pathways }: { pathways: StudyRoute[] }) {
+export default function SavedItemsPage({
+  pathways,
+  examinations,
+  scholarships,
+}: {
+  pathways: StudyRoute[];
+  examinations: Examination[];
+  scholarships: Scholarship[];
+}) {
   const pathname = usePathname();
   const account = useAccount();
   const saved = useSavedItems();
@@ -224,8 +231,8 @@ export default function SavedItemsPage({ pathways }: { pathways: StudyRoute[] })
     };
   }, [pendingRemoval]);
   const resolved = useMemo(
-    () => saved.status === "saved" ? saved.items.map((item) => resolveItem(item, pathways)) : [],
-    [saved, pathways],
+    () => saved.status === "saved" ? saved.items.map((item) => resolveItem(item, pathways, examinations, scholarships)) : [],
+    [saved, pathways, examinations, scholarships],
   );
   const query = search.trim().toLocaleLowerCase();
   const matchingItems = resolved
@@ -530,7 +537,7 @@ export default function SavedItemsPage({ pathways }: { pathways: StudyRoute[] })
             </h2>
             <p id="saved-remove-description" className="mt-2 text-sm leading-relaxed text-[#59665e]">
               {pendingRemoval
-                ? `“${resolveItem(pendingRemoval, pathways).title}” will be removed from your Saved list. You can save it again later.`
+                ? `“${resolveItem(pendingRemoval, pathways, examinations, scholarships).title}” will be removed from your Saved list. You can save it again later.`
                 : ""}
             </p>
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

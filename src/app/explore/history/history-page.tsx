@@ -28,6 +28,8 @@ import { SavedItemButton } from "../saved-item-button";
 import type { SavedItemType } from "../saved-items";
 import { resolveHistoryItem, type ResolvedHistoryItem } from "./history-resolver";
 import type { StudyRoute } from "../../../db/pathway-types";
+import type { Examination } from "../../../db/examination-types";
+import type { Scholarship } from "../../../db/scholarship-types";
 
 type Category = Exclude<SavedItemType, "institution-offering">;
 
@@ -144,7 +146,15 @@ function HistoryCard({
   );
 }
 
-export default function ExplorationHistoryPage({ pathways }: { pathways: StudyRoute[] }) {
+export default function ExplorationHistoryPage({
+  pathways,
+  examinations,
+  scholarships,
+}: {
+  pathways: StudyRoute[];
+  examinations: Examination[];
+  scholarships: Scholarship[];
+}) {
   const pathname = usePathname();
   const account = useAccount();
   const history = useExplorationHistory();
@@ -169,10 +179,10 @@ export default function ExplorationHistoryPage({ pathways }: { pathways: StudyRo
   const resolved = useMemo(
     () => history.status === "saved"
       ? history.items
-          .map((item) => resolveHistoryItem(item, pathways))
+          .map((item) => resolveHistoryItem(item, pathways, examinations, scholarships))
           .sort((a, b) => b.item.lastVisitedAt - a.item.lastVisitedAt)
       : [],
-    [history, pathways],
+    [history, pathways, examinations, scholarships],
   );
   const counts = useMemo(() => ({
     all: resolved.length,
