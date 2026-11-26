@@ -15,13 +15,14 @@ import {
 } from "lucide-react";
 import { Breadcrumbs } from "../../breadcrumbs";
 import { SavedItemButton } from "../saved-item-button";
+import { latestEvidenceCheck } from "../catalogue-evidence";
 import { useEducationStage } from "../../education-stage";
 import { possibilityFields } from "../../discover/possibility-fields";
 import {
-  examinations,
   examinationLevels,
   northeastStates,
 } from "./examination-data";
+import type { Examination } from "../../../db/examination-types";
 
 const pageSize = 6;
 const levelValues = ["all", "national", "state", "institution"] as const;
@@ -37,7 +38,11 @@ function isStageFilter(value: string | null): value is StageFilter {
   return value !== null && stageValues.some((stage) => stage === value);
 }
 
-export default function ExaminationsExplorer() {
+export default function ExaminationsExplorer({
+  examinations,
+}: {
+  examinations: Examination[];
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const savedEducation = useEducationStage();
@@ -326,7 +331,9 @@ export default function ExaminationsExplorer() {
           </div>
 
           <p className="mt-3 text-sm leading-relaxed text-[#59665e]">
-            Sample records are illustrative and may not reflect current requirements. Confirm details with the conducting authority and institution.
+            {examinations.some((exam) => exam.dataClassification === "demo")
+              ? "Development preview only: demo records are illustrative, unverified and not published opportunities. Check official authorities for current requirements."
+              : "Current cycle details can change. Check the official authority and institution for the latest requirements."}
           </p>
 
           {visibleExaminations.length > 0 ? (
@@ -348,18 +355,30 @@ export default function ExaminationsExplorer() {
                         {examinationLevels[exam.level]}
                       </span>
                       <span className="rounded-full bg-[#f3eed9] px-3 py-1 text-xs font-semibold text-[#6d5a1e]">
-                        {exam.stages
+                      {exam.stages.length ? exam.stages
                           .map((examStage) =>
                             examStage === "class-10" ? "Class 10" : "Class 12",
                           )
-                          .join(" · ")}
+                          .join(" · ") : "Stage not recorded"}
+                    </span>
+                    {exam.dataClassification === "demo" && (
+                      <span className="rounded-full border border-[#e7d6a8] bg-[#fff8e8] px-3 py-1 text-xs font-semibold text-[#594c32]">
+                        Development demo · unverified
                       </span>
+                    )}
                     </div>
                     <h3 className="mt-4 font-serif text-[1.35rem] font-semibold leading-snug tracking-[-.025em] transition-colors duration-200 group-hover:text-[#145543]">
                       {exam.name}
                     </h3>
                     <p className="mt-2.5 min-h-[3.5rem] text-sm leading-relaxed text-[#59665e]">
                       {exam.purpose}
+                    </p>
+                    <p className="mt-2 text-xs leading-relaxed text-[#718078]">
+                      {exam.dataClassification === "demo"
+                        ? "Illustrative demo · not verified for a current cycle"
+                        : latestEvidenceCheck(exam.sources)
+                          ? `Latest linked source checked ${latestEvidenceCheck(exam.sources)}`
+                          : "Linked source check date unavailable"}
                     </p>
 
                     <dl className="mt-5 flex-1 divide-y divide-[#e4ece7] border-y border-[#e4ece7] text-sm">
@@ -404,18 +423,17 @@ export default function ExaminationsExplorer() {
                     </dl>
 
                     <div className="mt-5 flex flex-wrap items-center gap-3">
-                      {exam.id === "jee-main" ? (
-                        <Link
-                          href={`/explore/examinations/${exam.id}?${filterParams.toString()}`}
-                          className="cb-card-action"
-                        >
-                          Understand this examination
-                          <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                        </Link>
-                      ) : (
-                        <span className="cb-card-action cb-card-action-disabled">
-                          Details coming soon
-                        </span>
+                      <Link
+                        href={`/explore/examinations/${exam.id}?${filterParams.toString()}`}
+                        className="cb-card-action"
+                      >
+                        Understand this examination
+                        <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                      </Link>
+                      {exam.officialUrl && (
+                        <a href={exam.officialUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold text-[#145543] underline underline-offset-2">
+                          Official site
+                        </a>
                       )}
                       <SavedItemButton
                         type="examination"
@@ -447,13 +465,12 @@ export default function ExaminationsExplorer() {
           ) : (
             <div className="mt-5 rounded-2xl border border-[#dce7df] bg-white p-6 sm:p-8">
               <h3 className="font-serif text-2xl font-semibold tracking-[-.03em]">
-                No matching sample examinations
+                {examinations.length ? "No matching examinations" : "No examinations are published yet"}
               </h3>
               <p className="mt-2 max-w-[60ch] text-base leading-relaxed text-[#59665e]">
-                We don&apos;t have a verified sample for these filters yet.
-                Not every course requires an entrance examination; some use
-                merit-based admission or another selection process. Try
-                changing the stage, filters or search.
+                {examinations.length
+                  ? "Try changing the stage, region, level or search. The catalogue does not imply that every course requires an entrance examination."
+                  : "No reviewed real examination records are available yet. Please check the relevant official examination authority directly."}
               </p>
             </div>
           )}

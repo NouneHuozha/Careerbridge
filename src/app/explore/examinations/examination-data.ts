@@ -1,18 +1,5 @@
-export type ExaminationStage = "class-10" | "class-12";
-export type ExaminationLevel = "national" | "state" | "institution";
-
-export type Examination = {
-  id: string;
-  name: string;
-  level: ExaminationLevel;
-  stages: ExaminationStage[];
-  purpose: string;
-  programmes: string[];
-  authority: string;
-  regions: string[];
-  fields: string[];
-  officialUrl?: string;
-};
+import type { Examination, ExaminationLevel } from "../../../db/examination-types";
+export type { Examination, ExaminationLevel, ExaminationStage } from "../../../db/examination-types";
 
 export const examinationLevels: Record<ExaminationLevel, string> = {
   national: "National level",

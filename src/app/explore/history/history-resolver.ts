@@ -2,8 +2,8 @@ import { fieldGuideData } from "../fields/field-data";
 import { courseCatalog } from "../courses/catalog/course-catalog-data";
 import { institutionProfilePages } from "../institution-directory/institution-profile-data";
 import type { StudyRoute } from "../../../db/pathway-types";
-import { examinations } from "../examinations/examination-data";
-import { scholarships } from "../scholarships/scholarship-data";
+import type { Examination } from "../../../db/examination-types";
+import type { Scholarship } from "../../../db/scholarship-types";
 import { resolvedInstitutionCampusOfferings } from "../institutions/institution-data";
 import type { ExplorationHistoryItem } from "../exploration-history";
 import type { SavedItemType } from "../saved-items";
@@ -17,7 +17,12 @@ export type ResolvedHistoryItem = {
   href: string;
 };
 
-export function resolveHistoryItem(item: ExplorationHistoryItem, pathways: StudyRoute[]): ResolvedHistoryItem {
+export function resolveHistoryItem(
+  item: ExplorationHistoryItem,
+  pathways: StudyRoute[],
+  examinations: Examination[],
+  scholarships: Scholarship[],
+): ResolvedHistoryItem {
   if (item.type === "field") {
     const field = fieldGuideData[item.id as keyof typeof fieldGuideData];
     if (field) {
@@ -113,13 +118,7 @@ export function resolveHistoryItem(item: ExplorationHistoryItem, pathways: Study
         label: "Examination",
         title: examination.name,
         description: examination.purpose,
-        href: examination.id === "jee-main"
-          ? `/explore/examinations/${examination.id}${params.size ? `?${params}` : ""}`
-          : `/explore/examinations?${new URLSearchParams({
-              q: examination.name,
-              ...(item.context?.stage ? { stage: item.context.stage } : {}),
-              ...(item.context?.fieldId ? { field: item.context.fieldId } : {}),
-            }).toString()}`,
+        href: `/explore/examinations/${examination.id}${params.size ? `?${params}` : ""}`,
       };
     }
   }
