@@ -63,6 +63,7 @@ const database = {
 };
 
 const publisher = Object.fromEntries([
+  "associateRealExamScholarshipReviewSource",
   "submitRealExamScholarshipDraftForReview",
   "recordRealExamScholarshipEvidenceReview",
   "approveRealExamScholarshipDraft",
@@ -171,4 +172,51 @@ test("catalogue lifecycle derives actor ID and requires direct review attestatio
   })));
   assert.equal(response.status, 200);
   assert.equal(state.actions[0].input.reviewerUserId, 1);
+});
+
+test("catalogue lifecycle associates only valid active official sources for existing claim keys", async () => {
+  reset();
+  state.authorized = true;
+  const source = {
+    sourceName: "NATIONAL ELIGIBILITY CUM ENTRANCE TEST | NEET | India",
+    authority: "National Testing Agency, Ministry of Education, Government of India",
+    canonicalUrl: "https://neet.nta.nic.in/",
+    category: "examination",
+    sourceType: "official_public_web_page",
+    status: "active",
+  };
+  const body = {
+    action: "associate-source",
+    kind: "exam",
+    externalKey: "neet-ug",
+    revisionId: "47076958-a045-4a70-aa1f-5fc8f05ed649",
+    source,
+    claimKeys: ["examination.level", "examination.purpose", "examination.authority"],
+  };
+  const response = await route.POST(request(JSON.stringify(body)));
+  assert.equal(response.status, 200);
+  assert.equal(state.actions[0].name, "associateRealExamScholarshipReviewSource");
+  assert.equal(state.actions[0].input.reviewerUserId, 1);
+  assert.deepEqual(state.actions[0].input.claimKeys, body.claimKeys);
+
+  reset();
+  state.authorized = true;
+  const invalid = await route.POST(request(JSON.stringify({
+    ...body,
+    source: { ...source, canonicalUrl: "http://neet.nta.nic.in/" },
+  })));
+  assert.equal(invalid.status, 422);
+  assert.equal(state.actions.length, 0);
+
+  const mismatchedCategory = await route.POST(request(JSON.stringify({
+    ...body,
+    source: { ...source, category: "scholarship" },
+  })));
+  assert.equal(mismatchedCategory.status, 422);
+  assert.equal(state.actions.length, 0);
+
+  state.authorized = false;
+  const nonAdmin = await route.POST(request(JSON.stringify(body)));
+  assert.equal(nonAdmin.status, 403);
+  assert.equal(state.actions.length, 0);
 });

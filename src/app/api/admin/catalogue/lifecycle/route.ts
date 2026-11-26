@@ -12,6 +12,7 @@ import {
   verifyNeonDevelopmentEndpoint,
 } from "../../../../../../scripts/import-real-pathway-draft.mjs";
 import {
+  associateRealExamScholarshipReviewSource,
   approveRealExamScholarshipDraft,
   getRealExamScholarshipReviewRecord,
   publishApprovedRealExamScholarship,
@@ -43,9 +44,18 @@ type ReviewClaim = {
   sourceUrls: string[];
   reviewedDirectly?: boolean;
 };
+type ReviewSource = {
+  sourceName: string;
+  authority: string;
+  canonicalUrl: string;
+  category: "examination" | "scholarship";
+  sourceType: "official_public_web_page";
+  status: "active";
+};
 type LifecycleInput =
   | { action: "submit" | "approve" | "reject"; kind: CatalogueKind; externalKey: string; revisionId: string }
   | { action: "review"; kind: CatalogueKind; externalKey: string; revisionId: string; claims: ReviewClaim[] }
+  | { action: "associate-source"; kind: CatalogueKind; externalKey: string; revisionId: string; source: ReviewSource; claimKeys: string[] }
   | { action: "publish"; kind: CatalogueKind; externalKey: string; revisionId: string; expectedPublishedRevisionId: string | null };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -60,10 +70,38 @@ function validExternalKey(value: unknown): value is string {
   return typeof value === "string" && /^[a-z0-9][a-z0-9._-]{0,179}$/.test(value);
 }
 
+function isCatalogueKind(value: unknown): value is CatalogueKind {
+  return value === "exam" || value === "scholarship";
+}
+
+function isReviewSource(value: unknown, kind: CatalogueKind): value is ReviewSource {
+  if (!isRecord(value) ||
+      !hasOnlyKeys(value, ["sourceName", "authority", "canonicalUrl", "category", "sourceType", "status"]) ||
+      typeof value.sourceName !== "string" || value.sourceName.length < 1 ||
+      value.sourceName.length > 200 || value.sourceName !== value.sourceName.trim() ||
+      typeof value.authority !== "string" || value.authority.length < 1 ||
+      value.authority.length > 200 || value.authority !== value.authority.trim() ||
+      typeof value.canonicalUrl !== "string" || value.canonicalUrl.length > 2048 ||
+      value.canonicalUrl !== value.canonicalUrl.trim() ||
+      value.category !== configurations[kind].itemType ||
+      value.sourceType !== "official_public_web_page" ||
+      value.status !== "active") return false;
+  try {
+    const url = new URL(value.canonicalUrl);
+    return url.protocol === "https:" &&
+      url.username === "" &&
+      url.password === "" &&
+      url.search === "" &&
+      url.hash === "" &&
+      url.href === value.canonicalUrl;
+  } catch {
+    return false;
+  }
+}
+
 function isLifecycleInput(value: unknown): value is LifecycleInput {
   if (!isRecord(value) ||
-      typeof value.kind !== "string" ||
-      !Object.hasOwn(configurations, value.kind) ||
+      !isCatalogueKind(value.kind) ||
       !validExternalKey(value.externalKey) ||
       typeof value.revisionId !== "string" ||
       !uuidPattern.test(value.revisionId) ||
@@ -86,6 +124,20 @@ function isLifecycleInput(value: unknown): value is LifecycleInput {
         claim.sourceUrls.every((url) => typeof url === "string" && url.length <= 2048) &&
         (claim.reviewedDirectly === undefined || typeof claim.reviewedDirectly === "boolean") &&
         (claim.decision !== "verified" || claim.reviewedDirectly === true),
+      );
+  }
+  if (value.action === "associate-source") {
+    const claimPrefix = value.kind === "exam" ? "examination." : "scholarship.";
+    return hasOnlyKeys(value, [...base, "source", "claimKeys"]) &&
+      isReviewSource(value.source, value.kind) &&
+      Array.isArray(value.claimKeys) &&
+      value.claimKeys.length > 0 &&
+      value.claimKeys.length <= 40 &&
+      new Set(value.claimKeys).size === value.claimKeys.length &&
+      value.claimKeys.every((claimKey) =>
+        typeof claimKey === "string" &&
+        claimKey.startsWith(claimPrefix) &&
+        claimKey.length <= 160,
       );
   }
   if (value.action === "publish") {
@@ -328,6 +380,14 @@ export async function POST(request: NextRequest) {
         revisionId: input.revisionId,
       };
       switch (input.action) {
+        case "associate-source":
+          result = await associateRealExamScholarshipReviewSource(client, {
+            ...identity,
+            reviewerUserId: authorization.actor.id,
+            source: input.source,
+            claimKeys: input.claimKeys,
+          });
+          break;
         case "submit":
           result = await submitRealExamScholarshipDraftForReview(client, {
             ...identity,

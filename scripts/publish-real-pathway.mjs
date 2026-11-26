@@ -10,6 +10,7 @@ import {
   expectedProjectId,
   verifyNeonDevelopmentEndpoint,
 } from "./import-real-pathway-draft.mjs";
+import { reconcileSourceRegistry } from "../src/db/source-reconciliation.mjs";
 
 const { loadEnvConfig } = nextEnv;
 const { Pool } = pg;
@@ -520,6 +521,69 @@ export async function submitRealExamScholarshipDraftForReview(client, {
   }
 }
 
+export async function associateRealExamScholarshipReviewSource(client, {
+  kind, externalKey, revisionId, reviewerUserId, source, claimKeys,
+}) {
+  await client.query("BEGIN");
+  try {
+    await client.query("SELECT pg_advisory_xact_lock($1, $2)", publicationLock);
+    await requireReviewer(client, reviewerUserId);
+    if (!Array.isArray(claimKeys) || claimKeys.length === 0 ||
+        new Set(claimKeys).size !== claimKeys.length) {
+      throw new Error("Claim keys must be unique and non-empty.");
+    }
+    if (source?.status !== "active" ||
+        source?.sourceType !== "official_public_web_page" ||
+        source?.category !== (kind === "exam" ? "examination" : "scholarship")) {
+      throw new Error("Only an active official catalogue source can be associated.");
+    }
+    const preflight = await preflightReviewableCatalogue(client, { kind, externalKey, revisionId });
+    if (!["ready_for_evidence_review", "ready_for_approval"].includes(preflight.outcome)) {
+      throw new Error(preflight.issues[0]?.message ?? "Source association is not ready for review.");
+    }
+    if (claimKeys.some((claimKey) => !preflight.requiredClaims.includes(claimKey))) {
+      throw new Error("Claim keys must be existing required claim keys.");
+    }
+    const [registered] = await reconcileSourceRegistry(client, [{
+      sourceKey: `admin-review:${kind}:${externalKey}`,
+      sourceName: source.sourceName,
+      authority: source.authority,
+      canonicalUrl: source.canonicalUrl,
+      category: source.category,
+      sourceType: source.sourceType,
+      status: source.status,
+    }], { mode: "apply" });
+    if (!registered?.id) throw new Error("The official source was not registered.");
+    let associationsAdded = 0;
+    for (const claimKey of claimKeys) {
+      const association = await client.query(
+        `INSERT INTO public.catalog_revision_sources
+           (revision_id, source_id, claim_key, verification_status)
+         VALUES ($1, $2, $3, 'pending_review')
+         ON CONFLICT (revision_id, source_id, claim_key) DO NOTHING
+         RETURNING source_id`,
+        [revisionId, registered.id, claimKey],
+      );
+      associationsAdded += association.rowCount ?? 0;
+    }
+    await client.query("COMMIT");
+    return {
+      action: "source_associated",
+      kind,
+      externalKey,
+      revisionId,
+      sourceId: registered.id,
+      sourceUrl: source.canonicalUrl,
+      sourceRegistryAction: registered.action,
+      claimKeys,
+      associationsAdded,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  }
+}
+
 export async function recordRealExamScholarshipEvidenceReview(client, {
   kind, externalKey, revisionId, reviewerUserId, claims,
 }) {
@@ -551,25 +615,41 @@ export async function recordRealExamScholarshipEvidenceReview(client, {
         .map((entry) => entry.sourceUrl)
         .filter(Boolean))].sort();
       const provided = [...new Set(claim.sourceUrls)].sort();
-      if (actual.length === 0 || JSON.stringify(actual) !== JSON.stringify(provided)) {
+      if (actual.length === 0 || provided.length === 0 ||
+          provided.some((sourceUrl) => !actual.includes(sourceUrl))) {
         throw new Error(`Reviewed source URLs for ${claim.claimKey} do not match its registered provenance.`);
       }
       if (claim.decision === "verified" && !claim.reviewedDirectly) {
         throw new Error(`Claim ${claim.claimKey} requires a direct-support attestation.`);
       }
       const updated = await client.query(
-        `UPDATE public.catalog_revision_sources
+        `UPDATE public.catalog_revision_sources AS crs
             SET checked_at=now(), verified_at=CASE WHEN $3='verified' THEN now() ELSE NULL END,
                 verification_status=$3
-          WHERE revision_id=$1 AND claim_key=$2`,
-        [revisionId, claim.claimKey, claim.decision],
+           FROM public.source_registry AS sr
+          WHERE crs.revision_id=$1 AND crs.claim_key=$2 AND crs.source_id=sr.id
+            AND COALESCE(sr.canonical_url, sr.normalized_url)=ANY($4::text[])`,
+        [revisionId, claim.claimKey, claim.decision, provided],
       );
-      if (updated.rowCount < 1) throw new Error(`No registered provenance rows found for ${claim.claimKey}.`);
+      if (updated.rowCount !== provided.length) {
+        throw new Error(`Reviewed source URLs for ${claim.claimKey} do not match its registered provenance.`);
+      }
     }
-    const decisions = new Set(claims.map((claim) => claim.decision));
-    const overall = decisions.size === 1 && decisions.has("verified") ? "verified" :
-      decisions.has("disputed") ? "disputed" :
-        decisions.has("unavailable") ? "unavailable" : "partially_verified";
+    const evidence = await client.query(
+      `SELECT claim_key,
+              BOOL_OR(verification_status='verified' AND verified_at IS NOT NULL) AS has_verified,
+              BOOL_OR(verification_status='disputed') AS has_disputed
+         FROM public.catalog_revision_sources
+        WHERE revision_id=$1
+        GROUP BY claim_key`,
+      [revisionId],
+    );
+    const states = new Map(evidence.rows.map((row) => [row.claim_key, row]));
+    const verifiedClaims = preflight.requiredClaims.filter((claimKey) => states.get(claimKey)?.has_verified);
+    const hasDisputed = evidence.rows.some((row) => row.has_disputed);
+    const overall = verifiedClaims.length === preflight.requiredClaims.length ? "verified" :
+      hasDisputed ? "disputed" :
+        verifiedClaims.length > 0 ? "partially_verified" : "unavailable";
     const revision = await client.query(
       `UPDATE public.catalog_item_revisions
           SET verification_status=$2, updated_at=now(), updated_by=$3
@@ -585,8 +665,8 @@ export async function recordRealExamScholarshipEvidenceReview(client, {
       externalKey,
       revisionId,
       reviewerUserId,
-      verifiedClaims: claims.filter((claim) => claim.decision === "verified").map((claim) => claim.claimKey),
-      unresolvedClaims: claims.filter((claim) => claim.decision !== "verified").map((claim) => claim.claimKey),
+      verifiedClaims,
+      unresolvedClaims: preflight.requiredClaims.filter((claimKey) => !verifiedClaims.includes(claimKey)),
       evidenceCount: preflight.provenanceCount,
     };
   } catch (error) {

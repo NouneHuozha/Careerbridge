@@ -1,0 +1,218 @@
+{
+  "kind": "scholarship",
+  "id": "ishan-uday-ner",
+  "aliases": [
+    {
+      "sourceSystem": "careerbridge",
+      "externalType": "scholarship",
+      "externalKey": "ishan-uday-ner",
+      "externalContextKey": ""
+    }
+  ],
+  "sources": [
+    {
+      "sourceKey": "ugc-ishan-uday",
+      "sourceName": "IshanUday special scholarship scheme",
+      "authority": "University Grants Commission",
+      "canonicalUrl": "https://www.ugc.gov.in/Scholarships/stu_Scholarship5",
+      "category": "scholarship",
+      "sourceType": "official_public_web_page",
+      "status": "active"
+    },
+    {
+      "sourceKey": "nsp-ay-2026-27",
+      "sourceName": "Schemes on the National Scholarship Portal - Academic Year 2026-27",
+      "authority": "National Scholarship Portal, Government of India",
+      "canonicalUrl": "https://scholarships.gov.in/All-Scholarships",
+      "category": "scholarship",
+      "sourceType": "official_public_web_page",
+      "status": "active"
+    },
+    {
+      "sourceKey": "nsp-ishan-guidelines",
+      "sourceName": "Ishan Uday scheme guidelines",
+      "authority": "University Grants Commission, Government of India",
+      "canonicalUrl": "https://scholarships.gov.in/public/schemeGuidelines/Guidelines_ISHAN%20UDAY_2324.pdf",
+      "category": "scholarship",
+      "sourceType": "official_download",
+      "status": "active"
+    },
+    {
+      "sourceKey": "nec-north-east-states",
+      "sourceName": "North Eastern Council - North East India",
+      "authority": "North Eastern Council, Government of India",
+      "canonicalUrl": "https://necouncil.gov.in/",
+      "category": "geography",
+      "sourceType": "official_public_web_page",
+      "status": "active"
+    }
+  ],
+  "revision": {
+    "title": "Ishan Uday Special Scholarship Scheme for North Eastern Region",
+    "summary": "UGC scholarship support for eligible North Eastern Region students already admitted to first-year full-time undergraduate study.",
+    "description": "Passing Class XII is a prerequisite, not a stand-alone application route: UGC says applicants must already be admitted to the first year of a recognized full-time undergraduate degree. UGC lists financial assistance of Rs 80,000 per year. The NSP 2026-27 scheme listing shows student applications open from 16 September to 30 November 2026; check the current portal details before applying.",
+    "publicationStatus": "draft",
+    "dataClassification": "real",
+    "verificationStatus": "pending_review",
+    "scholarship": {
+      "category": "Northeast region",
+      "provider": "University Grants Commission",
+      "support": "UGC lists financial assistance of Rs 80,000 per annum for eligible students.",
+      "studyLevels": [
+        "undergraduate"
+      ],
+      "eligibilityRegions": [
+        "Arunachal Pradesh",
+        "Assam",
+        "Manipur",
+        "Meghalaya",
+        "Mizoram",
+        "Nagaland",
+        "Sikkim",
+        "Tripura"
+      ],
+      "status": "open",
+      "officialUrl": "https://www.ugc.gov.in/Scholarships/stu_Scholarship5",
+      "detail": {
+        "eligibility": [
+          {
+            "title": "Already admitted to first-year undergraduate study",
+            "description": "UGC says applicants must have passed Class XII or equivalent from a recognized board at a school in the North Eastern Region and already be admitted to the first year of a recognized full-time undergraduate degree. UGC's guidelines also require a valid domicile certificate from a North Eastern state and parental income below Rs 4.5 lakh per year. Class XII completion alone is not enough; check current eligible institution and programme conditions."
+          }
+        ],
+        "benefitNotes": [
+          "UGC lists Rs 80,000 per year; the scheme guidelines express this as Rs 8,000 per month for 10 months. Confirm current award terms in the latest NSP documents."
+        ],
+        "applicationMethod": "The NSP 2026-27 scheme listing shows student applications open from 16 September through 30 November 2026. Recheck the live scheme page before submitting."
+      }
+    },
+    "provenance": [
+      {
+        "claimKey": "scholarship.title",
+        "sourceKey": "ugc-ishan-uday",
+        "sourceUrl": "https://www.ugc.gov.in/Scholarships/stu_Scholarship5",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.summary",
+        "sourceKey": "ugc-ishan-uday",
+        "sourceUrl": "https://www.ugc.gov.in/Scholarships/stu_Scholarship5",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.description",
+        "sourceKey": "ugc-ishan-uday",
+        "sourceUrl": "https://www.ugc.gov.in/Scholarships/stu_Scholarship5",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.description",
+        "sourceKey": "nsp-ay-2026-27",
+        "sourceUrl": "https://scholarships.gov.in/All-Scholarships",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.category",
+        "sourceKey": "ugc-ishan-uday",
+        "sourceUrl": "https://www.ugc.gov.in/Scholarships/stu_Scholarship5",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.provider",
+        "sourceKey": "ugc-ishan-uday",
+        "sourceUrl": "https://www.ugc.gov.in/Scholarships/stu_Scholarship5",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.support",
+        "sourceKey": "ugc-ishan-uday",
+        "sourceUrl": "https://www.ugc.gov.in/Scholarships/stu_Scholarship5",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.study_levels",
+        "sourceKey": "ugc-ishan-uday",
+        "sourceUrl": "https://www.ugc.gov.in/Scholarships/stu_Scholarship5",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.study_levels",
+        "sourceKey": "nsp-ishan-guidelines",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/Guidelines_ISHAN%20UDAY_2324.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.eligibility_regions",
+        "sourceKey": "ugc-ishan-uday",
+        "sourceUrl": "https://www.ugc.gov.in/Scholarships/stu_Scholarship5",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.eligibility_regions",
+        "sourceKey": "nec-north-east-states",
+        "sourceUrl": "https://necouncil.gov.in/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.status",
+        "sourceKey": "nsp-ay-2026-27",
+        "sourceUrl": "https://scholarships.gov.in/All-Scholarships",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.official_url",
+        "sourceKey": "ugc-ishan-uday",
+        "sourceUrl": "https://www.ugc.gov.in/Scholarships/stu_Scholarship5",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.detail.eligibility",
+        "sourceKey": "ugc-ishan-uday",
+        "sourceUrl": "https://www.ugc.gov.in/Scholarships/stu_Scholarship5",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.detail.eligibility",
+        "sourceKey": "nsp-ishan-guidelines",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/Guidelines_ISHAN%20UDAY_2324.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.detail.benefitNotes",
+        "sourceKey": "ugc-ishan-uday",
+        "sourceUrl": "https://www.ugc.gov.in/Scholarships/stu_Scholarship5",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.detail.benefitNotes",
+        "sourceKey": "nsp-ishan-guidelines",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/Guidelines_ISHAN%20UDAY_2324.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.detail.applicationMethod",
+        "sourceKey": "nsp-ay-2026-27",
+        "sourceUrl": "https://scholarships.gov.in/All-Scholarships",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      }
+    ]
+  }
+}

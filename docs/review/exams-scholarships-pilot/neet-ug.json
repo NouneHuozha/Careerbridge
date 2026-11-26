@@ -1,0 +1,115 @@
+{
+  "kind": "exam",
+  "id": "neet-ug",
+  "aliases": [
+    {
+      "sourceSystem": "careerbridge",
+      "externalType": "examination",
+      "externalKey": "neet-ug",
+      "externalContextKey": ""
+    }
+  ],
+  "sources": [
+    {
+      "sourceKey": "nta-neet-ug-2027",
+      "sourceName": "NEET (UG) 2027 information",
+      "authority": "National Testing Agency, Ministry of Education, Government of India",
+      "canonicalUrl": "https://www.nta.gov.in/exams/neet/",
+      "category": "examination",
+      "sourceType": "official_public_web_page",
+      "status": "active"
+    }
+  ],
+  "revision": {
+    "title": "National Eligibility-cum-Entrance Test (UG) (NEET-UG) 2027",
+    "summary": "NTA's national entrance test for undergraduate medical admissions; the 2027 information bulletin is expected in February.",
+    "description": "NTA describes NEET (UG) as a single national entrance test for undergraduate medical admissions, including MBBS, BDS and Indian-system and homoeopathy programmes. The current NTA page describes a Class 12 science subject background and says the NEET (UG) 2027 information bulletin is expected in February 2027. Use that bulletin for confirmed 2027 eligibility, examination format and application instructions; do not treat 2026 bulletin details as 2027 rules.",
+    "publicationStatus": "draft",
+    "dataClassification": "real",
+    "verificationStatus": "pending_review",
+    "examination": {
+      "level": "national",
+      "stages": [
+        "class-12"
+      ],
+      "purpose": "Single national entrance test for undergraduate medical and related programmes.",
+      "programmes": [
+        "MBBS",
+        "BDS",
+        "BAMS",
+        "BUMS",
+        "BSMS",
+        "BHMS"
+      ],
+      "authority": "National Testing Agency, Ministry of Education, Government of India",
+      "regions": [],
+      "fields": [],
+      "officialUrl": "https://www.nta.gov.in/exams/neet/"
+    },
+    "provenance": [
+      {
+        "claimKey": "examination.title",
+        "sourceKey": "nta-neet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/neet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.summary",
+        "sourceKey": "nta-neet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/neet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.description",
+        "sourceKey": "nta-neet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/neet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.level",
+        "sourceKey": "nta-neet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/neet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.stages",
+        "sourceKey": "nta-neet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/neet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.purpose",
+        "sourceKey": "nta-neet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/neet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.programmes",
+        "sourceKey": "nta-neet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/neet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.authority",
+        "sourceKey": "nta-neet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/neet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.official_url",
+        "sourceKey": "nta-neet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/neet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      }
+    ]
+  }
+}

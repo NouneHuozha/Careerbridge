@@ -1,0 +1,111 @@
+{
+  "kind": "exam",
+  "id": "cuet-ug",
+  "aliases": [
+    {
+      "sourceSystem": "careerbridge",
+      "externalType": "examination",
+      "externalKey": "cuet-ug",
+      "externalContextKey": ""
+    }
+  ],
+  "sources": [
+    {
+      "sourceKey": "nta-cuet-ug-2027",
+      "sourceName": "CUET (UG) 2027 information",
+      "authority": "National Testing Agency, Ministry of Education, Government of India",
+      "canonicalUrl": "https://www.nta.gov.in/exams/cuet/",
+      "category": "examination",
+      "sourceType": "official_public_web_page",
+      "status": "active"
+    }
+  ],
+  "revision": {
+    "title": "Common University Entrance Test (UG) (CUET-UG) 2027",
+    "summary": "NTA's common entrance test for undergraduate admission at participating universities.",
+    "description": "NTA's CUET (UG) 2027 page says candidates who have passed Class XII or are appearing in 2027 are eligible. It lists application and document submission for February-March 2027 and an examination window in May-June 2027. Each university sets its own cut-offs, subject combinations and admission criteria, so check the target programme before selecting subjects.",
+    "publicationStatus": "draft",
+    "dataClassification": "real",
+    "verificationStatus": "pending_review",
+    "examination": {
+      "level": "national",
+      "stages": [
+        "class-12"
+      ],
+      "purpose": "Common entrance for undergraduate admission at central universities and participating state, deemed and private universities across India.",
+      "programmes": [
+        "Undergraduate programmes at central universities",
+        "Undergraduate programmes at participating state, deemed and private universities"
+      ],
+      "authority": "National Testing Agency, Ministry of Education, Government of India",
+      "regions": [],
+      "fields": [],
+      "officialUrl": "https://www.nta.gov.in/exams/cuet/"
+    },
+    "provenance": [
+      {
+        "claimKey": "examination.title",
+        "sourceKey": "nta-cuet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/cuet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.summary",
+        "sourceKey": "nta-cuet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/cuet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.description",
+        "sourceKey": "nta-cuet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/cuet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.level",
+        "sourceKey": "nta-cuet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/cuet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.stages",
+        "sourceKey": "nta-cuet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/cuet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.purpose",
+        "sourceKey": "nta-cuet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/cuet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.programmes",
+        "sourceKey": "nta-cuet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/cuet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.authority",
+        "sourceKey": "nta-cuet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/cuet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "examination.official_url",
+        "sourceKey": "nta-cuet-ug-2027",
+        "sourceUrl": "https://www.nta.gov.in/exams/cuet/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      }
+    ]
+  }
+}

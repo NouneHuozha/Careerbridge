@@ -1,0 +1,226 @@
+{
+  "kind": "scholarship",
+  "id": "pm-usp-csss",
+  "aliases": [
+    {
+      "sourceSystem": "careerbridge",
+      "externalType": "scholarship",
+      "externalKey": "pm-usp-csss",
+      "externalContextKey": ""
+    }
+  ],
+  "sources": [
+    {
+      "sourceKey": "nsp-ay-2026-27",
+      "sourceName": "Schemes on the National Scholarship Portal - Academic Year 2026-27",
+      "authority": "National Scholarship Portal, Government of India",
+      "canonicalUrl": "https://scholarships.gov.in/All-Scholarships",
+      "category": "scholarship",
+      "sourceType": "official_public_web_page",
+      "status": "active"
+    },
+    {
+      "sourceKey": "nsp-student-home",
+      "sourceName": "National Scholarship Portal student announcements",
+      "authority": "National Scholarship Portal, Government of India",
+      "canonicalUrl": "https://scholarships.gov.in/Students",
+      "category": "scholarship",
+      "sourceType": "official_public_web_page",
+      "status": "active"
+    },
+    {
+      "sourceKey": "csss-guidelines",
+      "sourceName": "PM-USP CSSS updated guidelines",
+      "authority": "Department of Higher Education, Ministry of Education, Government of India",
+      "canonicalUrl": "https://scholarships.gov.in/public/schemeGuidelines/CSSS_GUIDLINES_07022024_updated.pdf",
+      "category": "scholarship",
+      "sourceType": "official_download",
+      "status": "active"
+    },
+    {
+      "sourceKey": "csss-faq-2025-26",
+      "sourceName": "PM-USP CSSS FAQ 2025-26",
+      "authority": "Department of Higher Education, Ministry of Education, Government of India",
+      "canonicalUrl": "https://scholarships.gov.in/public/schemeGuidelines/FAQ_DOHE_CSSS.pdf",
+      "category": "scholarship",
+      "sourceType": "official_download",
+      "status": "active"
+    }
+  ],
+  "revision": {
+    "title": "PM-USP Central Sector Scheme of Scholarship for College and University Students (CSSS)",
+    "summary": "Merit-cum-means support for eligible college and university students. The 2025-26 FAQ is prior-year guidance; NSP lists the current 2026-27 application cycle separately.",
+    "description": "The Ministry's 2025-26 FAQ describes fresh applicants as students above the 80th percentile in Class XII who pursue a regular degree course, subject to income and other-scholarship conditions. These are prior-year criteria, not automatically confirmed 2026-27 rules. NSP's 2026-27 scheme listing reports student applications open through 30 November 2026; check current-cycle eligibility and the live application status before applying.",
+    "publicationStatus": "draft",
+    "dataClassification": "real",
+    "verificationStatus": "pending_review",
+    "scholarship": {
+      "category": "Merit-cum-means scholarship",
+      "provider": "Department of Higher Education, Ministry of Education, Government of India",
+      "support": "Financial assistance toward day-to-day higher-study expenses; rates vary by course and year.",
+      "studyLevels": [
+        "undergraduate",
+        "postgraduate"
+      ],
+      "eligibilityRegions": "all",
+      "status": "open",
+      "officialUrl": "https://scholarships.gov.in/All-Scholarships",
+      "detail": {
+        "eligibility": [
+          {
+            "title": "Prior-year criteria: 2025-26 FAQ",
+            "description": "The Ministry's 2025-26 FAQ says fresh applicants needed to be above the 80th percentile in the relevant Class XII stream, pursue a regular degree course, have family income up to Rs 4.5 lakh per year, and not receive another scholarship or fee reimbursement. Treat these as 2025-26 FAQ criteria; verify the 2026-27 rules in the current scheme specification."
+          }
+        ],
+        "benefitNotes": [
+          "The updated Ministry guidelines state Rs 12,000 per year at graduation level for the first three years and Rs 20,000 per year at postgraduate level. Later-year rules differ for professional, integrated and technical courses; check the current scheme specification for the applicable rate."
+        ],
+        "applicationMethod": "The NSP 2026-27 scheme listing reports student applications open through 30 November 2026. A separate NSP student-home announcement gives an earlier 31 October renewal deadline, so verify the live scheme-specific route for fresh versus renewal applications.",
+        "sourceYear": "2025-26",
+        "lastChecked": "2026-11-26"
+      }
+    },
+    "provenance": [
+      {
+        "claimKey": "scholarship.title",
+        "sourceKey": "csss-faq-2025-26",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/FAQ_DOHE_CSSS.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.summary",
+        "sourceKey": "csss-faq-2025-26",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/FAQ_DOHE_CSSS.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.summary",
+        "sourceKey": "nsp-ay-2026-27",
+        "sourceUrl": "https://scholarships.gov.in/All-Scholarships",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.description",
+        "sourceKey": "csss-faq-2025-26",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/FAQ_DOHE_CSSS.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.description",
+        "sourceKey": "nsp-ay-2026-27",
+        "sourceUrl": "https://scholarships.gov.in/All-Scholarships",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.category",
+        "sourceKey": "csss-faq-2025-26",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/FAQ_DOHE_CSSS.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.provider",
+        "sourceKey": "nsp-ay-2026-27",
+        "sourceUrl": "https://scholarships.gov.in/All-Scholarships",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.support",
+        "sourceKey": "csss-guidelines",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/CSSS_GUIDLINES_07022024_updated.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.study_levels",
+        "sourceKey": "csss-guidelines",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/CSSS_GUIDLINES_07022024_updated.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.study_levels",
+        "sourceKey": "csss-faq-2025-26",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/FAQ_DOHE_CSSS.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.eligibility_regions",
+        "sourceKey": "csss-guidelines",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/CSSS_GUIDLINES_07022024_updated.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.status",
+        "sourceKey": "nsp-ay-2026-27",
+        "sourceUrl": "https://scholarships.gov.in/All-Scholarships",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.official_url",
+        "sourceKey": "nsp-ay-2026-27",
+        "sourceUrl": "https://scholarships.gov.in/All-Scholarships",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.detail.eligibility",
+        "sourceKey": "csss-faq-2025-26",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/FAQ_DOHE_CSSS.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.detail.benefitNotes",
+        "sourceKey": "csss-guidelines",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/CSSS_GUIDLINES_07022024_updated.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.detail.benefitNotes",
+        "sourceKey": "csss-faq-2025-26",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/FAQ_DOHE_CSSS.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.detail.applicationMethod",
+        "sourceKey": "nsp-ay-2026-27",
+        "sourceUrl": "https://scholarships.gov.in/All-Scholarships",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.detail.applicationMethod",
+        "sourceKey": "nsp-student-home",
+        "sourceUrl": "https://scholarships.gov.in/Students",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.detail.sourceYear",
+        "sourceKey": "csss-faq-2025-26",
+        "sourceUrl": "https://scholarships.gov.in/public/schemeGuidelines/FAQ_DOHE_CSSS.pdf",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "scholarship.detail.lastChecked",
+        "sourceKey": "nsp-ay-2026-27",
+        "sourceUrl": "https://scholarships.gov.in/All-Scholarships",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      }
+    ]
+  }
+}
