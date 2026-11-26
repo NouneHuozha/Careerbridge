@@ -266,10 +266,11 @@ async function InstitutionDetails({
                   </p>
                 )}
               </div>
-              {offering?.duration || offering?.studyMode ? (
+              {offering?.programme || offering?.duration || offering?.studyMode ? (
                 <div className="border-t border-[#cddfd2] px-5 pb-5 sm:px-7 sm:pb-7">
                   <h3 className="mb-3 pt-4 text-xs font-semibold uppercase tracking-[.12em] text-[#557163]">Course information</h3>
                   <div className="grid gap-3 sm:grid-cols-2">
+                    {offering.programme && <Fact label="Official programme name" fact={offering.programme} />}
                     {offering.duration && <Fact label="Duration" fact={offering.duration} />}
                     {offering.studyMode && <Fact label="Study mode" fact={offering.studyMode} />}
                   </div>
@@ -420,9 +421,11 @@ async function InstitutionDetails({
                       <div>
                         <p className="text-sm font-semibold text-[#29483a]">{fact}</p>
                         <p className="mt-1 text-xs text-[#718078]">
-                          {source.checkedOn
-                            ? `${verificationLabel(source.verificationStatus)} · checked ${formatDate(source.checkedOn)}`
-                            : verificationLabel(source.verificationStatus)}
+                          {source.verificationStatus === "verified" && source.checkedOn
+                            ? verificationLabel(source.verificationStatus, source.checkedOn)
+                            : source.checkedOn
+                              ? `${verificationLabel(source.verificationStatus)} · checked ${formatDate(source.checkedOn)}`
+                              : verificationLabel(source.verificationStatus)}
                         </p>
                       </div>
                       <SourceLink source={source} />

@@ -5,6 +5,8 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test, { after, before } from "node:test";
+import { importOneInstitutionCatalogueDraft } from "../../scripts/import-institution-catalogue-draft.mjs";
+import * as catalogueLifecycle from "../../scripts/publish-real-pathway.mjs";
 
 const databaseUrl = process.env.INSTITUTIONS_TEST_DATABASE_URL;
 const expectedDatabaseName = "careerbridge_institutions_test";
@@ -71,6 +73,7 @@ if (!databaseUrl) {
     offering: "a3000000-0000-4000-8000-000000000031",
     demoCourseOffering: "a3000000-0000-4000-8000-000000000032",
     draftCourseOffering: "a3000000-0000-4000-8000-000000000033",
+    lifecycleOfferingRevision: "a3100000-0000-4000-8000-000000000034",
     source: "a3000000-0000-4000-8000-000000000041",
     institutionRevision: "a3100000-0000-4000-8000-000000000001",
     draftInstitutionRevision: "a3100000-0000-4000-8000-000000000002",
@@ -331,6 +334,7 @@ if (!databaseUrl) {
             ),
         }],
       });
+      await addAlias(client, fixture.draftInstitution, "institution", "a3-draft-institution");
       await addItem(client, {
         id: fixture.demoInstitution,
         type: "institution",
@@ -350,6 +354,7 @@ if (!databaseUrl) {
             ),
         }],
       });
+      await addAlias(client, fixture.demoInstitution, "institution", "a3-demo-institution");
       await addItem(client, {
         id: fixture.noPointerInstitution,
         type: "institution",
@@ -422,6 +427,7 @@ if (!databaseUrl) {
             ),
         }],
       });
+      await addAlias(client, fixture.draftCampus, "campus", "a3-draft-campus");
       await addItem(client, {
         id: fixture.demoParentCampus,
         type: "campus",
@@ -493,6 +499,7 @@ if (!databaseUrl) {
           },
         ],
       });
+      await addAlias(client, fixture.course, "course", "a3-course");
       await addItem(client, {
         id: fixture.demoCourse,
         type: "course",
@@ -634,8 +641,29 @@ if (!databaseUrl) {
                 fixture.campusOldRevision,
               ],
             ),
+        }, {
+          id: fixture.lifecycleOfferingRevision,
+          number: 2,
+          status: "draft",
+          classification: "real",
+          title: "A3 Lifecycle Draft Offering",
+          typed: (connection, revisionId) =>
+            connection.query(
+              `INSERT INTO public.course_offering_revisions
+                (revision_id, course_item_id, course_revision_id, campus_item_id, campus_revision_id, slug)
+               VALUES ($1, $2, $3, $4, $5, 'a3-lifecycle-draft-offering')`,
+              [
+                revisionId,
+                fixture.course,
+                fixture.courseNewRevision,
+                fixture.campus,
+                fixture.campusNewRevision,
+              ],
+            ),
         }],
       });
+      await addAlias(client, fixture.draftCourseOffering, "institution-offering", "a3-lifecycle-offering", "a3-course");
+      await addAlias(client, fixture.draftCourseOffering, "institution-offering", "a3-lifecycle-offering", "a3-not-course");
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");
@@ -683,6 +711,12 @@ if (!databaseUrl) {
       id: "a3-bca-offering",
       institutionId: "a3-institution",
       aliases: [
+        {
+          sourceSystem: "careerbridge",
+          externalType: "institution-offering",
+          externalKey: "a3-bca-offering",
+          externalContextKey: "a3-course",
+        },
         {
           sourceSystem: "careerbridge",
           externalType: "institution-offering",
@@ -753,6 +787,10 @@ if (!databaseUrl) {
         publicationStatus: "draft",
         dataClassification: "real",
         verificationStatus: "pending_review",
+        slug: "a3-institution",
+        initials: "A3",
+        institutionType: "College",
+        ownership: "Public",
         content: { website: "https://example.test/a3-institution" },
         provenance: [],
       },
@@ -766,7 +804,7 @@ if (!databaseUrl) {
       aliases: [{
         sourceSystem: "careerbridge",
         externalType: "campus",
-        externalKey: "a3-campus",
+        externalKey: "a3-institution--a3-campus",
         externalContextKey: "",
       }],
       institution: {
@@ -783,6 +821,44 @@ if (!databaseUrl) {
         verificationStatus: "pending_review",
         content: { city: "Test City" },
         provenance: [],
+      },
+    };
+  }
+
+  function importableInstitution(id, canonicalUrl = `https://example.test/${id}`) {
+    return {
+      kind: "institution",
+      id,
+      aliases: [{
+        sourceSystem: "careerbridge",
+        externalType: "institution",
+        externalKey: id,
+        externalContextKey: "",
+      }],
+      sources: [{
+        sourceKey: "institution-site",
+        sourceName: "A3 Imported Institution Source",
+        authority: "A3 Test Authority",
+        canonicalUrl,
+        category: "institution",
+        sourceType: "official_public_web_page",
+      }],
+      revision: {
+        title: "A3 Imported Institution",
+        slug: id,
+        initials: "A3",
+        institutionType: "College",
+        publicationStatus: "draft",
+        dataClassification: "real",
+        verificationStatus: "pending_review",
+        content: { website: canonicalUrl },
+        provenance: [{
+          claimKey: "institution.website",
+          sourceKey: "institution-site",
+          sourceUrl: canonicalUrl,
+          checkedAt: "2026-11-20",
+          verificationStatus: "pending_review",
+        }],
       },
     };
   }
@@ -921,6 +997,55 @@ if (!databaseUrl) {
     }, /must reference a course and a campus catalogue item/);
   });
 
+  test("lifecycle lookups require empty ordinary context and an exact linked course context", async () => {
+    const client = await testPool.connect();
+    try {
+      const institution = await catalogueLifecycle.getRealExamScholarshipReviewRecord(client, {
+        kind: "institution",
+        externalKey: "a3-draft-institution",
+        revisionId: fixture.draftInstitutionRevision,
+      });
+      assert.equal(institution.itemId, fixture.draftInstitution);
+      assert.equal(institution.externalContextKey, "");
+
+      const campus = await catalogueLifecycle.getRealExamScholarshipReviewRecord(client, {
+        kind: "campus",
+        externalKey: "a3-draft-campus",
+        revisionId: fixture.draftCampusRevision,
+      });
+      assert.equal(campus.itemId, fixture.draftCampus);
+      assert.equal(campus.externalContextKey, "");
+
+      const offeringInput = {
+        kind: "course_offering",
+        externalKey: "a3-lifecycle-offering",
+        externalContextKey: "a3-course",
+        revisionId: fixture.lifecycleOfferingRevision,
+      };
+      const offering = await catalogueLifecycle.getRealExamScholarshipReviewRecord(client, offeringInput);
+      assert.equal(offering.itemId, fixture.draftCourseOffering);
+      assert.equal(offering.externalContextKey, "a3-course");
+      assert.equal(offering.revision.id, fixture.lifecycleOfferingRevision);
+
+      assert.equal(await catalogueLifecycle.getRealExamScholarshipReviewRecord(client, {
+        ...offeringInput,
+        externalContextKey: "a3-not-course",
+      }), null);
+      assert.equal(await catalogueLifecycle.getRealExamScholarshipReviewRecord(client, {
+        ...offeringInput,
+        externalContextKey: "",
+      }), null);
+      assert.equal(await catalogueLifecycle.getRealExamScholarshipReviewRecord(client, {
+        kind: "campus",
+        externalKey: "a3-draft-campus",
+        externalContextKey: "a3-course",
+        revisionId: fixture.draftCampusRevision,
+      }), null);
+    } finally {
+      client.release();
+    }
+  });
+
   test("PostgreSQL withholds unverified claims and serves verified evidence only", async () => {
     const offering = await institutionReader.getPublishedCourseOffering(
       "a3-institution",
@@ -1026,5 +1151,241 @@ if (!databaseUrl) {
       ),
       /Published catalogue revisions are immutable/,
     );
+  });
+
+  test("draft importer previews without writes, creates idempotent drafts, and rolls back failures", async () => {
+    const client = await testPool.connect();
+    const record = importableInstitution("a3-imported-institution");
+    let importedItemId = null;
+    try {
+      const preview = await importOneInstitutionCatalogueDraft(client, record, { preview: true });
+      assert.equal(preview.action, "would_insert");
+      assert.equal(preview.identity, "would_create");
+      assert.equal(preview.published, false);
+      assert.equal((await client.query(
+        "SELECT count(*)::int AS count FROM public.catalog_item_aliases WHERE external_key=$1",
+        [record.id],
+      )).rows[0].count, 0);
+
+      const first = await importOneInstitutionCatalogueDraft(client, record);
+      importedItemId = first.catalogItemId;
+      assert.equal(first.action, "inserted");
+      assert.equal(first.identity, "created");
+      assert.equal(first.provenanceCount, 1);
+      assert.equal(first.published, false);
+
+      const withAdditionalAlias = {
+        ...record,
+        aliases: [...record.aliases, {
+          sourceSystem: "pilot-legacy",
+          externalType: "institution",
+          externalKey: "a3-legacy-institution",
+          externalContextKey: "",
+        }],
+      };
+      const second = await importOneInstitutionCatalogueDraft(client, withAdditionalAlias);
+      assert.equal(second.action, "unchanged");
+      assert.equal(second.revisionId, first.revisionId);
+      assert.equal(second.identity, "reused");
+      assert.equal(second.aliasesToCreate.length, 1);
+      assert.equal((await client.query(
+        "SELECT count(*)::int AS count FROM public.catalog_item_aliases WHERE catalog_item_id=$1",
+        [importedItemId],
+      )).rows[0].count, 2);
+      const third = await importOneInstitutionCatalogueDraft(client, withAdditionalAlias);
+      assert.equal(third.action, "unchanged");
+      assert.equal(third.aliasesToCreate.length, 0);
+      const persisted = await client.query(
+        `SELECT i.published_revision_id, r.publication_status, r.data_classification,
+                r.verification_status, count(crs.source_id)::int AS provenance_count
+           FROM public.catalog_items i
+           JOIN public.catalog_item_revisions r ON r.catalog_item_id=i.id
+           LEFT JOIN public.catalog_revision_sources crs ON crs.revision_id=r.id
+          WHERE i.id=$1 GROUP BY i.id, r.id`,
+        [importedItemId],
+      );
+      assert.equal(persisted.rowCount, 1);
+      assert.equal(persisted.rows[0].published_revision_id, null);
+      assert.equal(persisted.rows[0].publication_status, "draft");
+      assert.equal(persisted.rows[0].data_classification, "real");
+      assert.equal(persisted.rows[0].verification_status, "pending_review");
+      assert.equal(persisted.rows[0].provenance_count, 1);
+
+      const rollback = importableInstitution(
+        "a3-import-rollback",
+        "https://example.test/a3-source",
+      );
+      rollback.sources[0].sourceName = "Conflicting Source Name";
+      await assert.rejects(
+        importOneInstitutionCatalogueDraft(client, rollback),
+        /conflicts with existing metadata/,
+      );
+      assert.equal((await client.query(
+        "SELECT count(*)::int AS count FROM public.catalog_item_aliases WHERE external_key=$1",
+        [rollback.id],
+      )).rows[0].count, 0);
+
+      const ambiguous = importableInstitution("a3-ambiguous-institution");
+      ambiguous.aliases.push({
+        sourceSystem: "careerbridge",
+        externalType: "institution",
+        externalKey: "a3-institution",
+        externalContextKey: "",
+      }, {
+        sourceSystem: "careerbridge",
+        externalType: "institution",
+        externalKey: "a3-demo-institution",
+        externalContextKey: "",
+      });
+      await assert.rejects(
+        importOneInstitutionCatalogueDraft(client, ambiguous),
+        /Incoming aliases resolve to different catalogue identities/,
+      );
+      assert.equal((await client.query(
+        "SELECT count(*)::int AS count FROM public.catalog_item_aliases WHERE external_key=$1",
+        [ambiguous.id],
+      )).rows[0].count, 0);
+    } finally {
+      if (importedItemId) {
+        await client.query("DELETE FROM public.catalog_items WHERE id=$1", [importedItemId]);
+        await client.query(
+          "DELETE FROM public.source_registry WHERE normalized_url=public.normalize_source_url($1)",
+          [record.sources[0].canonicalUrl],
+        );
+      }
+      client.release();
+    }
+  });
+
+  test("draft importer rejects a mismatched exact campus revision before creating an offering identity", async () => {
+    const client = await testPool.connect();
+    const record = offeringImportRecord();
+    record.id = "a3-invalid-import-offering";
+    record.aliases = [{
+      sourceSystem: "careerbridge",
+      externalType: "institution-offering",
+      externalKey: record.id,
+      externalContextKey: record.course.id,
+    }];
+    record.campus.revisionId = fixture.courseOldRevision;
+    try {
+      await assert.rejects(
+        importOneInstitutionCatalogueDraft(client, record),
+        /Dependency campus item\/revision relationship does not exist/,
+      );
+      assert.equal((await client.query(
+        "SELECT count(*)::int AS count FROM public.catalog_item_aliases WHERE external_key=$1",
+        [record.id],
+      )).rows[0].count, 0);
+
+      const incorrectCourseRevision = offeringImportRecord();
+      incorrectCourseRevision.id = "a3-invalid-import-course-offering";
+      incorrectCourseRevision.aliases = [{
+        sourceSystem: "careerbridge",
+        externalType: "institution-offering",
+        externalKey: incorrectCourseRevision.id,
+        externalContextKey: incorrectCourseRevision.course.id,
+      }];
+      incorrectCourseRevision.course.revisionId = fixture.campusOldRevision;
+      incorrectCourseRevision.campus.revisionId = fixture.campusNewRevision;
+      await assert.rejects(
+        importOneInstitutionCatalogueDraft(client, incorrectCourseRevision),
+        /Dependency course item\/revision relationship does not exist/,
+      );
+      assert.equal((await client.query(
+        "SELECT count(*)::int AS count FROM public.catalog_item_aliases WHERE external_key=$1",
+        [incorrectCourseRevision.id],
+      )).rows[0].count, 0);
+
+      const contextless = offeringImportRecord();
+      contextless.id = "a3-ambiguous-contextless-offering";
+      contextless.aliases = [{
+        sourceSystem: "careerbridge",
+        externalType: "institution-offering",
+        externalKey: contextless.id,
+        externalContextKey: contextless.course.id,
+      }, {
+        sourceSystem: "careerbridge",
+        externalType: "institution-offering",
+        externalKey: contextless.institutionId,
+        externalContextKey: "",
+      }];
+      contextless.campus.revisionId = fixture.campusNewRevision;
+      contextless.course.revisionId = fixture.courseNewRevision;
+      await assert.rejects(
+        importOneInstitutionCatalogueDraft(client, contextless),
+        /contextless legacy offering alias is ambiguous/,
+      );
+      assert.equal((await client.query(
+        "SELECT count(*)::int AS count FROM public.catalog_item_aliases WHERE external_key=$1",
+        [contextless.id],
+      )).rows[0].count, 0);
+    } finally {
+      client.release();
+    }
+  });
+
+  test("draft importer creates idempotent campus and offering revisions with exact dependencies", async () => {
+    const client = await testPool.connect();
+    const campusRecord = campusImportRecord();
+    campusRecord.id = "a3-imported-campus";
+    campusRecord.aliases[0].externalKey = `${campusRecord.institution.id}--${campusRecord.id}`;
+    const offeringRecord = offeringImportRecord();
+    offeringRecord.id = "a3-imported-offering";
+    offeringRecord.aliases = [{
+      sourceSystem: "careerbridge",
+      externalType: "institution-offering",
+      externalKey: offeringRecord.id,
+      externalContextKey: offeringRecord.course.id,
+    }];
+    offeringRecord.campus.revisionId = fixture.campusNewRevision;
+    offeringRecord.course.revisionId = fixture.courseNewRevision;
+    offeringRecord.revision.details = { duration: "3 years" };
+    offeringRecord.revision.provenance = [];
+    let campusItemId = null;
+    let offeringItemId = null;
+    try {
+      const campusFirst = await importOneInstitutionCatalogueDraft(client, campusRecord);
+      campusItemId = campusFirst.catalogItemId;
+      assert.equal(campusFirst.action, "inserted");
+      assert.equal((await importOneInstitutionCatalogueDraft(client, campusRecord)).action, "unchanged");
+      const campusRow = await client.query(
+        `SELECT i.published_revision_id, r.publication_status, c.institution_item_id
+           FROM public.catalog_items i
+           JOIN public.catalog_item_revisions r ON r.catalog_item_id=i.id
+           JOIN public.campus_revisions c ON c.revision_id=r.id
+          WHERE i.id=$1`,
+        [campusItemId],
+      );
+      assert.equal(campusRow.rowCount, 1);
+      assert.equal(campusRow.rows[0].published_revision_id, null);
+      assert.equal(campusRow.rows[0].publication_status, "draft");
+      assert.equal(campusRow.rows[0].institution_item_id, fixture.institution);
+
+      const offeringFirst = await importOneInstitutionCatalogueDraft(client, offeringRecord);
+      offeringItemId = offeringFirst.catalogItemId;
+      assert.equal(offeringFirst.action, "inserted");
+      assert.equal((await importOneInstitutionCatalogueDraft(client, offeringRecord)).action, "unchanged");
+      const offeringRow = await client.query(
+        `SELECT i.published_revision_id, r.publication_status,
+                o.course_item_id, o.course_revision_id, o.campus_item_id, o.campus_revision_id
+           FROM public.catalog_items i
+           JOIN public.catalog_item_revisions r ON r.catalog_item_id=i.id
+           JOIN public.course_offering_revisions o ON o.revision_id=r.id
+          WHERE i.id=$1`,
+        [offeringItemId],
+      );
+      assert.equal(offeringRow.rowCount, 1);
+      assert.equal(offeringRow.rows[0].published_revision_id, null);
+      assert.equal(offeringRow.rows[0].publication_status, "draft");
+      assert.equal(offeringRow.rows[0].course_item_id, fixture.course);
+      assert.equal(offeringRow.rows[0].course_revision_id, fixture.courseNewRevision);
+      assert.equal(offeringRow.rows[0].campus_item_id, fixture.campus);
+      assert.equal(offeringRow.rows[0].campus_revision_id, fixture.campusNewRevision);
+    } finally {
+      if (offeringItemId) await client.query("DELETE FROM public.catalog_items WHERE id=$1", [offeringItemId]);
+      if (campusItemId) await client.query("DELETE FROM public.catalog_items WHERE id=$1", [campusItemId]);
+      client.release();
+    }
   });
 }

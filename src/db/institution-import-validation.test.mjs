@@ -37,6 +37,10 @@ function institution(overrides = {}) {
       publicationStatus: "draft",
       dataClassification: "real",
       verificationStatus: "pending_review",
+      slug: "kohima-science-college-jotsoma",
+      initials: "KSC",
+      institutionType: "College",
+      ownership: "Government",
       content: { website: "https://college.example/" },
       provenance: [],
     },
@@ -62,7 +66,7 @@ function campus(overrides = {}) {
     aliases: [{
       sourceSystem: "careerbridge",
       externalType: "campus",
-      externalKey: "legacy-campus-key",
+      externalKey: "kohima-science-college-jotsoma--main",
       externalContextKey: "",
     }],
     institution: institutionDependency(),
@@ -85,6 +89,11 @@ function courseOffering(overrides = {}) {
     id: "kohima-bca-offering",
     institutionId: "kohima-science-college-jotsoma",
     aliases: [{
+      sourceSystem: "careerbridge",
+      externalType: "institution-offering",
+      externalKey: "kohima-bca-offering",
+      externalContextKey: "bca",
+    }, {
       sourceSystem: "careerbridge",
       externalType: "institution-offering",
       externalKey: "kohima-science-college-jotsoma",
@@ -135,6 +144,63 @@ test("valid institution, campus, and offering records pass validation", () => {
   assert.doesNotThrow(() => validateInstitutionImportRecord(institution()));
   assert.doesNotThrow(() => validateCampusImportRecord(campus()));
   assert.doesNotThrow(() => validateCourseOfferingImportRecord(courseOffering()));
+});
+
+test("PostgreSQL UUIDs with non-RFC version and variant bits are accepted", () => {
+  const record = courseOffering({
+    course: {
+      ...courseOffering().course,
+      catalogItemId: "567931b0-a9d8-931b-1cfa-b3df49f01c6e",
+    },
+  });
+  assert.doesNotThrow(() => validateCourseOfferingImportRecord(record));
+});
+
+test("institution typed fields and source references are validated", () => {
+  const record = institution({
+    sources: [{
+      sourceKey: "college-site",
+      sourceName: "College website",
+      authority: "Kohima Science College",
+      canonicalUrl: "https://college.example/",
+      category: "institution",
+      sourceType: "official_public_web_page",
+    }],
+    revision: {
+      ...institution().revision,
+      provenance: [{
+        claimKey: "institution.website",
+        sourceKey: "college-site",
+        sourceUrl: "https://college.example/",
+        verificationStatus: "pending_review",
+      }],
+    },
+  });
+  assert.doesNotThrow(() => validateInstitutionImportRecord(record));
+  assert.throws(
+    () => validateInstitutionImportRecord({
+      ...record,
+      revision: { ...record.revision, slug: "different-stable-id" },
+    }),
+    /revision.slug: must match the stable institution ID/,
+  );
+  assert.throws(
+    () => validateInstitutionImportRecord({
+      ...record,
+      revision: {
+        ...record.revision,
+        provenance: [{ ...record.revision.provenance[0], sourceKey: "missing-source" }],
+      },
+    }),
+    /revision.provenance\[0\].sourceKey: must reference a source in record.sources/,
+  );
+  assert.throws(
+    () => validateInstitutionImportRecord({
+      ...record,
+      sources: [{ ...record.sources[0], canonicalUrl: "javascript:alert(1)" }],
+    }),
+    /sources\[0\].canonicalUrl: must be an absolute HTTP\(S\) URL/,
+  );
 });
 
 test("required fields, identifiers, enums, and draft-only imports are checked", () => {
@@ -293,9 +359,14 @@ test("null, empty, and omitted optional values remain distinct in hashes", () =>
   assert.throws(() => canonicalizeImportValue({ optional: undefined }), /JSON-compatible values/);
 });
 
-test("seeded institution-offering alias contexts are preserved without new conventions", () => {
+test("legacy institution-offering aliases are retained alongside a course-bound canonical alias", () => {
   const legacyContext = courseOffering({
     aliases: [{
+      sourceSystem: "careerbridge",
+      externalType: "institution-offering",
+      externalKey: "kohima-bca-offering",
+      externalContextKey: "bca",
+    }, {
       sourceSystem: "careerbridge",
       externalType: "institution-offering",
       externalKey: "kohima-science-college-jotsoma",
@@ -309,11 +380,11 @@ test("seeded institution-offering alias contexts are preserved without new conve
       aliases: [{
         sourceSystem: "careerbridge",
         externalType: "institution-offering",
-        externalKey: "kohima-science-college-jotsoma",
-        externalContextKey: "bca/main",
+        externalKey: "kohima-bca-offering",
+        externalContextKey: "bsc",
       }],
     })),
-    /legacy empty or course-ID context/,
+    /offering context must match the offering's canonical course ID/,
   );
 });
 

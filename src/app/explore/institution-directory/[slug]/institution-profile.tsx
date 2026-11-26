@@ -695,7 +695,7 @@ export default function InstitutionProfile({
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
               {institution.sources.map((source) => (
                 <a
-                  key={source.url}
+                  key={`${source.url}:${source.label}`}
                   href={source.url}
                   target="_blank"
                   rel="noreferrer"

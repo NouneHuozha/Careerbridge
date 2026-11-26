@@ -1,0 +1,54 @@
+{
+  "kind": "campus",
+  "id": "panikhaiti-campus",
+  "aliases": [
+    {
+      "sourceSystem": "careerbridge",
+      "externalType": "campus",
+      "externalKey": "assam-down-town-university--panikhaiti-campus",
+      "externalContextKey": ""
+    }
+  ],
+  "sources": [
+    {
+      "sourceKey": "adtu-campus-contact",
+      "sourceName": "Assam down town University campus location",
+      "authority": "Assam down town University",
+      "canonicalUrl": "https://adtu.in/contact/",
+      "category": "campus",
+      "sourceType": "official_public_web_page",
+      "dataTypes": ["campus_address"],
+      "expectedUpdateBehavior": "Review when the official campus contact address changes.",
+      "status": "active"
+    }
+  ],
+  "institution": {
+    "id": "assam-down-town-university",
+    "catalogItemId": "8c8fc3a6-94e4-43c7-8207-b1b88a176ba2",
+    "itemType": "institution",
+    "publicationStatus": "published",
+    "dataClassification": "real"
+  },
+  "revision": {
+    "title": "Assam down town University Campus",
+    "publicationStatus": "draft",
+    "dataClassification": "real",
+    "verificationStatus": "pending_review",
+    "stateId": "f9311950-b8c5-59dd-a644-9f33eb7c0249",
+    "content": {
+      "locality": "Panikhaiti",
+      "city": "Guwahati",
+      "state": "Assam",
+      "address": "Sankar Madhab Path, Gandhi Nagar, Panikhaiti, Guwahati, Assam, India 781026"
+    },
+    "provenance": [
+      {
+        "claimKey": "campus.address",
+        "sourceKey": "adtu-campus-contact",
+        "sourceUrl": "https://adtu.in/contact/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      }
+    ]
+  }
+}

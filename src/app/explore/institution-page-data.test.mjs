@@ -80,7 +80,24 @@ const offering = {
       externalContextKey: "bca",
     },
   ],
-  provenance: [],
+  provenance: [
+    {
+      sourceName: "North Valley official programme",
+      canonicalUrl: "https://college.example/bca",
+      claimKey: "offering.programme",
+      checkedAt: new Date("2026-11-20T00:00:00.000Z"),
+      verifiedAt: new Date("2026-11-26T00:00:00.000Z"),
+      verificationStatus: "verified",
+    },
+    {
+      sourceName: "North Valley official programme",
+      canonicalUrl: "https://college.example/bca",
+      claimKey: "offering.duration",
+      checkedAt: new Date("2026-11-20T00:00:00.000Z"),
+      verifiedAt: new Date("2026-11-26T00:00:00.000Z"),
+      verificationStatus: "verified",
+    },
+  ],
   id: "offering-1",
   slug: "north-valley-bca",
   courseItemId: "course-bca",
@@ -88,7 +105,7 @@ const offering = {
   campusItemId: campus.catalogItemId,
   campusRevisionId: campus.revisionId,
   institutionItemId: institution.catalogItemId,
-  details: { description: "Published course description" },
+  details: { description: "Published course description", duration: "4 years" },
 };
 
 test("public directory and profile loaders return only published-reader records", async () => {
@@ -137,6 +154,10 @@ test("course list uses matching published offering aliases and relationships", a
   assert.equal(results[0].courseId, "bca");
   assert.equal(results[0].institution.name, institution.title);
   assert.equal(results[0].campus.name, campus.title);
+  assert.equal(results[0].offering?.programme?.value, offering.title);
+  assert.equal(results[0].offering?.programme?.source?.url, "https://college.example/bca");
+  assert.equal(results[0].offering?.programme?.verificationStatus, "verified");
+  assert.equal(results[0].offering?.duration?.value, "4 years");
   assert.equal(results[0].offering?.description?.value, "Published course description");
 });
 
@@ -156,6 +177,7 @@ test("course detail resolves the published offering and rejects missing course c
 
   assert.equal(detail?.slug, "north-valley-bca");
   assert.equal(detail?.courseId, "bca");
+  assert.equal(detail?.offering?.programme?.value, offering.title);
   assert.equal(wrongCourse, null);
   assert.equal(wrongSlug, null);
 });

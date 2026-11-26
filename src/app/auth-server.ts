@@ -167,6 +167,29 @@ function currentUserFailureCategory(error: unknown) {
   return isClerkTransportFailure(error) ? "transport" : "non_retryable";
 }
 
+type ClerkAuthDiagnostic = {
+  event:
+    | "auth_identity"
+    | "auth_identity_exception"
+    | "current_user_lookup"
+    | "current_user_lookup_exception";
+  clerkUserIdPresent: boolean | null;
+  clerkCurrentUserFound: boolean | null;
+  clerkUserIdMatchesCurrentUser: boolean | null;
+  failureCategory?: ReturnType<typeof currentUserFailureCategory>;
+  status?: number | null;
+  clerkErrorCode?: string | null;
+  attempt?: number;
+  maxAttempts?: number;
+  retrying?: boolean;
+};
+
+function logClerkAuthDiagnostic(diagnostic: ClerkAuthDiagnostic) {
+  if (process.env.NODE_ENV === "development") {
+    console.info("[careerbridge-next] Clerk auth diagnostic", diagnostic);
+  }
+}
+
 async function currentUserWithRetry() {
   for (let attempt = 1; attempt <= CURRENT_USER_MAX_ATTEMPTS; attempt += 1) {
     try {
@@ -184,6 +207,19 @@ async function currentUserWithRetry() {
         clerkErrorCode: safeClerkErrorCode(error),
         retrying,
       };
+
+      logClerkAuthDiagnostic({
+        event: "current_user_lookup_exception",
+        clerkUserIdPresent: true,
+        clerkCurrentUserFound: null,
+        clerkUserIdMatchesCurrentUser: null,
+        failureCategory,
+        status: diagnostics.status,
+        clerkErrorCode: diagnostics.clerkErrorCode,
+        attempt,
+        maxAttempts: CURRENT_USER_MAX_ATTEMPTS,
+        retrying,
+      });
 
       if (retrying) {
         console.warn("[careerbridge-next] Clerk current-user lookup failed", diagnostics);
@@ -322,9 +358,37 @@ async function syncClerkPrimaryEmail(clerkUserId: string) {
 }
 
 export async function getCurrentUser() {
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) return null;
+  let clerkUserId: string | null;
+  try {
+    ({ userId: clerkUserId } = await auth());
+  } catch (error) {
+    logClerkAuthDiagnostic({
+      event: "auth_identity_exception",
+      clerkUserIdPresent: null,
+      clerkCurrentUserFound: null,
+      clerkUserIdMatchesCurrentUser: null,
+      failureCategory: currentUserFailureCategory(error),
+      status: errorStatus(error),
+      clerkErrorCode: safeClerkErrorCode(error),
+    });
+    throw error;
+  }
+  if (!clerkUserId) {
+    logClerkAuthDiagnostic({
+      event: "auth_identity",
+      clerkUserIdPresent: false,
+      clerkCurrentUserFound: null,
+      clerkUserIdMatchesCurrentUser: null,
+    });
+    return null;
+  }
   const clerkUser = await currentUserWithRetry();
+  logClerkAuthDiagnostic({
+    event: "current_user_lookup",
+    clerkUserIdPresent: true,
+    clerkCurrentUserFound: clerkUser !== null,
+    clerkUserIdMatchesCurrentUser: clerkUser ? clerkUser.id === clerkUserId : null,
+  });
   if (!clerkUser || clerkUser.id !== clerkUserId) {
     throw new AuthenticationRequiredError("Sign in again to continue.");
   }

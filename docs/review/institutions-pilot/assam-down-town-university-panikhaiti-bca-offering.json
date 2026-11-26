@@ -1,0 +1,78 @@
+{
+  "kind": "course_offering",
+  "id": "assam-down-town-university--panikhaiti-campus--bca",
+  "institutionId": "assam-down-town-university",
+  "aliases": [
+    {
+      "sourceSystem": "careerbridge",
+      "externalType": "institution-offering",
+      "externalKey": "assam-down-town-university--panikhaiti-campus--bca",
+      "externalContextKey": "bca"
+    }
+  ],
+  "campus": {
+    "id": "assam-down-town-university--panikhaiti-campus",
+    "catalogItemId": "799d5563-cec7-4be6-bd55-a1f01bc43866",
+    "revisionId": "5d003843-a734-4efc-8c8c-aec46f9d93ef",
+    "itemType": "campus",
+    "institution": {
+      "id": "assam-down-town-university",
+      "catalogItemId": "8c8fc3a6-94e4-43c7-8207-b1b88a176ba2",
+      "itemType": "institution",
+      "publicationStatus": "published",
+      "dataClassification": "real"
+    },
+    "publicationStatus": "published",
+    "dataClassification": "real"
+  },
+  "course": {
+    "id": "bca",
+    "catalogItemId": "567931b0-a9d8-931b-1cfa-b3df49f01c6e",
+    "revisionId": "a0cbb6a5-be20-4213-a28b-9c218753a644",
+    "itemType": "course",
+    "publicationStatus": "published",
+    "dataClassification": "real"
+  },
+  "sources": [
+    {
+      "sourceKey": "adtu-bca-programme",
+      "sourceName": "Assam down town University — Bachelor of Computer Application",
+      "authority": "Assam down town University",
+      "canonicalUrl": "https://adtu.in/programme/bachelor-of-computer-application.html",
+      "category": "course_offering",
+      "sourceType": "official_public_web_page",
+      "dataTypes": [
+        "course-offering",
+        "duration"
+      ],
+      "expectedUpdateBehavior": "Recheck the official programme page before material updates.",
+      "status": "active"
+    }
+  ],
+  "revision": {
+    "title": "Bachelor of Computer Application",
+    "publicationStatus": "draft",
+    "dataClassification": "real",
+    "verificationStatus": "pending_review",
+    "slug": "assam-down-town-university--panikhaiti-campus--bca",
+    "details": {
+      "duration": "4 years"
+    },
+    "provenance": [
+      {
+        "claimKey": "offering.programme",
+        "sourceKey": "adtu-bca-programme",
+        "sourceUrl": "https://adtu.in/programme/bachelor-of-computer-application.html",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "offering.duration",
+        "sourceKey": "adtu-bca-programme",
+        "sourceUrl": "https://adtu.in/programme/bachelor-of-computer-application.html",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      }
+    ]
+  }
+}

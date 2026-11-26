@@ -29,11 +29,30 @@ export type ImportAlias = {
 
 export type ImportProvenance = {
   claimKey: string;
+  sourceKey?: string;
   sourceId?: string | null;
   sourceUrl?: string | null;
   checkedAt?: string | null;
   verifiedAt?: string | null;
   verificationStatus: CatalogVerificationStatus;
+};
+
+export type ImportSource = {
+  sourceKey: string;
+  sourceName: string;
+  authority?: string | null;
+  canonicalUrl: string;
+  category: string;
+  sourceType:
+    | "official_api"
+    | "structured_government_dataset"
+    | "official_download"
+    | "official_public_web_page"
+    | "admin_manual_entry";
+  dataTypes?: string[];
+  termsNotes?: string | null;
+  expectedUpdateBehavior?: string | null;
+  status?: "active" | "paused" | "retired";
 };
 
 type ImportRevision<TContent> = {
@@ -51,7 +70,12 @@ export type InstitutionImportRecord = {
   kind: "institution";
   id: string;
   aliases: ImportAlias[];
+  sources?: ImportSource[];
   revision: ImportRevision<Record<string, unknown>> & {
+    slug: string;
+    initials: string;
+    institutionType: "College" | "University" | "Institute" | "School" | "Training centre";
+    ownership?: "Government" | "Private" | "Public" | null;
     content: Record<string, unknown>;
   };
 };
@@ -68,6 +92,7 @@ export type CampusImportRecord = {
   kind: "campus";
   id: string;
   aliases: ImportAlias[];
+  sources?: ImportSource[];
   institution: InstitutionDependency;
   revision: ImportRevision<Record<string, unknown>> & {
     stateId?: string | null;
@@ -99,6 +124,7 @@ export type CourseOfferingImportRecord = {
   id: string;
   institutionId: string;
   aliases: ImportAlias[];
+  sources?: ImportSource[];
   campus: CampusDependency;
   course: CourseDependency;
   revision: ImportRevision<Record<string, unknown>> & {
@@ -134,7 +160,8 @@ const verificationStatuses = new Set<CatalogVerificationStatus>([
   "superseded",
 ]);
 const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const stableIdPattern = /^[a-z0-9][a-z0-9._-]{0,179}$/;
 const sensitiveClaimKeys = new Set([
   "admission",
   "admissions",
@@ -188,6 +215,13 @@ function requireString(value: unknown, path: string): asserts value is string {
   }
   if (value !== value.trim()) {
     fail(path, "must not have leading or trailing whitespace; identifiers are not normalized.");
+  }
+}
+
+function requireStableId(value: unknown, path: string): asserts value is string {
+  requireString(value, path);
+  if (!stableIdPattern.test(value)) {
+    fail(path, "must be a lowercase stable catalogue ID of at most 180 characters.");
   }
 }
 
@@ -247,8 +281,11 @@ function validateAlias(aliasValue: unknown, path: string): ImportAlias {
   requireString(alias.sourceSystem, `${path}.sourceSystem`);
   requireString(alias.externalType, `${path}.externalType`);
   requireString(alias.externalKey, `${path}.externalKey`);
-  if (typeof alias.externalContextKey !== "string") {
-    fail(`${path}.externalContextKey`, "must be a string.");
+  if (
+    typeof alias.externalContextKey !== "string" ||
+    alias.externalContextKey !== alias.externalContextKey.trim()
+  ) {
+    fail(`${path}.externalContextKey`, "must be a trimmed string.");
   }
   return alias as ImportAlias;
 }
@@ -258,9 +295,10 @@ function validateAliases(
   kind: InstitutionCatalogImportRecord["kind"],
   externalKey: string,
   courseId?: string,
+  legacyExternalKey?: string,
 ) {
   if (!Array.isArray(value) || value.length === 0) {
-    fail("aliases", "must include at least one existing alias; identities are not created by validation.");
+    fail("aliases", "must include at least one canonical alias.");
   }
   const aliases = value.map((alias, index) => validateAlias(alias, `aliases[${index}]`));
   const keys = new Set<string>();
@@ -301,36 +339,105 @@ function validateAliases(
         (alias) =>
           alias.sourceSystem === "careerbridge" &&
           alias.externalType === "campus" &&
+          alias.externalKey === externalKey &&
           alias.externalContextKey === "",
       )
     ) {
-      fail("aliases", "must include an existing context-free CareerBridge campus alias.");
+      fail("aliases", "must include the canonical context-free CareerBridge campus alias.");
     }
   } else {
+    for (const alias of aliases) {
+      if (alias.externalContextKey !== "" && alias.externalContextKey !== courseId) {
+        fail("aliases", "offering context must match the offering's canonical course ID.");
+      }
+    }
     if (
       !aliases.some(
         (alias) =>
           alias.sourceSystem === "careerbridge" &&
           alias.externalType === "institution-offering" &&
           alias.externalKey === externalKey &&
-          (alias.externalContextKey === "" || alias.externalContextKey === courseId),
+          alias.externalContextKey === courseId,
       )
     ) {
-      fail(
-        "aliases",
-        "must retain an existing institution-offering alias with its legacy empty or course-ID context.",
-      );
+      fail("aliases", "must include a canonical offering alias keyed by offering ID and its course ID.");
     }
     for (const alias of aliases) {
       if (
         alias.sourceSystem === "careerbridge" &&
         alias.externalType === "institution-offering" &&
-        (alias.externalKey !== externalKey ||
-          (alias.externalContextKey !== "" && alias.externalContextKey !== courseId))
+        !(
+          (alias.externalKey === externalKey && alias.externalContextKey === courseId) ||
+          (alias.externalKey === legacyExternalKey &&
+            (alias.externalContextKey === "" || alias.externalContextKey === courseId))
+        )
       ) {
-        fail("aliases", "changes a seeded offering key or context.");
+        fail("aliases", "offering context must match its canonical course ID; legacy institution aliases are preserved.");
       }
     }
+  }
+}
+
+function validateSourceMetadata(value: unknown) {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) fail("sources", "must be an array when provided.");
+  const keys = new Set<string>();
+  for (const [index, sourceValue] of value.entries()) {
+    const path = `sources[${index}]`;
+    const source = requireObject(sourceValue, path);
+    assertOnlyKeys(
+      source,
+      [
+        "sourceKey",
+        "sourceName",
+        "authority",
+        "canonicalUrl",
+        "category",
+        "sourceType",
+        "dataTypes",
+        "termsNotes",
+        "expectedUpdateBehavior",
+        "status",
+      ],
+      path,
+    );
+    requireString(source.sourceKey, `${path}.sourceKey`);
+    requireString(source.sourceName, `${path}.sourceName`);
+    requireString(source.canonicalUrl, `${path}.canonicalUrl`);
+    requireString(source.category, `${path}.category`);
+    requireEnum(source.sourceType, new Set([
+      "official_api",
+      "structured_government_dataset",
+      "official_download",
+      "official_public_web_page",
+      "admin_manual_entry",
+    ]), `${path}.sourceType`);
+    if (source.authority !== undefined && source.authority !== null) {
+      requireString(source.authority, `${path}.authority`);
+    }
+    if (source.dataTypes !== undefined &&
+        (!Array.isArray(source.dataTypes) || !source.dataTypes.every((entry) => typeof entry === "string"))) {
+      fail(`${path}.dataTypes`, "must be an array of strings.");
+    }
+    for (const key of ["termsNotes", "expectedUpdateBehavior"] as const) {
+      if (source[key] !== undefined && source[key] !== null && typeof source[key] !== "string") {
+        fail(`${path}.${key}`, "must be a string or null.");
+      }
+    }
+    if (source.status !== undefined) {
+      requireEnum(source.status, new Set(["active", "paused", "retired"]), `${path}.status`);
+    }
+    let url: URL;
+    try {
+      url = new URL(source.canonicalUrl);
+    } catch {
+      fail(`${path}.canonicalUrl`, "must be an absolute HTTP(S) URL.");
+    }
+    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+      fail(`${path}.canonicalUrl`, "must be an absolute HTTP(S) URL without credentials.");
+    }
+    if (keys.has(source.sourceKey)) fail(`${path}.sourceKey`, "must be unique.");
+    keys.add(source.sourceKey);
   }
 }
 
@@ -360,10 +467,11 @@ function validateProvenance(value: unknown, path: string): ImportProvenance[] {
     const entry = requireObject(entryValue, entryPath);
     assertOnlyKeys(
       entry,
-      ["claimKey", "sourceId", "sourceUrl", "checkedAt", "verifiedAt", "verificationStatus"],
+      ["claimKey", "sourceKey", "sourceId", "sourceUrl", "checkedAt", "verifiedAt", "verificationStatus"],
       entryPath,
     );
     requireString(entry.claimKey, `${entryPath}.claimKey`);
+    if (entry.sourceKey !== undefined) requireString(entry.sourceKey, `${entryPath}.sourceKey`);
     if (entry.sourceId !== undefined && entry.sourceId !== null) {
       requireUuid(entry.sourceId, `${entryPath}.sourceId`);
     }
@@ -389,7 +497,7 @@ function validateProvenance(value: unknown, path: string): ImportProvenance[] {
       }
     }
     requireEnum(entry.verificationStatus, verificationStatuses, `${entryPath}.verificationStatus`);
-    if (entry.sourceId == null && entry.sourceUrl == null) {
+    if (entry.sourceId == null && entry.sourceUrl == null && entry.sourceKey == null) {
       fail(entryPath, "must identify a source URL or existing source ID.");
     }
     if (entry.verificationStatus === "verified") {
@@ -473,7 +581,7 @@ function validateRevision(
   const revision = requireObject(value, "revision");
   const typeKeys =
     kind === "institution"
-      ? ["content"]
+      ? ["slug", "initials", "institutionType", "ownership", "content"]
       : kind === "campus"
         ? ["stateId", "content"]
         : ["slug", "details"];
@@ -520,6 +628,22 @@ function validateRevision(
     const stateId = revision.stateId;
     if (stateId !== null) requireUuid(stateId, "revision.stateId");
   }
+  if (kind === "institution") {
+    requireString(revision.slug, "revision.slug");
+    requireString(revision.initials, "revision.initials");
+    requireEnum(
+      revision.institutionType,
+      new Set(["College", "University", "Institute", "School", "Training centre"]),
+      "revision.institutionType",
+    );
+    if (revision.ownership !== undefined && revision.ownership !== null) {
+      requireEnum(
+        revision.ownership,
+        new Set(["Government", "Private", "Public"]),
+        "revision.ownership",
+      );
+    }
+  }
   if (kind === "course_offering") {
     requireString(revision.slug, "revision.slug");
   }
@@ -530,15 +654,34 @@ function validateRecordBase(value: unknown, kind: InstitutionCatalogImportRecord
   const record = requireObject(value, "record");
   const allowed =
     kind === "institution"
-      ? ["kind", "id", "aliases", "revision"]
+      ? ["kind", "id", "aliases", "sources", "revision"]
       : kind === "campus"
-        ? ["kind", "id", "aliases", "institution", "revision"]
-        : ["kind", "id", "institutionId", "aliases", "campus", "course", "revision"];
+        ? ["kind", "id", "aliases", "sources", "institution", "revision"]
+        : ["kind", "id", "institutionId", "aliases", "sources", "campus", "course", "revision"];
   assertOnlyKeys(record, allowed, "record");
   if (record.kind !== kind) fail("record.kind", `must be "${kind}".`);
   requireString(record.id, "record.id");
   if (!Array.isArray(record.aliases)) fail("aliases", "must be an array.");
+  validateSourceMetadata(record.sources);
   return record;
+}
+
+function validateSourceReferences(record: Record<string, unknown>) {
+  const sourceKeys = new Set(
+    (record.sources as ImportSource[] | undefined)?.map((source) => source.sourceKey) ?? [],
+  );
+  const revision = record.revision as Record<string, unknown>;
+  const provenance = revision.provenance;
+  if (!Array.isArray(provenance)) return;
+  for (const [index, entry] of provenance.entries()) {
+    if (
+      isObject(entry) &&
+      entry.sourceKey !== undefined &&
+      !sourceKeys.has(entry.sourceKey as string)
+    ) {
+      fail(`revision.provenance[${index}].sourceKey`, "must reference a source in record.sources.");
+    }
+  }
 }
 
 function validateInstitutionDependency(value: unknown, path: string): InstitutionDependency {
@@ -548,7 +691,7 @@ function validateInstitutionDependency(value: unknown, path: string): Institutio
     ["id", "catalogItemId", "itemType", "publicationStatus", "dataClassification"],
     path,
   );
-  requireString(dependency.id, `${path}.id`);
+  requireStableId(dependency.id, `${path}.id`);
   requireUuid(dependency.catalogItemId, `${path}.catalogItemId`);
   if (dependency.itemType !== "institution") {
     fail(`${path}.itemType`, 'must be "institution".');
@@ -573,7 +716,7 @@ function validateCampusDependency(value: unknown): CampusDependency {
     ],
     "record.campus",
   );
-  requireString(campus.id, "record.campus.id");
+  requireStableId(campus.id, "record.campus.id");
   requireUuid(campus.catalogItemId, "record.campus.catalogItemId");
   requireUuid(campus.revisionId, "record.campus.revisionId");
   if (campus.itemType !== "campus") fail("record.campus.itemType", 'must be "campus".');
@@ -592,7 +735,7 @@ function validateCourseDependency(value: unknown): CourseDependency {
     ["id", "catalogItemId", "revisionId", "itemType", "publicationStatus", "dataClassification"],
     "record.course",
   );
-  requireString(course.id, "record.course.id");
+  requireStableId(course.id, "record.course.id");
   requireUuid(course.catalogItemId, "record.course.catalogItemId");
   requireUuid(course.revisionId, "record.course.revisionId");
   if (course.itemType !== "course") fail("record.course.itemType", 'must be "course".');
@@ -606,17 +749,23 @@ export function validateInstitutionImportRecord(
 ): asserts value is InstitutionImportRecord {
   const record = validateRecordBase(value, "institution");
   const id = record.id;
-  requireString(id, "record.id");
+  requireStableId(id, "record.id");
   validateAliases(record.aliases, "institution", id);
-  validateRevision(record.revision, "institution");
+  const revision = validateRevision(record.revision, "institution");
+  validateSourceReferences(record);
+  if (revision.slug !== id) {
+    fail("revision.slug", "must match the stable institution ID.");
+  }
 }
 
 export function validateCampusImportRecord(value: unknown): asserts value is CampusImportRecord {
   const record = validateRecordBase(value, "campus");
   const id = record.id;
-  requireString(id, "record.id");
-  validateAliases(record.aliases, "campus", id);
+  requireStableId(id, "record.id");
   const institution = validateInstitutionDependency(record.institution, "record.institution");
+  const campusAliasKey = `${institution.id}--${id}`;
+  requireStableId(campusAliasKey, "aliases.canonicalCampus.externalKey");
+  validateAliases(record.aliases, "campus", campusAliasKey);
   const revision = requireObject(record.revision, "revision");
   const content = requireObject(revision.content, "revision.content");
   if (
@@ -626,6 +775,7 @@ export function validateCampusImportRecord(value: unknown): asserts value is Cam
     fail("record.institution.dataClassification", "a real campus cannot belong to a demo or test institution.");
   }
   validateRevision(revision, "campus");
+  validateSourceReferences(record);
   assertJsonValue(content, "revision.content");
 }
 
@@ -633,10 +783,12 @@ export function validateCourseOfferingImportRecord(
   value: unknown,
 ): asserts value is CourseOfferingImportRecord {
   const record = validateRecordBase(value, "course_offering");
-  requireString(record.institutionId, "record.institutionId");
+  requireStableId(record.institutionId, "record.institutionId");
+  const id = record.id;
+  requireStableId(id, "record.id");
   const campus = validateCampusDependency(record.campus);
   const course = validateCourseDependency(record.course);
-  validateAliases(record.aliases, "course_offering", record.institutionId, course.id);
+  validateAliases(record.aliases, "course_offering", id, course.id, record.institutionId);
   const revision = requireObject(record.revision, "revision");
   const content = requireObject(revision.details, "revision.details");
 
@@ -660,6 +812,7 @@ export function validateCourseOfferingImportRecord(
     }
   }
   validateRevision(revision, "course_offering");
+  validateSourceReferences(record);
   assertJsonValue(content, "revision.details");
 }
 
@@ -714,7 +867,18 @@ function fingerprintPayload(record: InstitutionCatalogImportRecord) {
     .sort((left, right) => canonicalize(left).localeCompare(canonicalize(right)));
 
   if (record.kind === "institution") {
-    return { kind: record.kind, id: record.id, revision, provenance };
+    return {
+      kind: record.kind,
+      id: record.id,
+      revision: {
+        ...revision,
+        slug: record.revision.slug,
+        initials: record.revision.initials,
+        institutionType: record.revision.institutionType,
+        ownership: record.revision.ownership ?? null,
+      },
+      provenance,
+    };
   }
   if (record.kind === "campus") {
     return {

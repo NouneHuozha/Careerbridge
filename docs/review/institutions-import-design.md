@@ -1,6 +1,6 @@
 # Institutions Import & Reader Design
 
-**Status:** Proposed design; no implementation or database operation performed
+**Status:** Design baseline; the draft importer and authenticated review support are implemented. No real institution import or publication has been performed.
 **Scope:** Repository data mapping, catalogue import lifecycle, server-side readers, and frontend migration.
 
 ## Evidence and confidence
@@ -23,6 +23,14 @@ Evidence labels:
 No Neon connection or SQL was used for this design.
 
 ## Current architecture and verified facts
+
+### Implemented import and review workflow
+
+- `scripts/import-institution-catalogue-draft.mjs` imports one institution, campus, or course-offering record per invocation: `node scripts/import-institution-catalogue-draft.mjs [--preview] <one-record.json>`. `--preview` runs read-only and reports identity/revision/source actions; normal execution is restricted to the verified Neon development endpoint and creates draft revisions only.
+- Identity aliases are resolved exactly inside a transaction. Conflicting alias targets fail; existing aliases are retained. The canonical campus alias is parent-qualified as `<institution-id>--<campus-id>`. A course offering uses its own stable ID as the alias key and the canonical course ID as context; compatible legacy institution-key aliases remain intact.
+- Real offerings require exact current published real course and campus revisions and a published real parent institution. The importer hashes normalized persisted content, reuses unchanged revisions, and refuses to overwrite an unresolved non-published revision.
+- The authenticated `src/app/api/admin/catalogue/lifecycle/route.ts` and its existing lifecycle helpers now support institution, campus, and course-offering draft retrieval, submission, source association, claim review, approval, rejection, and guarded publication using the same admin authorization and revision safeguards.
+- No institution/campus/offering payload has been imported into Neon, and no schema migration or real-database write was made. Integration tests use only a temporary disposable PostgreSQL container. The static source data and public readers remain unchanged.
 
 ### Source and route architecture
 
@@ -92,10 +100,10 @@ Flow:
 | Entity | Canonical CareerBridge alias |
 |---|---|
 | Institution | `source_system='careerbridge'`, `external_type='institution'`, `external_key=<stable institution ID>`, empty context. |
-| Campus | `source_system='careerbridge'`, `external_type='campus'`, `external_key=<institution ID>/<campus ID>`, empty context. Parent-qualifying the key is required because the current source repeats campus ID `main`. |
-| Course offering | `source_system='careerbridge'`, `external_type='institution-offering'`, `external_key=<institution ID>`, context that identifies course, campus, and any approved programme/intake variant. Use an encoded/versioned segment format so delimiters cannot make distinct tuples ambiguous. |
+| Campus | `source_system='careerbridge'`, `external_type='campus'`, `external_key=<institution ID>--<campus ID>`, empty context. Parent-qualifying the key avoids collisions when campus IDs such as `main` repeat across institutions. |
+| Course offering | `source_system='careerbridge'`, `external_type='institution-offering'`, `external_key=<stable offering ID>`, `external_context_key=<canonical course ID>`. Legacy institution-key aliases are retained only with empty or matching course-ID context. |
 
-For institution IDs, the existing migration already seeds the exact institution alias convention. Campus aliases are not seeded. The example campus key is a proposed convention and must be fixed before importer implementation.
+For institution IDs, the existing migration already seeds the exact institution alias convention. Campus aliases are not seeded; the parent-qualified convention is now enforced by import validation.
 
 For new identities, create the catalogue row and canonical alias in the same transaction. The database-generated UUID is not the idempotency key; the canonical alias is. An exact alias match must resolve to one catalogue item of the expected type. If it resolves to another type or a conflicting item, abort with an explicit identity conflict.
 

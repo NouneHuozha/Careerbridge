@@ -91,6 +91,7 @@ function makeClient() {
       fields: [],
       official_url: originalSourceUrl,
     },
+    identityRows: null,
     aliases: [{
       sourceSystem: "careerbridge",
       externalType: "examination",
@@ -107,9 +108,12 @@ function makeClient() {
       }
       if (statement.includes("pg_advisory_xact_lock")) return { rowCount: 1, rows: [] };
       if (statement.includes("FROM public.users")) return { rowCount: 1, rows: [{ id: params[0] }] };
-      if (statement.includes("a.source_system='careerbridge'") && statement.includes("r.id=$3")) {
-        return params[1] === externalKey && params[2] === revisionId
-          ? { rowCount: 1, rows: [{ ...state.revision }] }
+      if (statement.includes("a.source_system='careerbridge'") && statement.includes("r.id=$5")) {
+        return params[1] === externalKey && params[2] === "" && params[4] === revisionId
+          ? {
+            rowCount: state.identityRows?.length ?? 1,
+            rows: state.identityRows ?? [{ ...state.revision }],
+          }
           : { rowCount: 0, rows: [] };
       }
       if (statement.includes('SELECT source_system AS "sourceSystem"')) {
@@ -218,6 +222,99 @@ function associationInput(claimKeys = verifiedClaims) {
     claimKeys,
   };
 }
+
+test("review lookup rejects ambiguous exact alias and revision matches", async () => {
+  const mock = makeClient();
+  mock.state.identityRows = [{ ...mock.state.revision }, { ...mock.state.revision }];
+  const record = await publisher.getRealExamScholarshipReviewRecord(mock.client, {
+    kind: "exam",
+    externalKey,
+    revisionId,
+  });
+  assert.equal(record, null);
+});
+
+test("course-offering lookup binds the context to the linked course identity", async () => {
+  const itemId = "a3000000-0000-4000-8000-000000000034";
+  const courseRevisionId = "a3100000-0000-4000-8000-000000000023";
+  const offeringRevisionId = "a3100000-0000-4000-8000-000000000034";
+  const identityRow = {
+    item_id: itemId,
+    item_type: "course_offering",
+    published_revision_id: null,
+    id: offeringRevisionId,
+    catalog_item_id: itemId,
+    revision_number: 1,
+    publication_status: "draft",
+    data_classification: "real",
+    verification_status: "pending_review",
+    title: "Test course offering",
+    typed_revision_id: offeringRevisionId,
+    course_item_id: "a3000000-0000-4000-8000-000000000022",
+    course_revision_id: courseRevisionId,
+    campus_item_id: "a3000000-0000-4000-8000-000000000011",
+    campus_revision_id: "a3100000-0000-4000-8000-000000000012",
+  };
+  const identityQueries = [];
+  const client = {
+    async query(sql, params = []) {
+      const statement = String(sql);
+      if (statement.includes("FROM public.catalog_item_aliases a")) {
+        identityQueries.push({ statement, params });
+        return params[2] === "a3-course"
+          ? { rowCount: 1, rows: [identityRow] }
+          : { rowCount: 0, rows: [] };
+      }
+      if (statement.includes('SELECT source_system AS "sourceSystem"')) {
+        return {
+          rowCount: 1,
+          rows: [{
+            sourceSystem: "careerbridge",
+            externalType: "institution-offering",
+            externalKey: "a3-test-offering",
+            externalContextKey: "a3-course",
+          }],
+        };
+      }
+      if (statement.includes("SELECT crs.source_id")) return { rowCount: 0, rows: [] };
+      throw new Error(`Unexpected SQL in course-offering lifecycle test: ${statement.slice(0, 120)}`);
+    },
+  };
+
+  const exact = await publisher.getRealExamScholarshipReviewRecord(client, {
+    kind: "course_offering",
+    externalKey: "a3-test-offering",
+    externalContextKey: "a3-course",
+    revisionId: offeringRevisionId,
+  });
+  assert.equal(exact?.itemId, itemId);
+  assert.equal(exact?.externalContextKey, "a3-course");
+  assert.match(identityQueries[0].statement, /course_context\.catalog_item_id=t\.course_item_id/);
+  assert.deepEqual(identityQueries[0].params, [
+    "institution-offering",
+    "a3-test-offering",
+    "a3-course",
+    "course_offering",
+    offeringRevisionId,
+  ]);
+
+  const incorrect = await publisher.getRealExamScholarshipReviewRecord(client, {
+    kind: "course_offering",
+    externalKey: "a3-test-offering",
+    externalContextKey: "a3-other-course",
+    revisionId: offeringRevisionId,
+  });
+  assert.equal(incorrect, null);
+
+  const contextless = await publisher.getRealExamScholarshipReviewRecord(client, {
+    kind: "course_offering",
+    externalKey: "a3-test-offering",
+    externalContextKey: "",
+    revisionId: offeringRevisionId,
+  });
+  assert.equal(contextless, null);
+  assert.equal(identityQueries.length, 2);
+});
 
 test("source association is idempotent and review changes only the selected source rows", async () => {
   const mock = makeClient();

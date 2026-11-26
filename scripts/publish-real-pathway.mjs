@@ -49,6 +49,11 @@ const {
   validateRealScholarshipImportRecord,
   requiredScholarshipClaims,
 } = require("../src/db/scholarship-import-validation.ts");
+const {
+  validateInstitutionImportRecord,
+  validateCampusImportRecord,
+  validateCourseOfferingImportRecord,
+} = require("../src/db/institution-import-validation.ts");
 
 function issue(code, message) {
   return { code, message };
@@ -248,15 +253,49 @@ const reviewableCatalogues = {
     validate: validateRealScholarshipImportRecord,
     requiredClaims: requiredScholarshipClaims,
   },
+  institution: {
+    itemType: "institution",
+    aliasType: "institution",
+    table: "institution_revisions",
+    columns: "slug, initials, institution_type, ownership, institution_content",
+    validate: validateInstitutionImportRecord,
+    requiredClaims: ({ revision }) => [...new Set(revision.provenance.map((entry) => entry.claimKey))],
+  },
+  campus: {
+    itemType: "campus",
+    aliasType: "campus",
+    table: "campus_revisions",
+    columns: "institution_item_id, state_id, campus_content",
+    validate: validateCampusImportRecord,
+    requiredClaims: ({ revision }) => [...new Set(revision.provenance.map((entry) => entry.claimKey))],
+  },
+  course_offering: {
+    itemType: "course_offering",
+    aliasType: "institution-offering",
+    table: "course_offering_revisions",
+    columns: "course_item_id, course_revision_id, campus_item_id, campus_revision_id, slug, offering_details",
+    validate: validateCourseOfferingImportRecord,
+    requiredClaims: ({ revision }) => [...new Set(revision.provenance.map((entry) => entry.claimKey))],
+  },
 };
 
 function catalogueError(code, message) {
   return { outcome: code, issues: [issue(code, message)] };
 }
 
-async function findReviewableRevision(client, kind, externalKey, revisionId) {
+async function findReviewableRevision(client, kind, externalKey, revisionId, externalContextKey) {
   const config = reviewableCatalogues[kind];
-  if (!config) throw new Error("Catalogue kind must be exam or scholarship.");
+  if (!config) throw new Error("Unsupported catalogue kind.");
+  const contextKey = externalContextKey ?? "";
+  if (typeof contextKey !== "string" ||
+      (kind === "course_offering" ? contextKey.length === 0 : contextKey !== "")) return null;
+  const courseContextJoin = kind === "course_offering" ? `
+       JOIN public.catalog_item_aliases course_context
+         ON course_context.catalog_item_id=t.course_item_id
+        AND course_context.source_system='careerbridge'
+        AND course_context.external_type='course'
+        AND course_context.external_context_key=''
+        AND course_context.external_key=$3` : "";
   const identity = await client.query(
     `SELECT i.id AS item_id, i.item_type, i.published_revision_id,
             r.id, r.catalog_item_id, r.revision_number, r.publication_status,
@@ -267,9 +306,11 @@ async function findReviewableRevision(client, kind, externalKey, revisionId) {
        JOIN public.catalog_items i ON i.id=a.catalog_item_id
        JOIN public.catalog_item_revisions r ON r.catalog_item_id=i.id
        LEFT JOIN public.${config.table} t ON t.revision_id=r.id
+       ${courseContextJoin}
       WHERE a.source_system='careerbridge' AND a.external_type=$1
-        AND a.external_key=$2 AND a.external_context_key='' AND r.id=$3`,
-    [config.aliasType, externalKey, revisionId],
+        AND a.external_key=$2 AND a.external_context_key=$3
+        AND i.item_type=$4 AND r.id=$5`,
+    [config.aliasType, externalKey, contextKey, config.itemType, revisionId],
   );
   if (identity.rowCount !== 1) return null;
   const row = identity.rows[0];
@@ -295,7 +336,55 @@ async function findReviewableRevision(client, kind, externalKey, revisionId) {
   return { row, aliases: aliases.rows, evidence: evidence.rows, config };
 }
 
-function buildReviewableRecord(kind, loaded) {
+async function getIdentityDescriptor(client, itemId, aliasType) {
+  const result = await client.query(
+    `SELECT i.id, i.item_type, i.published_revision_id, a.external_key,
+            r.publication_status, r.data_classification
+       FROM public.catalog_items i
+       JOIN public.catalog_item_aliases a
+         ON a.catalog_item_id=i.id AND a.source_system='careerbridge'
+        AND a.external_type=$2 AND a.external_context_key=''
+       LEFT JOIN public.catalog_item_revisions r
+         ON r.id=COALESCE(i.published_revision_id,
+              (SELECT latest.id FROM public.catalog_item_revisions latest
+                WHERE latest.catalog_item_id=i.id
+                ORDER BY latest.revision_number DESC LIMIT 1))
+      WHERE i.id=$1`,
+    [itemId, aliasType],
+  );
+  if (result.rowCount !== 1 || result.rows[0].item_type !== aliasType) {
+    throw new Error(`Catalogue dependency ${itemId} does not resolve to one ${aliasType} identity.`);
+  }
+  const row = result.rows[0];
+  return {
+    id: row.external_key,
+    catalogItemId: row.id,
+    itemType: aliasType,
+    publicationStatus: row.publication_status ?? "draft",
+    dataClassification: row.data_classification ?? "real",
+    publishedRevisionId: row.published_revision_id,
+  };
+}
+
+async function getExactRevisionDescriptor(client, itemId, revisionId, itemType, table, columns) {
+  const result = await client.query(
+    `SELECT i.item_type, i.published_revision_id, r.id, r.publication_status,
+            r.data_classification, t.revision_id AS typed_revision_id, ${columns}
+       FROM public.catalog_items i
+       JOIN public.catalog_item_revisions r
+         ON r.catalog_item_id=i.id AND r.id=$2
+       LEFT JOIN public.${table} t ON t.revision_id=r.id
+      WHERE i.id=$1`,
+    [itemId, revisionId],
+  );
+  if (result.rowCount !== 1 || result.rows[0].item_type !== itemType ||
+      result.rows[0].typed_revision_id !== revisionId) {
+    throw new Error(`Catalogue dependency ${itemId}/${revisionId} has an invalid item or revision relationship.`);
+  }
+  return result.rows[0];
+}
+
+async function buildReviewableRecord(client, kind, loaded) {
   const { row, aliases, evidence } = loaded;
   const sources = new Map();
   for (const entry of evidence) {
@@ -331,6 +420,7 @@ function buildReviewableRecord(kind, loaded) {
       verificationStatus: "pending_review",
     })),
   };
+  const record = { kind, id: loaded.id ?? "", aliases, revision, sources: [...sources.values()] };
   if (kind === "exam") {
     revision.examination = {
       level: row.level,
@@ -342,7 +432,9 @@ function buildReviewableRecord(kind, loaded) {
       fields: row.fields,
       ...(row.official_url ? { officialUrl: row.official_url } : {}),
     };
-  } else {
+    return record;
+  }
+  if (kind === "scholarship") {
     revision.scholarship = {
       category: row.category,
       provider: row.provider,
@@ -353,8 +445,116 @@ function buildReviewableRecord(kind, loaded) {
       ...(row.official_url ? { officialUrl: row.official_url } : {}),
       detail: row.detail,
     };
+    return record;
   }
-  return { kind, id: loaded.id ?? "", aliases, revision, sources: [...sources.values()] };
+
+  if (kind === "institution") {
+    Object.assign(revision, {
+      slug: row.slug,
+      initials: row.initials,
+      institutionType: row.institution_type,
+      ownership: row.ownership,
+      content: row.institution_content,
+    });
+    return record;
+  }
+
+  if (kind === "campus") {
+    const institution = await getIdentityDescriptor(client, row.institution_item_id, "institution");
+    const campusPrefix = `${institution.id}--`;
+    if (!(loaded.id ?? "").startsWith(campusPrefix)) {
+      throw new Error("Campus review key does not match its parent-qualified campus alias.");
+    }
+    return {
+      kind,
+      id: loaded.id.slice(campusPrefix.length),
+      aliases,
+      institution: {
+        id: institution.id,
+        catalogItemId: institution.catalogItemId,
+        itemType: "institution",
+        publicationStatus: institution.publicationStatus,
+        dataClassification: institution.dataClassification,
+      },
+      sources: [...sources.values()],
+      revision: {
+        ...revision,
+        stateId: row.state_id,
+        content: row.campus_content,
+      },
+    };
+  }
+
+  const campus = await getExactRevisionDescriptor(
+    client,
+    row.campus_item_id,
+    row.campus_revision_id,
+    "campus",
+    "campus_revisions",
+    "t.institution_item_id, t.state_id, t.campus_content",
+  );
+  const campusIdentity = await getIdentityDescriptor(client, row.campus_item_id, "campus");
+  const institution = await getIdentityDescriptor(client, campus.institution_item_id, "institution");
+  const course = await getExactRevisionDescriptor(
+    client,
+    row.course_item_id,
+    row.course_revision_id,
+    "course",
+    "course_revisions",
+    "t.field_item_id, t.field_revision_id, t.qualification, t.stages, t.entry_after_class10, t.entry_after_class12, t.is_exploration_category, t.course_content",
+  );
+  const courseIdentity = await getIdentityDescriptor(client, row.course_item_id, "course");
+  if (
+    row.publication_status !== "published" &&
+    (campus.published_revision_id !== row.campus_revision_id ||
+      course.published_revision_id !== row.course_revision_id)
+  ) {
+    throw new Error("Unpublished course offerings must use the current published course and campus revisions.");
+  }
+  const canonicalOfferingAlias = aliases.find((alias) =>
+    alias.sourceSystem === "careerbridge" &&
+    alias.externalType === "institution-offering" &&
+    alias.externalKey !== institution.id &&
+    alias.externalContextKey === courseIdentity.id,
+  );
+  if (!canonicalOfferingAlias) {
+    throw new Error("Course offering has no canonical offering ID and course-context alias.");
+  }
+  return {
+    kind,
+    id: canonicalOfferingAlias.externalKey,
+    institutionId: institution.id,
+    aliases,
+    sources: [...sources.values()],
+    campus: {
+      id: campusIdentity.id,
+      catalogItemId: row.campus_item_id,
+      revisionId: row.campus_revision_id,
+      itemType: "campus",
+      institution: {
+        id: institution.id,
+        catalogItemId: institution.catalogItemId,
+        itemType: "institution",
+        publicationStatus: institution.publicationStatus,
+        dataClassification: institution.dataClassification,
+      },
+      publicationStatus: campus.publication_status,
+      dataClassification: campus.data_classification,
+    },
+    course: {
+      id: courseIdentity.id,
+      catalogItemId: row.course_item_id,
+      revisionId: row.course_revision_id,
+      itemType: "course",
+      publicationStatus: course.publication_status,
+      dataClassification: course.data_classification,
+    },
+    revision: {
+      ...revision,
+      slug: row.slug,
+      details: row.offering_details,
+    },
+  };
 }
 
 function actualRequiredClaims(kind, record) {
@@ -378,13 +578,18 @@ function reviewableState(row, itemType) {
   return null;
 }
 
-async function preflightReviewableCatalogue(client, { kind, externalKey, revisionId }) {
-  const loaded = await findReviewableRevision(client, kind, externalKey, revisionId);
+async function preflightReviewableCatalogue(client, { kind, externalKey, externalContextKey, revisionId }) {
+  const loaded = await findReviewableRevision(client, kind, externalKey, revisionId, externalContextKey);
   if (!loaded) return catalogueError("not_found", "Catalogue identity or revision was not found.");
   const { row, evidence, config } = loaded;
   const stateIssue = reviewableState(row, config.itemType);
   if (stateIssue) return { outcome: stateIssue.code, issues: [stateIssue] };
-  const record = buildReviewableRecord(kind, { ...loaded, id: externalKey });
+  let record;
+  try {
+    record = await buildReviewableRecord(client, kind, { ...loaded, id: externalKey });
+  } catch (error) {
+    return catalogueError("blocked_relationship", error.message);
+  }
   const requiredClaims = actualRequiredClaims(kind, record);
   if (evidence.length === 0) return catalogueError("blocked_evidence", "The revision has no registered claim-level provenance.");
   const inactive = evidence.find((source) => source.status !== "active");
@@ -419,6 +624,7 @@ async function preflightReviewableCatalogue(client, { kind, externalKey, revisio
     issues: [],
     kind,
     externalKey,
+    externalContextKey: kind === "course_offering" ? externalContextKey : "",
     catalogueItemId: row.item_id,
     revisionId: row.id,
     revisionNumber: row.revision_number,
@@ -434,8 +640,10 @@ export async function preflightRealExamScholarshipDraft(client, input) {
   return preflightReviewableCatalogue(client, input);
 }
 
-export async function getRealExamScholarshipReviewRecord(client, { kind, externalKey, revisionId }) {
-  const loaded = await findReviewableRevision(client, kind, externalKey, revisionId);
+export async function getRealExamScholarshipReviewRecord(client, {
+  kind, externalKey, externalContextKey, revisionId,
+}) {
+  const loaded = await findReviewableRevision(client, kind, externalKey, revisionId, externalContextKey);
   if (!loaded) return null;
   const { row, aliases, evidence, config } = loaded;
   if (row.item_type !== config.itemType || row.data_classification !== "real" ||
@@ -451,7 +659,7 @@ export async function getRealExamScholarshipReviewRecord(client, { kind, externa
     regions: row.regions,
     fields: row.fields,
     officialUrl: row.official_url,
-  } : {
+  } : kind === "scholarship" ? {
     category: row.category,
     provider: row.provider,
     support: row.support,
@@ -460,10 +668,28 @@ export async function getRealExamScholarshipReviewRecord(client, { kind, externa
     status: row.scholarship_status,
     officialUrl: row.official_url,
     detail: row.detail,
+  } : kind === "institution" ? {
+    slug: row.slug,
+    initials: row.initials,
+    institutionType: row.institution_type,
+    ownership: row.ownership,
+    content: row.institution_content,
+  } : kind === "campus" ? {
+    institutionItemId: row.institution_item_id,
+    stateId: row.state_id,
+    content: row.campus_content,
+  } : {
+    courseItemId: row.course_item_id,
+    courseRevisionId: row.course_revision_id,
+    campusItemId: row.campus_item_id,
+    campusRevisionId: row.campus_revision_id,
+    slug: row.slug,
+    details: row.offering_details,
   };
   return {
     kind,
     externalKey,
+    externalContextKey: kind === "course_offering" ? externalContextKey : "",
     itemId: row.item_id,
     publishedRevisionId: row.published_revision_id,
     aliases,
@@ -495,13 +721,13 @@ export async function getRealExamScholarshipReviewRecord(client, { kind, externa
 }
 
 export async function submitRealExamScholarshipDraftForReview(client, {
-  kind, externalKey, revisionId, reviewerUserId,
+  kind, externalKey, externalContextKey, revisionId, reviewerUserId,
 }) {
   await client.query("BEGIN");
   try {
     await client.query("SELECT pg_advisory_xact_lock($1, $2)", publicationLock);
     await requireReviewer(client, reviewerUserId);
-    const preflight = await preflightReviewableCatalogue(client, { kind, externalKey, revisionId });
+    const preflight = await preflightReviewableCatalogue(client, { kind, externalKey, externalContextKey, revisionId });
     if (preflight.outcome !== "ready_for_review") throw new Error(preflight.issues[0]?.message ?? "Only an eligible draft can be submitted for review.");
     const updated = await client.query(
       `UPDATE public.catalog_item_revisions
@@ -522,7 +748,7 @@ export async function submitRealExamScholarshipDraftForReview(client, {
 }
 
 export async function associateRealExamScholarshipReviewSource(client, {
-  kind, externalKey, revisionId, reviewerUserId, source, claimKeys,
+  kind, externalKey, externalContextKey, revisionId, reviewerUserId, source, claimKeys,
 }) {
   await client.query("BEGIN");
   try {
@@ -532,12 +758,13 @@ export async function associateRealExamScholarshipReviewSource(client, {
         new Set(claimKeys).size !== claimKeys.length) {
       throw new Error("Claim keys must be unique and non-empty.");
     }
-    if (source?.status !== "active" ||
+    const sourceCategory = reviewableCatalogues[kind]?.itemType;
+    if (!sourceCategory || source?.status !== "active" ||
         source?.sourceType !== "official_public_web_page" ||
-        source?.category !== (kind === "exam" ? "examination" : "scholarship")) {
+        source?.category !== sourceCategory) {
       throw new Error("Only an active official catalogue source can be associated.");
     }
-    const preflight = await preflightReviewableCatalogue(client, { kind, externalKey, revisionId });
+    const preflight = await preflightReviewableCatalogue(client, { kind, externalKey, externalContextKey, revisionId });
     if (!["ready_for_evidence_review", "ready_for_approval"].includes(preflight.outcome)) {
       throw new Error(preflight.issues[0]?.message ?? "Source association is not ready for review.");
     }
@@ -585,13 +812,13 @@ export async function associateRealExamScholarshipReviewSource(client, {
 }
 
 export async function recordRealExamScholarshipEvidenceReview(client, {
-  kind, externalKey, revisionId, reviewerUserId, claims,
+  kind, externalKey, externalContextKey, revisionId, reviewerUserId, claims,
 }) {
   await client.query("BEGIN");
   try {
     await client.query("SELECT pg_advisory_xact_lock($1, $2)", publicationLock);
     await requireReviewer(client, reviewerUserId);
-    const preflight = await preflightReviewableCatalogue(client, { kind, externalKey, revisionId });
+    const preflight = await preflightReviewableCatalogue(client, { kind, externalKey, externalContextKey, revisionId });
     if (!["ready_for_evidence_review", "ready_for_approval"].includes(preflight.outcome)) {
       throw new Error(preflight.issues[0]?.message ?? "Evidence can be reviewed only for an in-review revision.");
     }
@@ -676,13 +903,13 @@ export async function recordRealExamScholarshipEvidenceReview(client, {
 }
 
 export async function approveRealExamScholarshipDraft(client, {
-  kind, externalKey, revisionId, reviewerUserId,
+  kind, externalKey, externalContextKey, revisionId, reviewerUserId,
 }) {
   await client.query("BEGIN");
   try {
     await client.query("SELECT pg_advisory_xact_lock($1, $2)", publicationLock);
     await requireReviewer(client, reviewerUserId);
-    const preflight = await preflightReviewableCatalogue(client, { kind, externalKey, revisionId });
+    const preflight = await preflightReviewableCatalogue(client, { kind, externalKey, externalContextKey, revisionId });
     if (preflight.outcome !== "ready_for_approval") throw new Error(preflight.issues[0]?.message ?? "Catalogue revision is not ready for approval.");
     const updated = await client.query(
       `UPDATE public.catalog_item_revisions
@@ -703,13 +930,13 @@ export async function approveRealExamScholarshipDraft(client, {
 }
 
 export async function rejectRealExamScholarshipDraft(client, {
-  kind, externalKey, revisionId, reviewerUserId,
+  kind, externalKey, externalContextKey, revisionId, reviewerUserId,
 }) {
   await client.query("BEGIN");
   try {
     await client.query("SELECT pg_advisory_xact_lock($1, $2)", publicationLock);
     await requireReviewer(client, reviewerUserId);
-    const loaded = await findReviewableRevision(client, kind, externalKey, revisionId);
+    const loaded = await findReviewableRevision(client, kind, externalKey, revisionId, externalContextKey);
     if (!loaded || loaded.row.item_type !== loaded.config.itemType ||
         !["in_review", "approved"].includes(loaded.row.publication_status) ||
         loaded.row.data_classification !== "real" || loaded.row.published_at !== null) {
@@ -733,7 +960,7 @@ export async function rejectRealExamScholarshipDraft(client, {
 }
 
 export async function publishApprovedRealExamScholarship(client, {
-  kind, externalKey, revisionId, expectedPublishedRevisionId, publisherUserId,
+  kind, externalKey, externalContextKey, revisionId, expectedPublishedRevisionId, publisherUserId,
 }) {
   if (expectedPublishedRevisionId !== null && typeof expectedPublishedRevisionId !== "string") {
     throw new Error("expectedPublishedRevisionId must be a revision ID or null for first publication.");
@@ -742,7 +969,7 @@ export async function publishApprovedRealExamScholarship(client, {
   try {
     await client.query("SELECT pg_advisory_xact_lock($1, $2)", publicationLock);
     await requireReviewer(client, publisherUserId);
-    const preflight = await preflightReviewableCatalogue(client, { kind, externalKey, revisionId });
+    const preflight = await preflightReviewableCatalogue(client, { kind, externalKey, externalContextKey, revisionId });
     if (preflight.outcome === "published") {
       await client.query("COMMIT");
       return { action: "unchanged", ...preflight, record: undefined };

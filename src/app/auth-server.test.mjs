@@ -146,6 +146,7 @@ const identityLockPool = {
 function resetState() {
   Object.assign(state, {
     clerkUserId: "user_test_123",
+    authError: null,
     clerkExists: true,
     clerkUser: {
       id: "user_test_123",
@@ -192,13 +193,16 @@ function resetState() {
 
 resetState();
 const clerkServer = {
-  auth: async () => ({
-    userId: state.clerkUserId,
-    has: ({ reverification }) => {
-      state.events.push(`reverification:${reverification}:${state.reverified}`);
-      return state.reverified && reverification === "strict";
-    },
-  }),
+  auth: async () => {
+    if (state.authError) throw state.authError;
+    return {
+      userId: state.clerkUserId,
+      has: ({ reverification }) => {
+        state.events.push(`reverification:${reverification}:${state.reverified}`);
+        return state.reverified && reverification === "strict";
+      },
+    };
+  },
   currentUser: async () => {
     state.currentUserCalls += 1;
     if (state.currentUserResponses.length) {
@@ -268,6 +272,29 @@ async function captureClerkLogs(action) {
   } finally {
     console.warn = originalWarn;
     console.error = originalError;
+  }
+}
+
+async function captureClerkDiagnostics(action, nodeEnv = "development") {
+  const diagnostics = [];
+  const logs = [];
+  const originalInfo = console.info;
+  const originalWarn = console.warn;
+  const originalError = console.error;
+  const originalNodeEnv = process.env.NODE_ENV;
+  console.info = (...args) => diagnostics.push(args);
+  console.warn = (...args) => logs.push(args);
+  console.error = (...args) => logs.push(args);
+  process.env.NODE_ENV = nodeEnv;
+  try {
+    const value = await action();
+    return { value, diagnostics, logs };
+  } finally {
+    console.info = originalInfo;
+    console.warn = originalWarn;
+    console.error = originalError;
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
   }
 }
 
@@ -678,13 +705,14 @@ test("current-user lookup retries transport failures and 5xx responses", async (
     state.clerkUser,
   ];
 
-  const transportResult = await captureClerkLogs(() => authServer.getCurrentUser());
+  const transportResult = await captureClerkDiagnostics(() => authServer.getCurrentUser());
 
   assert.equal(transportResult.value.id, 7);
   assert.equal(state.currentUserCalls, 2);
   assert.equal(transportResult.logs[0][1].failureCategory, "transport");
   assert.equal(transportResult.logs[0][1].attempt, 1);
   assert.equal(transportResult.logs[0][1].retrying, true);
+  assert.equal(transportResult.diagnostics[0][1].failureCategory, "transport");
 
   resetState();
   state.users.set(state.clerkUserId, {
@@ -698,14 +726,121 @@ test("current-user lookup retries transport failures and 5xx responses", async (
     state.clerkUser,
   ];
 
-  const serverResult = await captureClerkLogs(() => authServer.getCurrentUser());
+  const serverResult = await captureClerkDiagnostics(() => authServer.getCurrentUser());
 
   assert.equal(serverResult.value.id, 7);
   assert.equal(state.currentUserCalls, 2);
   assert.equal(serverResult.logs[0][1].failureCategory, "server");
   assert.equal(serverResult.logs[0][1].status, 503);
+  assert.equal(serverResult.diagnostics[0][1].failureCategory, "server");
   assert.equal(JSON.stringify(serverResult.logs).includes("private@example.test"), false);
   assert.equal(JSON.stringify(serverResult.logs).includes("token-value"), false);
+});
+
+test("development Clerk diagnostics distinguish identity and current-user states", async () => {
+  resetState();
+  state.clerkUserId = null;
+  const missingIdentity = await captureClerkDiagnostics(() => authServer.getCurrentUser());
+  assert.equal(missingIdentity.value, null);
+  assert.equal(state.currentUserCalls, 0);
+  assert.deepEqual(missingIdentity.diagnostics[0][1], {
+    event: "auth_identity",
+    clerkUserIdPresent: false,
+    clerkCurrentUserFound: null,
+    clerkUserIdMatchesCurrentUser: null,
+  });
+
+  resetState();
+  state.clerkExists = false;
+  const missingCurrentUser = await captureClerkDiagnostics(() =>
+    assert.rejects(authServer.getCurrentUser(), authServer.AuthenticationRequiredError),
+  );
+  assert.deepEqual(missingCurrentUser.diagnostics[0][1], {
+    event: "current_user_lookup",
+    clerkUserIdPresent: true,
+    clerkCurrentUserFound: false,
+    clerkUserIdMatchesCurrentUser: null,
+  });
+
+  resetState();
+  state.clerkUser = { ...state.clerkUser, id: "user_mismatched" };
+  const mismatchedIdentity = await captureClerkDiagnostics(() =>
+    assert.rejects(authServer.getCurrentUser(), authServer.AuthenticationRequiredError),
+  );
+  assert.deepEqual(mismatchedIdentity.diagnostics[0][1], {
+    event: "current_user_lookup",
+    clerkUserIdPresent: true,
+    clerkCurrentUserFound: true,
+    clerkUserIdMatchesCurrentUser: false,
+  });
+
+  resetState();
+  state.users.set(state.clerkUserId, {
+    id: 7,
+    email: "student@example.test",
+    full_name: "Test Student",
+    auth_provider: "clerk",
+  });
+  const matchingIdentity = await captureClerkDiagnostics(() => authServer.getCurrentUser());
+  assert.deepEqual(matchingIdentity.diagnostics[0][1], {
+    event: "current_user_lookup",
+    clerkUserIdPresent: true,
+    clerkCurrentUserFound: true,
+    clerkUserIdMatchesCurrentUser: true,
+  });
+  const serializedDiagnostics = JSON.stringify(matchingIdentity.diagnostics);
+  assert.equal(serializedDiagnostics.includes(state.clerkUserId), false);
+  assert.equal(serializedDiagnostics.includes("student@example.test"), false);
+});
+
+test("development logs safe lookup exception categories and production adds no diagnostics", async () => {
+  resetState();
+  state.currentUserResponses = [
+    clerkApiError(503, "internal_server_error", "private@example.test secret-value"),
+    state.clerkUser,
+  ];
+  state.users.set(state.clerkUserId, {
+    id: 7,
+    email: "student@example.test",
+    full_name: "Test Student",
+    auth_provider: "clerk",
+  });
+
+  const development = await captureClerkDiagnostics(() => authServer.getCurrentUser());
+  assert.equal(development.diagnostics[0][1].event, "current_user_lookup_exception");
+  assert.equal(development.diagnostics[0][1].failureCategory, "server");
+  assert.equal(development.diagnostics[0][1].status, 503);
+  assert.equal(development.diagnostics[0][1].retrying, true);
+  assert.equal(JSON.stringify(development).includes("private@example.test"), false);
+  assert.equal(JSON.stringify(development).includes("secret-value"), false);
+
+  resetState();
+  state.clerkUser = { ...state.clerkUser, id: "user_mismatched" };
+  const production = await captureClerkDiagnostics(
+    () => assert.rejects(authServer.getCurrentUser(), authServer.AuthenticationRequiredError),
+    "production",
+  );
+  assert.deepEqual(production.diagnostics, []);
+});
+
+test("development diagnostics classify auth identity lookup exceptions without messages", async () => {
+  resetState();
+  state.authError = clerkApiError(503, "internal_server_error", "private@example.test secret-value");
+
+  const result = await captureClerkDiagnostics(() =>
+    assert.rejects(authServer.getCurrentUser(), /ClerkAPIResponseError/),
+  );
+  assert.deepEqual(result.diagnostics[0][1], {
+    event: "auth_identity_exception",
+    clerkUserIdPresent: null,
+    clerkCurrentUserFound: null,
+    clerkUserIdMatchesCurrentUser: null,
+    failureCategory: "server",
+    status: 503,
+    clerkErrorCode: "internal_server_error",
+  });
+  assert.equal(JSON.stringify(result.diagnostics).includes("private@example.test"), false);
+  assert.equal(JSON.stringify(result.diagnostics).includes("secret-value"), false);
 });
 
 test("exhausted Clerk retries stop at the attempt limit and return a safe error", async () => {
@@ -739,13 +874,14 @@ test("non-retryable Clerk responses and identity failures are not retried", asyn
       clerkApiError(status, "authentication_invalid", "request rejected"),
     ];
 
-    await captureClerkLogs(() =>
+    const result = await captureClerkDiagnostics(() =>
       assert.rejects(
         authServer.getCurrentUser(),
         authServer.ClerkUserLookupUnavailableError,
       ),
     );
     assert.equal(state.currentUserCalls, 1);
+    assert.equal(result.diagnostics[0][1].failureCategory, "non_retryable");
   }
 
   resetState();

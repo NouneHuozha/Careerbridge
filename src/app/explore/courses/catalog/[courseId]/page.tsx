@@ -14,7 +14,7 @@ import { Breadcrumbs } from "../../../../breadcrumbs";
 import { SavedItemButton } from "../../../saved-item-button";
 import { HistoryVisit } from "../../../history-visit";
 import { possibilityFields } from "../../../../discover/possibility-fields";
-import { resolvedInstitutionCampusOfferings } from "../../../institutions/institution-data";
+import { listPublicCourseInstitutionOfferings } from "../../../institution-page-data";
 import { getPublishedCourse } from "../../../../../db/courses";
 
 type PageProps = {
@@ -53,12 +53,10 @@ export default async function CourseDetailPage({
     field: course.fieldId,
     stage,
   }).toString()}`;
-  const verifiedInstitutions = resolvedInstitutionCampusOfferings
+  const verifiedInstitutions = (await listPublicCourseInstitutionOfferings(course.id))
     .filter(
       (item) =>
-        item.courseId === course.id &&
-        !item.isDemo &&
-        item.sources?.some(
+        item.sources.some(
           ({ source }) =>
             source.url &&
             source.checkedOn &&

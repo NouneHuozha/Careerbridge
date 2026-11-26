@@ -46,6 +46,7 @@ export type PublicOfferingFact = {
 };
 
 type PublishedOfferingDetails = {
+  programme?: PublicOfferingFact;
   description?: PublicOfferingFact;
   duration?: PublicOfferingFact;
   studyMode?: PublicOfferingFact;
@@ -261,6 +262,9 @@ function mapOfferingDetails(record: PublishedCourseOffering): PublishedOfferingD
   const details = record.details;
   const provenance = record.provenance;
   const result: PublishedOfferingDetails = {};
+
+  const programme = fact(record.title, provenance, "offering.programme");
+  if (programme) result.programme = programme;
 
   for (const key of ["description", "duration", "studyMode"] as const) {
     const mapped = fact(details[key], provenance, `offering.${key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)}`);

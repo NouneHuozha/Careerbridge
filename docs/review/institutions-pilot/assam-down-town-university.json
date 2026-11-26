@@ -1,0 +1,79 @@
+{
+  "kind": "institution",
+  "id": "assam-down-town-university",
+  "aliases": [
+    {
+      "sourceSystem": "careerbridge",
+      "externalType": "institution",
+      "externalKey": "assam-down-town-university",
+      "externalContextKey": ""
+    }
+  ],
+  "sources": [
+    {
+      "sourceKey": "adtu-home",
+      "sourceName": "Assam down town University homepage",
+      "authority": "Assam down town University",
+      "canonicalUrl": "https://adtu.in/",
+      "category": "institution",
+      "sourceType": "official_public_web_page",
+      "dataTypes": ["official_website"],
+      "expectedUpdateBehavior": "Review when the official institutional website changes.",
+      "status": "active"
+    },
+    {
+      "sourceKey": "adtu-about",
+      "sourceName": "About Assam down town University",
+      "authority": "Assam down town University",
+      "canonicalUrl": "https://adtu.in/about/about_adtu/",
+      "category": "institution",
+      "sourceType": "official_public_web_page",
+      "dataTypes": ["institution_name", "institution_type", "ownership"],
+      "expectedUpdateBehavior": "Review when the official institutional profile changes.",
+      "status": "active"
+    }
+  ],
+  "revision": {
+    "title": "Assam down town University",
+    "publicationStatus": "draft",
+    "dataClassification": "real",
+    "verificationStatus": "pending_review",
+    "slug": "assam-down-town-university",
+    "initials": "AdtU",
+    "institutionType": "University",
+    "ownership": "Private",
+    "content": {
+      "website": "https://adtu.in/"
+    },
+    "provenance": [
+      {
+        "claimKey": "institution.name",
+        "sourceKey": "adtu-about",
+        "sourceUrl": "https://adtu.in/about/about_adtu/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "institution.type",
+        "sourceKey": "adtu-about",
+        "sourceUrl": "https://adtu.in/about/about_adtu/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "institution.ownership",
+        "sourceKey": "adtu-about",
+        "sourceUrl": "https://adtu.in/about/about_adtu/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      },
+      {
+        "claimKey": "institution.website",
+        "sourceKey": "adtu-home",
+        "sourceUrl": "https://adtu.in/",
+        "checkedAt": "2026-11-26",
+        "verificationStatus": "pending_review"
+      }
+    ]
+  }
+}
