@@ -69,6 +69,7 @@ function makeState({ classification = "real", status = "draft", verificationStat
       expected_update_behavior: null,
       status: "active",
     })),
+    auditEvents: [],
   };
 }
 
@@ -79,6 +80,10 @@ function fakeClient(initial = {}, userRoles = { 7: "admin", 8: "admin", 9: "admi
     async query(sql, params = []) {
       calls.push({ sql: String(sql), params });
       if (["BEGIN", "COMMIT", "ROLLBACK"].includes(String(sql))) return { rowCount: 0, rows: [] };
+      if (String(sql).startsWith("INSERT INTO public.admin_audit_events")) {
+        state.auditEvents.push(params);
+        return { rowCount: 1, rows: [{ id: "audit-event" }] };
+      }
       if (String(sql).includes("pg_advisory_xact_lock")) return { rowCount: 1, rows: [] };
       if (String(sql).includes("FROM public.users")) {
         return userRoles[params[0]] === "admin"
@@ -275,6 +280,21 @@ test("reviewer attestation, approval, and expected-pointer publication operate a
   assert.equal(published.reviewerUserId, 7);
   assert.equal(mock.state.row.updated_by, 7);
   assert.ok(mock.calls.some((call) => call.sql.includes("pg_advisory_xact_lock")));
+  assert.deepEqual(mock.state.auditEvents, [
+    [7, "pathway", "submit", itemId, revisionId],
+    [7, "pathway", "review", itemId, revisionId],
+    [8, "pathway", "approve", itemId, revisionId],
+    [9, "pathway", "publish", itemId, revisionId],
+  ]);
+
+  const unchanged = await publisher.publishApprovedRealPathway(mock.client, {
+    pathwayId,
+    revisionId,
+    expectedPublishedRevisionId: revisionId,
+    publisherUserId: 9,
+  });
+  assert.equal(unchanged.action, "unchanged");
+  assert.equal(mock.state.auditEvents.length, 4);
 });
 
 test("publication refuses a stale expected pointer without replacing the current pointer", async () => {

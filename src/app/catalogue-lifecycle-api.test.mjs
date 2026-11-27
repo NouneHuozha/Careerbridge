@@ -15,13 +15,16 @@ loadModule.extensions[".ts"] = (module, filename) => {
   module._compile(output, filename);
 };
 
-class AuthenticationRequiredError extends Error {}
-class AccountDeletionPendingError extends Error {}
-class AccountProvisioningRequiredError extends Error {}
+class AdminAuthenticationRequiredError extends Error {}
+class AdminAccessDeniedError extends Error {}
 
 const state = {
   user: { id: 1 },
   authorized: false,
+  authorizationCalls: 0,
+  developmentTargetAllowed: true,
+  developmentTargetChecks: 0,
+  databaseName: "neondb",
   actions: [],
   lookupResult: null,
   lookups: [],
@@ -29,12 +32,14 @@ const state = {
   listQuery: null,
 };
 
-const authServer = {
-  AuthenticationRequiredError,
-  AccountDeletionPendingError,
-  AccountProvisioningRequiredError,
-  async getCurrentUser() {
-    return state.user;
+const adminAuthorization = {
+  AdminAuthenticationRequiredError,
+  AdminAccessDeniedError,
+  async requireAdmin() {
+    state.authorizationCalls += 1;
+    if (!state.user) throw new AdminAuthenticationRequiredError();
+    if (!state.authorized) throw new AdminAccessDeniedError();
+    return { id: state.user.id };
   },
 };
 
@@ -45,7 +50,7 @@ const database = {
         ? { rowCount: 1, rows: [{ id: params[0] }] }
         : { rowCount: 0, rows: [] };
     }
-    return { rowCount: 1, rows: [{ database_name: "neondb" }] };
+    return { rowCount: 1, rows: [{ database_name: state.databaseName }] };
   },
   async connect() {
     return {
@@ -63,7 +68,7 @@ const database = {
           state.listQuery = { sql: String(sql), params };
           return { rowCount: state.listRows.length, rows: state.listRows };
         }
-        return { rowCount: 1, rows: [{ database_name: "neondb" }] };
+        return { rowCount: 1, rows: [{ database_name: state.databaseName }] };
       },
       release() {},
     };
@@ -94,15 +99,21 @@ Module._load = function (request, parent, isMain) {
       NextResponse: { json: (body, init) => new Response(JSON.stringify(body), init) },
     };
   }
-  if (request === "../../../../auth-server" && parent?.filename.endsWith("catalogue\\lifecycle\\route.ts")) {
-    return authServer;
+  if (request === "../../../../admin-auth" && parent?.filename.endsWith("catalogue\\lifecycle\\route.ts")) {
+    return adminAuthorization;
   }
   if (request === "../../../../../db/pool" && parent?.filename.endsWith("catalogue\\lifecycle\\route.ts")) {
-    return { getPool: () => database, getIdentityLockPool: () => database };
+    return { getIdentityLockPool: () => database };
   }
   if (request === "../../../../../../scripts/import-real-pathway-draft.mjs" &&
       parent?.filename.endsWith("catalogue\\lifecycle\\route.ts")) {
-    return { assertDevelopmentTarget() {}, verifyNeonDevelopmentEndpoint() {} };
+    return {
+      assertDevelopmentTarget() {
+        state.developmentTargetChecks += 1;
+        if (!state.developmentTargetAllowed) throw new Error("Development target refused.");
+      },
+      verifyNeonDevelopmentEndpoint() {},
+    };
   }
   if (request === "../../../../../../scripts/publish-real-pathway.mjs" &&
       parent?.filename.endsWith("catalogue\\lifecycle\\route.ts")) {
@@ -124,6 +135,10 @@ function request(body, origin = "http://localhost") {
 function reset() {
   state.user = { id: 1 };
   state.authorized = false;
+  state.authorizationCalls = 0;
+  state.developmentTargetAllowed = true;
+  state.developmentTargetChecks = 0;
+  state.databaseName = "neondb";
   state.actions = [];
   state.lookupResult = null;
   state.lookups = [];
@@ -146,6 +161,27 @@ test("catalogue lifecycle rejects unauthenticated submissions", async () => {
   })));
   assert.equal(response.status, 401);
   assert.equal(state.actions.length, 0);
+
+  const malformed = await route.POST(request("{"));
+  assert.equal(malformed.status, 401);
+  assert.equal(state.actions.length, 0);
+});
+
+test("catalogue lifecycle GET rejects unauthenticated and non-admin requests", async () => {
+  reset();
+  state.user = null;
+  const unauthenticated = await route.GET(getRequest(
+    "http://localhost/api/admin/catalogue/lifecycle?kind=campus",
+  ));
+  assert.equal(unauthenticated.status, 401);
+  assert.equal(state.authorizationCalls, 1);
+
+  reset();
+  const nonAdmin = await route.GET(getRequest(
+    "http://localhost/api/admin/catalogue/lifecycle?kind=campus",
+  ));
+  assert.equal(nonAdmin.status, 403);
+  assert.equal(state.authorizationCalls, 1);
 });
 
 test("catalogue lifecycle rejects non-admin submissions", async () => {
@@ -157,6 +193,56 @@ test("catalogue lifecycle rejects non-admin submissions", async () => {
     revisionId: "4e059b7f-91eb-4e84-aba0-11268020cac3",
   })));
   assert.equal(response.status, 403);
+  assert.equal(state.actions.length, 0);
+
+  const malformed = await route.POST(request("{"));
+  assert.equal(malformed.status, 403);
+  assert.equal(state.actions.length, 0);
+});
+
+test("catalogue lifecycle cannot be authorized by client-supplied actor fields", async () => {
+  reset();
+  state.authorized = true;
+  const response = await route.POST(request(JSON.stringify({
+    action: "submit",
+    kind: "exam",
+    externalKey: "jee-main",
+    revisionId: "4e059b7f-91eb-4e84-aba0-11268020cac3",
+    actorId: 99,
+    role: "admin",
+  })));
+  assert.equal(response.status, 422);
+  assert.equal(state.authorizationCalls, 1);
+  assert.equal(state.actions.length, 0);
+});
+
+test("catalogue lifecycle refuses a failed development target guard", async () => {
+  reset();
+  state.authorized = true;
+  state.developmentTargetAllowed = false;
+  const response = await route.POST(request(JSON.stringify({
+    action: "submit",
+    kind: "exam",
+    externalKey: "jee-main",
+    revisionId: "4e059b7f-91eb-4e84-aba0-11268020cac3",
+  })));
+  assert.equal(response.status, 503);
+  assert.equal(state.developmentTargetChecks, 1);
+  assert.equal(state.authorizationCalls, 0);
+  assert.equal(state.actions.length, 0);
+});
+
+test("catalogue lifecycle refuses a connection outside neondb", async () => {
+  reset();
+  state.authorized = true;
+  state.databaseName = "production";
+  const response = await route.POST(request(JSON.stringify({
+    action: "submit",
+    kind: "exam",
+    externalKey: "jee-main",
+    revisionId: "4e059b7f-91eb-4e84-aba0-11268020cac3",
+  })));
+  assert.equal(response.status, 503);
   assert.equal(state.actions.length, 0);
 });
 

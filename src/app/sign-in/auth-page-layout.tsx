@@ -28,7 +28,9 @@ export default function AuthPageLayout({
     setRecoveringPassword(false);
     const url = new URL(window.location.href);
     url.pathname = `/${nextMode}`;
-    url.search = new URLSearchParams({ next }).toString();
+    const params = new URLSearchParams({ next });
+    if (searchParams.get("setup") === "1") params.set("setup", "1");
+    url.search = params.toString();
     window.history.pushState(null, "", url);
   }
 

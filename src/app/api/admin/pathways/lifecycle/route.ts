@@ -1,11 +1,10 @@
 import { connection, NextRequest, NextResponse } from "next/server";
 import {
-  AccountDeletionPendingError,
-  AccountProvisioningRequiredError,
-  AuthenticationRequiredError,
-  getCurrentUser,
-} from "../../../../auth-server";
-import { getIdentityLockPool, getPool } from "../../../../../db/pool";
+  AdminAccessDeniedError,
+  AdminAuthenticationRequiredError,
+  requireAdmin,
+} from "../../../../admin-auth";
+import { getIdentityLockPool } from "../../../../../db/pool";
 import {
   assertDevelopmentTarget,
   verifyNeonDevelopmentEndpoint,
@@ -84,26 +83,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "This request could not be verified." }, { status: 403, headers: noStore });
   }
 
-  const contentLength = Number(request.headers.get("content-length") ?? 0);
-  if (contentLength > maxBodyBytes) {
-    return NextResponse.json({ error: "This request is too large." }, { status: 413, headers: noStore });
-  }
-
-  let input: unknown;
-  try {
-    const body = await request.text();
-    if (new TextEncoder().encode(body).byteLength > maxBodyBytes) {
-      return NextResponse.json({ error: "This request is too large." }, { status: 413, headers: noStore });
-    }
-    input = JSON.parse(body);
-  } catch {
-    return NextResponse.json({ error: "Please send a valid Pathways lifecycle request." }, { status: 400, headers: noStore });
-  }
-
-  if (!isLifecycleInput(input)) {
-    return NextResponse.json({ error: "The Pathways lifecycle request is invalid." }, { status: 422, headers: noStore });
-  }
-
   try {
     assertDevelopmentTarget({
       directUrl: process.env.DATABASE_URL_UNPOOLED,
@@ -115,17 +94,26 @@ export async function POST(request: NextRequest) {
     });
     verifyNeonDevelopmentEndpoint();
 
-    const actor = await getCurrentUser();
-    if (!actor) {
-      return NextResponse.json({ error: "Sign in before managing Pathways." }, { status: 401, headers: noStore });
+    const actor = await requireAdmin();
+
+    const contentLength = Number(request.headers.get("content-length") ?? 0);
+    if (contentLength > maxBodyBytes) {
+      return NextResponse.json({ error: "This request is too large." }, { status: 413, headers: noStore });
     }
-    const authorization = await getPool().query(
-      `SELECT id FROM public.users
-        WHERE id=$1 AND role='admin' AND auth_provider='clerk' AND external_id IS NOT NULL`,
-      [actor.id],
-    );
-    if (authorization.rowCount !== 1) {
-      return NextResponse.json({ error: "Catalogue administration is not enabled for this account." }, { status: 403, headers: noStore });
+
+    let input: unknown;
+    try {
+      const body = await request.text();
+      if (new TextEncoder().encode(body).byteLength > maxBodyBytes) {
+        return NextResponse.json({ error: "This request is too large." }, { status: 413, headers: noStore });
+      }
+      input = JSON.parse(body);
+    } catch {
+      return NextResponse.json({ error: "Please send a valid Pathways lifecycle request." }, { status: 400, headers: noStore });
+    }
+
+    if (!isLifecycleInput(input)) {
+      return NextResponse.json({ error: "The Pathways lifecycle request is invalid." }, { status: 422, headers: noStore });
     }
 
     const client = await getIdentityLockPool().connect();
@@ -133,6 +121,15 @@ export async function POST(request: NextRequest) {
       const database = await client.query("SELECT current_database() AS database_name");
       if (database.rows[0]?.database_name !== "neondb") {
         throw new Error("Pathways lifecycle operation refused because the database is not the verified development database.");
+      }
+      const role = await client.query(
+        `SELECT id FROM public.users
+          WHERE id=$1 AND role='admin' AND auth_provider='clerk' AND external_id IS NOT NULL
+          FOR SHARE`,
+        [actor.id],
+      );
+      if (role.rowCount !== 1) {
+        throw new AdminAccessDeniedError();
       }
 
       let result;
@@ -172,10 +169,10 @@ export async function POST(request: NextRequest) {
       client.release();
     }
   } catch (error) {
-    if (error instanceof AuthenticationRequiredError) {
+    if (error instanceof AdminAuthenticationRequiredError) {
       return NextResponse.json({ error: "Sign in before managing Pathways." }, { status: 401, headers: noStore });
     }
-    if (error instanceof AccountProvisioningRequiredError || error instanceof AccountDeletionPendingError) {
+    if (error instanceof AdminAccessDeniedError) {
       return NextResponse.json({ error: "Catalogue administration is not enabled for this account." }, { status: 403, headers: noStore });
     }
     console.error("[careerbridge-next] Pathways lifecycle action failed", error);

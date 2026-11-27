@@ -271,3 +271,11 @@
     padding-inline: clamp(1.1rem, 4vw, 5rem);
   }
 }
+
+[data-admin-density="compact"] table :is(th, td) {
+  padding-block: 0.5rem;
+}
+
+[data-admin-density="comfortable"] table :is(th, td) {
+  padding-block: 0.875rem;
+}

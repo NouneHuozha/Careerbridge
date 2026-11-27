@@ -4,6 +4,7 @@ import { useAuth, useSignIn } from "@clerk/nextjs";
 import { Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { postLoginUrl } from "../auth-routing";
 import { useAccount } from "../account-provider";
 import { authUserFromValue } from "../auth-types";
 
@@ -65,7 +66,7 @@ export default function SignInForm({
         (("provisioningRequired" in result && result.provisioningRequired === true) ||
           ("deletionPending" in result && result.deletionPending === true))
       ) {
-        router.push(`/sign-up?next=${encodeURIComponent(next)}`);
+        router.push(`/sign-up?next=${encodeURIComponent(next)}&setup=1`);
         return;
       }
       setError(responseError(
@@ -79,7 +80,7 @@ export default function SignInForm({
       return;
     }
     await account.refresh();
-    router.push(next);
+    router.push(postLoginUrl(next));
   }
 
   async function startRequiredVerification() {

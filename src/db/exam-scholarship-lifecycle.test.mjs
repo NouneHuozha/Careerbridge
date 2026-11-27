@@ -98,6 +98,7 @@ function makeClient() {
       externalKey,
       externalContextKey: "",
     }],
+    auditEvents: [],
   };
 
   const client = {
@@ -105,6 +106,10 @@ function makeClient() {
       const statement = String(sql).trim();
       if (/^(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\b/.test(statement)) {
         return { rowCount: 0, rows: [] };
+      }
+      if (statement.startsWith("INSERT INTO public.admin_audit_events")) {
+        state.auditEvents.push(params);
+        return { rowCount: 1, rows: [{ id: "audit-event" }] };
       }
       if (statement.includes("pg_advisory_xact_lock")) return { rowCount: 1, rows: [] };
       if (statement.includes("FROM public.users")) return { rowCount: 1, rows: [{ id: params[0] }] };
@@ -331,6 +336,7 @@ test("source association is idempotent and review changes only the selected sour
   );
   assert.equal(repeated.sourceRegistryAction, "reused");
   assert.equal(repeated.associationsAdded, 0);
+  assert.deepEqual(mock.state.auditEvents, [[7, "exam", "associate-source", itemId, revisionId]]);
   assert.equal(mock.state.provenance.length, 12);
 
   const claims = requiredClaims.map((claimKey) => ({
@@ -353,6 +359,10 @@ test("source association is idempotent and review changes only the selected sour
   assert.equal(mock.state.revision.publication_status, "in_review");
   assert.equal(mock.state.revision.published_revision_id, null);
   assert.equal(mock.state.revision.verification_status, "partially_verified");
+  assert.deepEqual(mock.state.auditEvents, [
+    [7, "exam", "associate-source", itemId, revisionId],
+    [7, "exam", "review", itemId, revisionId],
+  ]);
   assert.equal(mock.state.provenance.filter((entry) => entry.verification_status === "verified").length, 3);
   assert.equal(mock.state.provenance.filter((entry) => entry.verification_status === "unavailable").length, 9);
   assert.ok(mock.state.provenance

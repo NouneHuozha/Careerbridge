@@ -1,12 +1,11 @@
 import { connection, NextRequest, NextResponse } from "next/server";
 import type { PoolClient } from "pg";
 import {
-  AccountDeletionPendingError,
-  AccountProvisioningRequiredError,
-  AuthenticationRequiredError,
-  getCurrentUser,
-} from "../../../../auth-server";
-import { getIdentityLockPool, getPool } from "../../../../../db/pool";
+  AdminAccessDeniedError,
+  AdminAuthenticationRequiredError,
+  requireAdmin,
+} from "../../../../admin-auth";
+import { getIdentityLockPool } from "../../../../../db/pool";
 import {
   assertDevelopmentTarget,
   verifyNeonDevelopmentEndpoint,
@@ -182,18 +181,6 @@ function isSameOrigin(request: NextRequest) {
   return Boolean(origin && origin === new URL(request.url).origin);
 }
 
-async function authorizeActor() {
-  const actor = await getCurrentUser();
-  if (!actor) return { actor: null, status: 401 as const };
-  const authorization = await getPool().query(
-    `SELECT id FROM public.users
-      WHERE id=$1 AND role='admin' AND auth_provider='clerk' AND external_id IS NOT NULL`,
-    [actor.id],
-  );
-  if (authorization.rowCount !== 1) return { actor: null, status: 403 as const };
-  return { actor, status: 200 as const };
-}
-
 async function verifyDevelopmentTarget() {
   assertDevelopmentTarget({
     directUrl: process.env.DATABASE_URL_UNPOOLED,
@@ -340,13 +327,7 @@ export async function GET(request: NextRequest) {
   await connection();
   try {
     await verifyDevelopmentTarget();
-    const authorization = await authorizeActor();
-    if (!authorization.actor) {
-      return NextResponse.json(
-        { error: authorization.status === 401 ? "Sign in before managing catalogue records." : "Catalogue administration is not enabled for this account." },
-        { status: authorization.status, headers: noStore },
-      );
-    }
+    const actor = await requireAdmin();
     const params = new URL(request.url).searchParams;
     const kind = params.get("kind");
     if (!isCatalogueKind(kind)) {
@@ -355,7 +336,7 @@ export async function GET(request: NextRequest) {
     const externalKey = params.get("externalKey");
     const externalContextKey = params.get("externalContextKey");
     const revisionId = params.get("revisionId");
-    const client = await openAuthorizedClient(authorization.actor.id);
+    const client = await openAuthorizedClient(actor.id);
     try {
       await client.query("BEGIN");
       try {
@@ -363,7 +344,7 @@ export async function GET(request: NextRequest) {
           `SELECT id FROM public.users
             WHERE id=$1 AND role='admin' AND auth_provider='clerk' AND external_id IS NOT NULL
             FOR SHARE`,
-          [authorization.actor.id],
+          [actor.id],
         );
         if (role.rowCount !== 1) {
           await client.query("ROLLBACK");
@@ -408,10 +389,10 @@ export async function GET(request: NextRequest) {
       client.release();
     }
   } catch (error) {
-    if (error instanceof AuthenticationRequiredError) {
+    if (error instanceof AdminAuthenticationRequiredError) {
       return NextResponse.json({ error: "Sign in before managing catalogue records." }, { status: 401, headers: noStore });
     }
-    if (error instanceof AccountProvisioningRequiredError || error instanceof AccountDeletionPendingError) {
+    if (error instanceof AdminAccessDeniedError) {
       return NextResponse.json({ error: "Catalogue administration is not enabled for this account." }, { status: 403, headers: noStore });
     }
     console.error("[careerbridge-next] Catalogue review retrieval failed", error);
@@ -424,33 +405,27 @@ export async function POST(request: NextRequest) {
   if (!isSameOrigin(request)) {
     return NextResponse.json({ error: "This request could not be verified." }, { status: 403, headers: noStore });
   }
-  const contentLength = Number(request.headers.get("content-length") ?? 0);
-  if (contentLength > maxBodyBytes) {
-    return NextResponse.json({ error: "This request is too large." }, { status: 413, headers: noStore });
-  }
-  let input: unknown;
-  try {
-    const body = await request.text();
-    if (new TextEncoder().encode(body).byteLength > maxBodyBytes) {
-      return NextResponse.json({ error: "This request is too large." }, { status: 413, headers: noStore });
-    }
-    input = JSON.parse(body);
-  } catch {
-    return NextResponse.json({ error: "Please send a valid catalogue lifecycle request." }, { status: 400, headers: noStore });
-  }
-  if (!isLifecycleInput(input)) {
-    return NextResponse.json({ error: "The catalogue lifecycle request is invalid." }, { status: 422, headers: noStore });
-  }
   try {
     await verifyDevelopmentTarget();
-    const authorization = await authorizeActor();
-    if (!authorization.actor) {
-      return NextResponse.json(
-        { error: authorization.status === 401 ? "Sign in before managing catalogue records." : "Catalogue administration is not enabled for this account." },
-        { status: authorization.status, headers: noStore },
-      );
+    const actor = await requireAdmin();
+    const contentLength = Number(request.headers.get("content-length") ?? 0);
+    if (contentLength > maxBodyBytes) {
+      return NextResponse.json({ error: "This request is too large." }, { status: 413, headers: noStore });
     }
-    const client = await openAuthorizedClient(authorization.actor.id);
+    let input: unknown;
+    try {
+      const body = await request.text();
+      if (new TextEncoder().encode(body).byteLength > maxBodyBytes) {
+        return NextResponse.json({ error: "This request is too large." }, { status: 413, headers: noStore });
+      }
+      input = JSON.parse(body);
+    } catch {
+      return NextResponse.json({ error: "Please send a valid catalogue lifecycle request." }, { status: 400, headers: noStore });
+    }
+    if (!isLifecycleInput(input)) {
+      return NextResponse.json({ error: "The catalogue lifecycle request is invalid." }, { status: 422, headers: noStore });
+    }
+    const client = await openAuthorizedClient(actor.id);
     try {
       let result;
       const identity = {
@@ -463,7 +438,7 @@ export async function POST(request: NextRequest) {
         case "associate-source":
           result = await associateRealExamScholarshipReviewSource(client, {
             ...identity,
-            reviewerUserId: authorization.actor.id,
+            reviewerUserId: actor.id,
             source: input.source,
             claimKeys: input.claimKeys,
           });
@@ -471,33 +446,33 @@ export async function POST(request: NextRequest) {
         case "submit":
           result = await submitRealExamScholarshipDraftForReview(client, {
             ...identity,
-            reviewerUserId: authorization.actor.id,
+            reviewerUserId: actor.id,
           });
           break;
         case "review":
           result = await recordRealExamScholarshipEvidenceReview(client, {
             ...identity,
-            reviewerUserId: authorization.actor.id,
+            reviewerUserId: actor.id,
             claims: input.claims,
           });
           break;
         case "approve":
           result = await approveRealExamScholarshipDraft(client, {
             ...identity,
-            reviewerUserId: authorization.actor.id,
+            reviewerUserId: actor.id,
           });
           break;
         case "reject":
           result = await rejectRealExamScholarshipDraft(client, {
             ...identity,
-            reviewerUserId: authorization.actor.id,
+            reviewerUserId: actor.id,
           });
           break;
         case "publish":
           result = await publishApprovedRealExamScholarship(client, {
             ...identity,
             expectedPublishedRevisionId: input.expectedPublishedRevisionId,
-            publisherUserId: authorization.actor.id,
+            publisherUserId: actor.id,
           });
           break;
       }
@@ -506,10 +481,10 @@ export async function POST(request: NextRequest) {
       client.release();
     }
   } catch (error) {
-    if (error instanceof AuthenticationRequiredError) {
+    if (error instanceof AdminAuthenticationRequiredError) {
       return NextResponse.json({ error: "Sign in before managing catalogue records." }, { status: 401, headers: noStore });
     }
-    if (error instanceof AccountProvisioningRequiredError || error instanceof AccountDeletionPendingError) {
+    if (error instanceof AdminAccessDeniedError) {
       return NextResponse.json({ error: "Catalogue administration is not enabled for this account." }, { status: 403, headers: noStore });
     }
     const message = error instanceof Error ? error.message : "";

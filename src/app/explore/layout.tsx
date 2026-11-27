@@ -1,8 +1,13 @@
 import type { ReactNode } from "react";
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { getCurrentCareerBridgeRole } from "../auth-role";
 import { StudentNavigation } from "./student-navigation";
 
-export default function ExploreLayout({ children }: { children: ReactNode }) {
+export default async function ExploreLayout({ children }: { children: ReactNode }) {
+  const role = await getCurrentCareerBridgeRole();
+  if (role === "admin") redirect("/admin");
+
   return (
     <>
       <Suspense

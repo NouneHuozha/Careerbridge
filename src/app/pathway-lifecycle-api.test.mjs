@@ -15,24 +15,28 @@ loadModule.extensions[".ts"] = (module, filename) => {
   module._compile(output, filename);
 };
 
-class AuthenticationRequiredError extends Error {}
-class AccountDeletionPendingError extends Error {}
-class AccountProvisioningRequiredError extends Error {}
+class AdminAuthenticationRequiredError extends Error {}
+class AdminAccessDeniedError extends Error {}
 
 const state = {
   user: { id: 42, email: "admin@example.test", name: "Test Admin" },
   authorized: false,
-  authCalls: 0,
+  databaseAuthorized: true,
+  authorizationCalls: 0,
+  developmentTargetAllowed: true,
+  developmentTargetChecks: 0,
+  databaseName: "neondb",
   actions: [],
   queries: [],
 };
-const authServer = {
-  AccountDeletionPendingError,
-  AccountProvisioningRequiredError,
-  AuthenticationRequiredError,
-  async getCurrentUser() {
-    state.authCalls += 1;
-    return state.user;
+const adminAuthorization = {
+  AdminAuthenticationRequiredError,
+  AdminAccessDeniedError,
+  async requireAdmin() {
+    state.authorizationCalls += 1;
+    if (!state.user) throw new AdminAuthenticationRequiredError();
+    if (!state.authorized) throw new AdminAccessDeniedError();
+    return { id: state.user.id };
   },
 };
 const database = {
@@ -42,8 +46,13 @@ const database = {
   },
   async connect() {
     return {
-      async query() {
-        return { rowCount: 1, rows: [{ database_name: "neondb" }] };
+      async query(sql, params = []) {
+        if (/role='admin'/.test(String(sql))) {
+          return state.databaseAuthorized
+            ? { rowCount: 1, rows: [{ id: params[0] }] }
+            : { rowCount: 0, rows: [] };
+        }
+        return { rowCount: 1, rows: [{ database_name: state.databaseName }] };
       },
       release() {},
     };
@@ -64,12 +73,18 @@ Module._load = function (request, parent, isMain) {
       NextResponse: { json: (body, init) => new Response(JSON.stringify(body), init) },
     };
   }
-  if (request === "../../../../auth-server" && parent?.filename.endsWith("pathways\\lifecycle\\route.ts")) return authServer;
+  if (request === "../../../../admin-auth" && parent?.filename.endsWith("pathways\\lifecycle\\route.ts")) return adminAuthorization;
   if (request === "../../../../../db/pool" && parent?.filename.endsWith("pathways\\lifecycle\\route.ts")) {
-    return { getPool: () => database, getIdentityLockPool: () => database };
+    return { getIdentityLockPool: () => database };
   }
   if (request === "../../../../../../scripts/import-real-pathway-draft.mjs" && parent?.filename.endsWith("pathways\\lifecycle\\route.ts")) {
-    return { assertDevelopmentTarget() {}, verifyNeonDevelopmentEndpoint() {} };
+    return {
+      assertDevelopmentTarget() {
+        state.developmentTargetChecks += 1;
+        if (!state.developmentTargetAllowed) throw new Error("Development target refused.");
+      },
+      verifyNeonDevelopmentEndpoint() {},
+    };
   }
   if (request === "../../../../../../scripts/publish-real-pathway.mjs" && parent?.filename.endsWith("pathways\\lifecycle\\route.ts")) {
     return publisher;
@@ -90,13 +105,18 @@ function request(body, origin = "http://localhost") {
 function reset() {
   state.user = { id: 42, email: "admin@example.test", name: "Test Admin" };
   state.authorized = false;
-  state.authCalls = 0;
+  state.databaseAuthorized = true;
+  state.authorizationCalls = 0;
+  state.developmentTargetAllowed = true;
+  state.developmentTargetChecks = 0;
+  state.databaseName = "neondb";
   state.actions = [];
   state.queries = [];
 }
 
 test("lifecycle route rejects client-selected reviewer identities", async () => {
   reset();
+  state.authorized = true;
   const response = await route.POST(request(JSON.stringify({
     action: "submit",
     pathwayId: "open-schooling",
@@ -105,7 +125,7 @@ test("lifecycle route rejects client-selected reviewer identities", async () => 
   })));
 
   assert.equal(response.status, 422);
-  assert.equal(state.authCalls, 0);
+  assert.equal(state.authorizationCalls, 1);
   assert.equal(state.actions.length, 0);
 });
 
@@ -121,13 +141,65 @@ test("lifecycle route rejects unauthenticated and cross-origin requests", async 
   assert.equal(state.actions.length, 0);
 
   reset();
+  state.user = null;
+  const malformed = await route.POST(request("{"));
+  assert.equal(malformed.status, 401);
+  assert.equal(state.actions.length, 0);
+
+  reset();
+  const nonAdminMalformed = await route.POST(request("{"));
+  assert.equal(nonAdminMalformed.status, 403);
+  assert.equal(state.actions.length, 0);
+
+  reset();
   const crossOrigin = await route.POST(request(JSON.stringify({
     action: "submit",
     pathwayId: "open-schooling",
     revisionId: "4e059b7f-91eb-4e84-aba0-11268020cac3",
   }), "http://attacker.test"));
   assert.equal(crossOrigin.status, 403);
-  assert.equal(state.authCalls, 0);
+  assert.equal(state.authorizationCalls, 0);
+  assert.equal(state.actions.length, 0);
+});
+
+test("lifecycle route refuses a failed development target guard", async () => {
+  reset();
+  state.authorized = true;
+  state.developmentTargetAllowed = false;
+  const response = await route.POST(request(JSON.stringify({
+    action: "submit",
+    pathwayId: "open-schooling",
+    revisionId: "4e059b7f-91eb-4e84-aba0-11268020cac3",
+  })));
+  assert.equal(response.status, 503);
+  assert.equal(state.developmentTargetChecks, 1);
+  assert.equal(state.authorizationCalls, 0);
+  assert.equal(state.actions.length, 0);
+});
+
+test("lifecycle route refuses a connection outside neondb", async () => {
+  reset();
+  state.authorized = true;
+  state.databaseName = "production";
+  const response = await route.POST(request(JSON.stringify({
+    action: "submit",
+    pathwayId: "open-schooling",
+    revisionId: "4e059b7f-91eb-4e84-aba0-11268020cac3",
+  })));
+  assert.equal(response.status, 503);
+  assert.equal(state.actions.length, 0);
+});
+
+test("lifecycle route fails closed if authorization changes after client initialization", async () => {
+  reset();
+  state.authorized = true;
+  state.databaseAuthorized = false;
+  const response = await route.POST(request(JSON.stringify({
+    action: "submit",
+    pathwayId: "open-schooling",
+    revisionId: "4e059b7f-91eb-4e84-aba0-11268020cac3",
+  })));
+  assert.equal(response.status, 403);
   assert.equal(state.actions.length, 0);
 });
 
@@ -141,9 +213,7 @@ test("lifecycle route requires an authorized Clerk-backed admin session", async 
 
   assert.equal(response.status, 403);
   assert.equal(state.actions.length, 0);
-  assert.equal(state.queries[0].params[0], 42);
-  assert.match(state.queries[0].sql, /role='admin'/);
-  assert.match(state.queries[0].sql, /auth_provider='clerk'/);
+  assert.equal(state.authorizationCalls, 1);
 });
 
 test("lifecycle route derives the actor from Clerk and delegates only after authorization", async () => {

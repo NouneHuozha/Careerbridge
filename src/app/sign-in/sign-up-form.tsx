@@ -5,6 +5,7 @@ import { Eye, EyeOff, LockKeyhole, Mail, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { postLoginUrl } from "../auth-routing";
 import { useAccount } from "../account-provider";
 import {
   createCareerBridgeAccountDeletionFetcher,
@@ -86,7 +87,7 @@ export default function SignUpForm({
         }
         if (response.ok) {
           await account.refresh();
-          router.replace(next);
+          router.replace(postLoginUrl(next));
           return;
         }
         setError(responseError(result, "Your CareerBridge account could not be loaded."));
@@ -124,7 +125,7 @@ export default function SignUpForm({
     }
 
     await account.refresh();
-    router.push(next);
+    router.push(postLoginUrl(next));
   }
 
   async function retryAccountDeletion() {

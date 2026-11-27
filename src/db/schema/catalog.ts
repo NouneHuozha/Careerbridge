@@ -27,6 +27,22 @@ export type CatalogItemType =
   | "examination"
   | "scholarship";
 
+export type AdminAuditKind =
+  | "exam"
+  | "scholarship"
+  | "institution"
+  | "campus"
+  | "course_offering"
+  | "pathway";
+
+export type AdminAuditAction =
+  | "submit"
+  | "associate-source"
+  | "review"
+  | "approve"
+  | "reject"
+  | "publish";
+
 export const states = pgTable(
   "states",
   {
@@ -451,6 +467,53 @@ export const catalogRevisionSources = pgTable(
     check(
       "catalog_revision_sources_verification_check",
       sql`${table.verificationStatus} IS NULL OR ${table.verificationStatus} IN ('not_collected', 'unverified', 'pending_review', 'verified', 'partially_verified', 'disputed', 'unavailable', 'stale', 'expired', 'superseded')`,
+    ),
+  ],
+);
+
+export const adminAuditEvents = pgTable(
+  "admin_audit_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    actorId: integer("actor_id").notNull(),
+    kind: text("kind").$type<AdminAuditKind>().notNull(),
+    action: text("action").$type<AdminAuditAction>().notNull(),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => catalogItems.id, { onDelete: "restrict" }),
+    revisionId: uuid("revision_id").notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "admin_audit_events_item_revision_fk",
+      columns: [table.itemId, table.revisionId],
+      foreignColumns: [catalogItemRevisions.catalogItemId, catalogItemRevisions.id],
+    }).onDelete("restrict"),
+    index("admin_audit_events_item_created_idx").on(
+      table.itemId,
+      table.createdAt.desc(),
+    ),
+    index("admin_audit_events_revision_created_idx").on(
+      table.revisionId,
+      table.createdAt.desc(),
+    ),
+    index("admin_audit_events_actor_created_idx").on(
+      table.actorId,
+      table.createdAt.desc(),
+    ),
+    index("admin_audit_events_kind_action_created_idx").on(
+      table.kind,
+      table.action,
+      table.createdAt.desc(),
+    ),
+    check(
+      "admin_audit_events_kind_check",
+      sql`${table.kind} IN ('exam', 'scholarship', 'institution', 'campus', 'course_offering', 'pathway')`,
+    ),
+    check(
+      "admin_audit_events_action_check",
+      sql`${table.action} IN ('submit', 'associate-source', 'review', 'approve', 'reject', 'publish')`,
     ),
   ],
 );

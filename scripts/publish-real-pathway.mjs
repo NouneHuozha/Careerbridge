@@ -236,6 +236,22 @@ async function requireReviewer(client, reviewerUserId) {
   }
 }
 
+async function insertAdminAuditEvent(client, actorId, kind, action, itemId, revisionId) {
+  let result;
+  try {
+    result = await client.query(
+      `INSERT INTO public.admin_audit_events
+         (actor_id, kind, action, item_id, revision_id)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id`,
+      [actorId, kind, action, itemId, revisionId],
+    );
+  } catch (error) {
+    throw new Error("Admin audit event could not be recorded.", { cause: error });
+  }
+  if (result.rowCount !== 1) throw new Error("Admin audit event could not be recorded.");
+}
+
 const reviewableCatalogues = {
   exam: {
     itemType: "examination",
@@ -739,6 +755,7 @@ export async function submitRealExamScholarshipDraftForReview(client, {
       [revisionId, preflight.catalogueItemId, reviewerUserId],
     );
     if (updated.rowCount !== 1) throw new Error("Catalogue draft changed while submission for review was in progress.");
+    await insertAdminAuditEvent(client, reviewerUserId, kind, "submit", preflight.catalogueItemId, revisionId);
     await client.query("COMMIT");
     return { action: "submitted_for_review", ...preflight, outcome: "in_review", record: undefined, submittedByUserId: reviewerUserId };
   } catch (error) {
@@ -792,6 +809,9 @@ export async function associateRealExamScholarshipReviewSource(client, {
         [revisionId, registered.id, claimKey],
       );
       associationsAdded += association.rowCount ?? 0;
+    }
+    if (associationsAdded > 0) {
+      await insertAdminAuditEvent(client, reviewerUserId, kind, "associate-source", preflight.catalogueItemId, revisionId);
     }
     await client.query("COMMIT");
     return {
@@ -885,6 +905,7 @@ export async function recordRealExamScholarshipEvidenceReview(client, {
       [revisionId, overall, reviewerUserId],
     );
     if (revision.rowCount !== 1) throw new Error("Catalogue lifecycle changed during evidence review.");
+    await insertAdminAuditEvent(client, reviewerUserId, kind, "review", preflight.catalogueItemId, revisionId);
     await client.query("COMMIT");
     return {
       action: "evidence_reviewed",
@@ -921,6 +942,7 @@ export async function approveRealExamScholarshipDraft(client, {
       [revisionId, preflight.catalogueItemId, reviewerUserId],
     );
     if (updated.rowCount !== 1) throw new Error("Catalogue review changed while approval was in progress.");
+    await insertAdminAuditEvent(client, reviewerUserId, kind, "approve", preflight.catalogueItemId, revisionId);
     await client.query("COMMIT");
     return { action: "approved", ...preflight, outcome: "ready_for_publication", record: undefined, approverUserId: reviewerUserId };
   } catch (error) {
@@ -951,6 +973,7 @@ export async function rejectRealExamScholarshipDraft(client, {
       [revisionId, reviewerUserId],
     );
     if (updated.rowCount !== 1) throw new Error("Catalogue revision changed while rejection was in progress.");
+    await insertAdminAuditEvent(client, reviewerUserId, kind, "reject", loaded.row.item_id, revisionId);
     await client.query("COMMIT");
     return { action: "rejected", kind, externalKey, revisionId, reviewerUserId };
   } catch (error) {
@@ -1021,6 +1044,7 @@ export async function publishApprovedRealExamScholarship(client, {
         verification.rows[0].verified_count < preflight.requiredClaims.length) {
       throw new Error("Post-publication pointer, typed revision, or claim-level evidence verification failed.");
     }
+    await insertAdminAuditEvent(client, publisherUserId, kind, "publish", preflight.catalogueItemId, revisionId);
     await client.query("COMMIT");
     return { action: "published", ...preflight, outcome: "published", record: undefined, publisherUserId };
   } catch (error) {
@@ -1049,6 +1073,7 @@ export async function submitRealPathwayDraftForReview(client, { pathwayId, revis
       [revisionId, preflight.pathwayItemId],
     );
     if (update.rowCount !== 1) throw new Error("Pathway draft changed while submission for review was in progress.");
+    await insertAdminAuditEvent(client, reviewerUserId, "pathway", "submit", preflight.pathwayItemId, revisionId);
     await client.query("COMMIT");
     return { action: "submitted_for_review", ...preflight, outcome: "in_review", submittedByUserId: reviewerUserId };
   } catch (error) {
@@ -1104,6 +1129,7 @@ export async function recordRealPathwayEvidenceReview(client, { pathwayId, revis
       [revisionId, review.reviewerUserId],
     );
     if (update.rowCount !== 1) throw new Error("Pathway lifecycle changed while evidence review was in progress.");
+    await insertAdminAuditEvent(client, review.reviewerUserId, "pathway", "review", row.item_id, revisionId);
     await client.query("COMMIT");
     return {
       action: "evidence_verified",
@@ -1136,6 +1162,7 @@ export async function approveRealPathwayDraft(client, { pathwayId, revisionId, r
       [revisionId, preflight.pathwayItemId],
     );
     if (update.rowCount !== 1) throw new Error("Pathway review changed while approval was in progress.");
+    await insertAdminAuditEvent(client, reviewerUserId, "pathway", "approve", preflight.pathwayItemId, revisionId);
     await client.query("COMMIT");
     return { action: "approved", ...preflight, outcome: "ready_for_publication", approverUserId: reviewerUserId };
   } catch (error) {
@@ -1216,6 +1243,7 @@ export async function publishApprovedRealPathway(client, {
         required.some((claimKey) => !verifiedClaims.has(claimKey))) {
       throw new Error("Pathway post-publication pointer, type, provenance, or evidence verification failed.");
     }
+    await insertAdminAuditEvent(client, publisherUserId, "pathway", "publish", preflight.pathwayItemId, revisionId);
     await client.query("COMMIT");
     return { action: "published", ...preflight, outcome: "published", publisherUserId };
   } catch (error) {

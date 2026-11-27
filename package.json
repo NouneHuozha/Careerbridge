@@ -13,8 +13,12 @@
     "test:real-course-draft:postgres": "node --test src/db/real-course-draft-import.integration.test.mjs",
     "test:student-data:postgres": "node --test src/app/student-data-postgres.integration.test.mjs",
     "test:exam-scholarship-import-validation": "node --test src/db/exam-scholarship-import-validation.test.mjs",
+    "test:admin-lifecycle-audit:postgres": "node --test src/db/admin-lifecycle-audit-postgres.integration.test.mjs",
+    "test:admin-role-transfer": "node --test scripts/transfer-careerbridge-admin-role.test.mjs",
     "test:catalogue-lifecycle-api": "node --test src/app/catalogue-lifecycle-api.test.mjs",
+    "test:admin-foundation": "node --test src/app/admin-authorization.test.mjs src/app/admin-layout.test.mjs src/app/catalogue-lifecycle-api.test.mjs src/app/pathway-lifecycle-api.test.mjs",
     "pathways:bootstrap-admin": "node scripts/bootstrap-pathway-admin.mjs",
+    "admin:transfer-role": "node scripts/transfer-careerbridge-admin-role.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },
