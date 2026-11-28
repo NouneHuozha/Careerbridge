@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowRight, Clock3, FileSpreadsheet, FlaskConical, Search, SearchX } from "lucide-react";
+import { ArrowRight, Clock3, FileSpreadsheet, Search, SearchX } from "lucide-react";
 import { AdminPageHeader, AdminSectionCard, AdminStatusBadge } from "../admin-ui";
 import { AdminDate } from "../admin-date";
 import { filterIntakeJobs } from "./data-intake-utils";
@@ -12,13 +12,11 @@ const filters: Array<{ value: IntakeJobKind | "all"; label: string }> = [
   { value: "all", label: "All" },
   { value: "import", label: "Imports" },
   { value: "manual", label: "Manual" },
-  { value: "research", label: "Research" },
 ];
 
 const kindIcon = {
   import: FileSpreadsheet,
   manual: Clock3,
-  research: FlaskConical,
 };
 
 export function IntakeHistoryPage() {
@@ -31,7 +29,7 @@ export function IntakeHistoryPage() {
       <AdminPageHeader
         eyebrow="Data intake / Intake history"
         title="Intake history"
-        description="Inspect prior spreadsheet, manual-entry and research activity. Connected history is not available in this preview."
+        description="Inspect illustrative spreadsheet and manual-entry activity. Connected history is not available in this preview."
       />
       <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[#d6e4dd] bg-[#edf6f1] p-4">
         <p className="max-w-3xl text-sm leading-6 text-[#526c67]">

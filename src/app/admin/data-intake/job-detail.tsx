@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Download, FileSpreadsheet, FlaskConical, Info } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, FileSpreadsheet, Info, PenLine } from "lucide-react";
 import { AdminPageHeader, AdminSectionCard, AdminStatusBadge } from "../admin-ui";
 import { AdminDate } from "../admin-date";
 import type { ReactNode } from "react";
@@ -13,7 +13,7 @@ export function IntakeJobDetail({ job }: { job: IntakeJobPreview }) {
   const [reportMessage, setReportMessage] = useState("");
   const isImport = job.kind === "import";
   const summary = getImportPreviewSummary("use-existing");
-  const Icon = isImport ? FileSpreadsheet : FlaskConical;
+  const Icon = isImport ? FileSpreadsheet : PenLine;
 
   return (
     <div className="mx-auto w-full max-w-[1320px] space-y-6">
@@ -41,8 +41,8 @@ export function IntakeJobDetail({ job }: { job: IntakeJobPreview }) {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.9fr)]">
         <AdminSectionCard
           id="job-summary"
-          title={isImport ? "Import preview results" : "Research request"}
-          description={isImport ? "Illustrative counts from the sample spreadsheet scenario." : "This example request did not create a background job or contact a source."}
+          title={isImport ? "Import preview results" : "Manual-entry preview"}
+          description={isImport ? "Illustrative counts from the sample spreadsheet scenario." : "Illustrative details for a locally prepared record."}
         >
           {isImport ? (
             <div className="grid gap-3 sm:grid-cols-2">
@@ -62,9 +62,9 @@ export function IntakeJobDetail({ job }: { job: IntakeJobPreview }) {
             </div>
           ) : (
             <div className="rounded-lg border border-dashed border-[#d6e1dc] bg-[#f8faf8] p-4">
-              <p className="text-sm font-semibold text-[#17364a]">No research has run</p>
+              <p className="text-sm font-semibold text-[#17364a]">No saved manual-entry activity</p>
               <p className="mt-1 text-sm leading-6 text-[#657976]">
-                Candidate values and evidence are not available for this example request. Use the separate sample extraction review to inspect the UI.
+                Manual record previews are not saved to intake history or submitted to the catalogue.
               </p>
             </div>
           )}
@@ -81,12 +81,12 @@ export function IntakeJobDetail({ job }: { job: IntakeJobPreview }) {
         >
           <dl className="divide-y divide-[#edf1ee]">
             {([
-              ["Method", isImport ? "Spreadsheet import" : "Research & Fetch"],
+              ["Method", isImport ? "Spreadsheet import" : "Manual entry"],
               ["Record type", job.recordTypeLabel],
               ["Started by", "Example Admin"],
               ["Created", <AdminDate key="created" value={job.createdAt} includeTime />],
-              ["Source / file", isImport ? job.title : "No source fetched"],
-              ["Lifecycle", isImport ? "Draft preparation preview only" : "Request not started"],
+              ["Source / file", isImport ? job.title : "Entered in Admin preview"],
+              ["Lifecycle", isImport ? "Draft preparation preview only" : "Preview only; not submitted"],
             ] as Array<[string, ReactNode]>).map(([label, value]) => (
               <div key={label} className="grid grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)] gap-3 py-3">
                 <dt className="text-sm text-[#71817d]">{label}</dt>
@@ -116,11 +116,7 @@ export function IntakeJobDetail({ job }: { job: IntakeJobPreview }) {
             <Link href={`/admin/catalogue/${job.categorySlug}`} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#286c60] px-4 text-sm font-semibold text-white hover:bg-[#205b51]">
               View Catalogue preview <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
-          ) : (
-            <Link href="/admin/data-intake/research/review" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#286c60] px-4 text-sm font-semibold text-white hover:bg-[#205b51]">
-              Review sample extraction <ArrowRight aria-hidden="true" className="size-4" />
-            </Link>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

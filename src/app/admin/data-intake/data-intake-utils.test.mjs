@@ -20,19 +20,19 @@ const jobs = [
   },
   {
     id: "preview-job-0002",
-    title: "University research",
-    kind: "research",
-    status: "preview_pending",
+    title: "manual-entry-preview",
+    kind: "manual",
+    status: "preview_completed",
     createdAt: "2026-11-27T10:00:00.000Z",
-    recordTypeLabel: "Course",
-    recordsLabel: "Not started",
-    detail: "Example research request.",
+    recordTypeLabel: "Institution",
+    recordsLabel: "1 example record",
+    detail: "Example manual-entry preview.",
   },
 ];
 
 test("intake history filters by kind and searches preview job details", () => {
   assert.deepEqual(
-    filterIntakeJobs(jobs, "UNIVERSITY", "research").map(({ id }) => id),
+    filterIntakeJobs(jobs, "MANUAL", "manual").map(({ id }) => id),
     ["preview-job-0002"],
   );
   assert.deepEqual(

@@ -1,12 +1,8 @@
 import Link from "next/link";
 import {
   ArrowRight,
-  ClipboardList,
   FileSpreadsheet,
-  FlaskConical,
-  History,
   PenLine,
-  ShieldCheck,
 } from "lucide-react";
 import { AdminPageHeader, AdminSectionCard, AdminStatusBadge } from "../admin-ui";
 import { intakeJobPreviews } from "./intake-preview-data";
@@ -28,36 +24,24 @@ const methods = [
     icon: PenLine,
     tone: "bg-[#edf6f1] text-[#377b68]",
   },
-  {
-    href: "/admin/data-intake/research",
-    title: "Research & Fetch",
-    description: "Prepare a research request and inspect candidate information without fetching any source.",
-    action: "Prepare research preview",
-    icon: FlaskConical,
-    tone: "bg-[#f5efff] text-[#725592]",
-  },
 ];
 
 const workflowSteps = [
   {
     title: "Prepare",
-    description: "Spreadsheet, manual entry or research candidate",
-    icon: FileSpreadsheet,
+    description: "Spreadsheet import or manual entry",
   },
   {
     title: "Validate & reconcile",
     description: "Check required fields, duplicates and provenance",
-    icon: ShieldCheck,
   },
   {
     title: "Draft candidates",
     description: "Prepare new records or revisions with evidence",
-    icon: ClipboardList,
   },
   {
     title: "Review before publication",
     description: "Existing review, approval and publication lifecycle",
-    icon: History,
   },
 ];
 
@@ -67,14 +51,14 @@ export function DataIntakeOverview() {
       <AdminPageHeader
         eyebrow="Workspace / Data intake"
         title="Data Intake"
-        description="Prepare catalogue information through structured import, manual entry or research-assisted workflows."
+        description="Prepare catalogue information through spreadsheet import or manual record entry."
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#d6e4dd] bg-[#edf6f1] px-4 py-3.5">
         <div>
           <p className="text-sm font-semibold text-[#286c60]">Frontend preview only</p>
           <p className="mt-1 text-sm leading-5 text-[#526c67]">
-            No files are uploaded, no sources are fetched, and no records or intake jobs are saved.
+            Files are previewed locally. No catalogue records or intake jobs are saved.
           </p>
         </div>
         <AdminStatusBadge tone="accent">Not connected to backend</AdminStatusBadge>
@@ -94,7 +78,7 @@ export function DataIntakeOverview() {
         ))}
       </section>
 
-      <section aria-label="Choose an intake method" className="grid gap-4 xl:grid-cols-3">
+      <section aria-label="Choose an intake method" className="grid gap-4 lg:grid-cols-2">
         {methods.map(({ href, title, description, action, icon: Icon, tone }) => (
           <Link
             key={href}
@@ -119,28 +103,24 @@ export function DataIntakeOverview() {
         title="One controlled path into the catalogue"
         description="All intake methods prepare candidate data. None of them bypasses review, approval or publication."
       >
-        <div className="grid gap-3 lg:grid-cols-4">
-          {workflowSteps.map(({ title, description, icon: Icon }, index) => (
-            <div key={title} className="relative min-w-0 rounded-lg border border-[#e1e9e4] bg-[#f8faf8] p-4">
-              <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#71817d]">
-                <span className="grid size-6 place-items-center rounded-full bg-[#e6efeb] text-[#377b78]">
-                  {index + 1}
-                </span>
+        <ol aria-label="Catalogue intake process" className="grid gap-6 lg:grid-cols-4">
+          {workflowSteps.map(({ title, description }, index) => (
+            <li key={title} className="relative min-w-0 pr-5">
+              <span className="text-sm font-semibold text-[#377b78]">
                 Step {index + 1}
               </span>
-              <Icon aria-hidden="true" className="mt-4 size-5 text-[#377b78]" />
-              <h3 className="mt-2 text-sm font-semibold text-[#17364a]">{title}</h3>
-              <p className="mt-1 text-xs leading-5 text-[#657976]">{description}</p>
+              <h3 className="mt-2 text-base font-semibold text-[#17364a]">{title}</h3>
+              <p className="mt-1 text-sm leading-6 text-[#526b72]">{description}</p>
               {index < workflowSteps.length - 1 && (
-                <ArrowRight aria-hidden="true" className="absolute -right-3 top-1/2 z-10 hidden size-5 -translate-y-1/2 rounded-full bg-white text-[#91a49c] lg:block" />
+                <ArrowRight aria-hidden="true" className="absolute right-0 top-1 hidden size-4 text-[#91a49c] lg:block" />
               )}
-            </div>
+            </li>
           ))}
-        </div>
+        </ol>
         <div className="mt-4 rounded-lg border border-[#dce5e0] bg-white px-4 py-3 text-sm leading-6 text-[#526b72]">
           <strong className="font-semibold text-[#17364a]">Trust boundary:</strong>{" "}
           every claim needs its own supporting evidence and remains subject to the existing Review Queue.
-          An imported row or research result is not automatically verified or published.
+          Imported and manually entered information is not automatically verified or published.
         </div>
       </AdminSectionCard>
 

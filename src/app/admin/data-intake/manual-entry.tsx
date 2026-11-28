@@ -255,7 +255,7 @@ function ManualRecordForm({ recordType }: { recordType: ManualEntryTypeKey }) {
         </div>
         {selectedSource && (
           <p className="mt-3 text-xs leading-5 text-[#657976]">
-            Selected source: <strong className="font-semibold text-[#17364a]">{selectedSource.name}</strong>. No URL check or fetch will be performed.
+            Selected source: <strong className="font-semibold text-[#17364a]">{selectedSource.name}</strong>. It will be attached as supporting evidence.
           </p>
         )}
       </AdminSectionCard>

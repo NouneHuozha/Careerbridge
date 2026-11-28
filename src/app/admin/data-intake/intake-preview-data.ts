@@ -1,6 +1,6 @@
 import type { CatalogueCategorySlug } from "../catalogue/catalogue-preview-data";
 
-export type IntakeJobKind = "import" | "manual" | "research";
+export type IntakeJobKind = "import" | "manual";
 
 export type IntakeJobPreview = {
   id: string;
@@ -25,17 +25,6 @@ export const intakeJobPreviews: IntakeJobPreview[] = [
     recordTypeLabel: "Institutions",
     recordsLabel: "25 example rows",
     detail: "Example spreadsheet validation and duplicate-reconciliation summary.",
-  },
-  {
-    id: "preview-job-0002",
-    title: "University programme research",
-    kind: "research",
-    status: "preview_pending",
-    createdAt: "2026-11-27T09:18:00.000Z",
-    categorySlug: "courses",
-    recordTypeLabel: "Course",
-    recordsLabel: "Not started",
-    detail: "Illustrative research request. No source was fetched and no job was created.",
   },
 ];
 
