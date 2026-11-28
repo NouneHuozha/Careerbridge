@@ -17,6 +17,7 @@
     "test:admin-role-transfer": "node --test scripts/transfer-careerbridge-admin-role.test.mjs",
     "test:catalogue-lifecycle-api": "node --test src/app/catalogue-lifecycle-api.test.mjs",
     "test:admin-foundation": "node --test src/app/admin-authorization.test.mjs src/app/admin-layout.test.mjs src/app/catalogue-lifecycle-api.test.mjs src/app/pathway-lifecycle-api.test.mjs",
+    "test:automated-collection": "node --test src/app/admin/data-intake/automated/collection-logic.test.mjs",
     "pathways:bootstrap-admin": "node scripts/bootstrap-pathway-admin.mjs",
     "admin:transfer-role": "node scripts/transfer-careerbridge-admin-role.mjs",
     "db:generate": "drizzle-kit generate",

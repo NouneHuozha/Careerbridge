@@ -25,7 +25,13 @@ const navigationSections = [
     items: [
       { label: "Overview", href: "/admin", icon: LayoutDashboard, enabled: true },
       { label: "Catalogue", href: "/admin/catalogue", icon: Files, enabled: true },
-      { label: "Data intake", href: "/admin/data-intake", icon: Upload, enabled: true },
+      { label: "Data Intake", href: "/admin/data-intake", icon: Upload, enabled: true, subitems: [
+        { label: "Overview", href: "/admin/data-intake" },
+        { label: "Automated collection", href: "/admin/data-intake/automated" },
+        { label: "Excel / CSV import", href: "/admin/data-intake/import" },
+        { label: "Manual entry", href: "/admin/data-intake/manual" },
+        { label: "Intake history & jobs", href: "/admin/data-intake/history" },
+      ] },
       { label: "Review queue", href: "/admin/review", icon: ClipboardCheck, enabled: true },
       { label: "Sources", href: "/admin/sources", icon: Database, enabled: true },
       { label: "Audit history", href: "/admin/audit", icon: History, enabled: true },
@@ -74,16 +80,30 @@ function isDataIntakeRoute(pathname: string) {
 function getDataIntakeCrumbs(pathname: string): Array<{ label: string; href?: string }> {
   const segments = pathname.split("/").filter(Boolean).slice(2);
   if (segments.length === 0) return [];
+  if (segments[0] === "automated") {
+    const labels: Record<string, string> = {
+      new: "New collection",
+      discovery: "Source discovery",
+      configuration: "Collection configuration",
+      schedules: "Schedules",
+      fetched: "Fetched content",
+      extracted: "Extracted information",
+      changes: "Change detection",
+      history: "Collection history",
+      failures: "Failed fetches",
+      rules: "Collection rules",
+      runs: "Collection run",
+      jobs: "Job details",
+    };
+    return segments[1]
+      ? [{ label: "Automated collection", href: "/admin/data-intake/automated" }, { label: segments[1] === "schedules" && segments[2] === "calendar" ? "Schedule calendar" : labels[segments[1]] ?? formatRouteSegment(segments[1]) }]
+      : [{ label: "Automated collection" }];
+  }
   if (segments[0] === "import") return [{ label: "Spreadsheet import" }];
   if (segments[0] === "manual") {
     return segments[1]
       ? [{ label: "Manual entry", href: "/admin/data-intake/manual" }, { label: formatRouteSegment(segments[1]) }]
       : [{ label: "Manual entry" }];
-  }
-  if (segments[0] === "research") {
-    return segments[1] === "review"
-      ? [{ label: "Research & Fetch", href: "/admin/data-intake/research" }, { label: "Extracted data review" }]
-      : [{ label: "Research & Fetch" }];
   }
   if (segments[0] === "history") {
     return segments[1]
@@ -170,7 +190,7 @@ function AdminNavigation({ pathname, onNavigate }: AdminNavProps) {
             {section.label}
           </h2>
           <ul className="space-y-1">
-            {section.items.map(({ label, href, icon: Icon, enabled }) => {
+            {section.items.map(({ label, href, icon: Icon, enabled, subitems }) => {
               const active = isNavigationItemActive(label, href, pathname);
               const disabled = !enabled;
               const itemClassName = `flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors duration-150 ${
@@ -197,15 +217,43 @@ function AdminNavigation({ pathname, onNavigate }: AdminNavProps) {
                       </span>
                     </button>
                   ) : (
-                    <Link
-                      href={href}
-                      aria-current={active ? "page" : undefined}
-                      onClick={onNavigate}
-                      className={itemClassName}
-                    >
-                      <Icon aria-hidden="true" className="size-[18px] shrink-0" strokeWidth={1.8} />
-                      <span className="min-w-0 flex-1 truncate">{label}</span>
-                    </Link>
+                    <>
+                      <Link
+                        href={href}
+                        aria-current={active ? "page" : undefined}
+                        onClick={onNavigate}
+                        className={itemClassName}
+                      >
+                        <Icon aria-hidden="true" className="size-[18px] shrink-0" strokeWidth={1.8} />
+                        <span className="min-w-0 flex-1 truncate">{label}</span>
+                      </Link>
+                      {subitems && pathname.startsWith(href) ? (
+                        <ul className="mt-1 space-y-1 border-l border-white/10 pl-3">
+                          {subitems.map((subitem) => {
+                            const subActive =
+                              subitem.href === "/admin/data-intake"
+                                ? pathname === subitem.href
+                                : pathname === subitem.href || pathname.startsWith(`${subitem.href}/`);
+                            return (
+                              <li key={subitem.href}>
+                                <Link
+                                  href={subitem.href}
+                                  aria-current={subActive ? "page" : undefined}
+                                  onClick={onNavigate}
+                                  className={`block rounded-md px-3 py-2 text-sm ${
+                                    subActive
+                                      ? "bg-white/10 text-white"
+                                      : "text-[#c7d7d8] hover:bg-white/6 hover:text-white"
+                                  }`}
+                                >
+                                  {subitem.label}
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : null}
+                    </>
                   )}
                 </li>
               );

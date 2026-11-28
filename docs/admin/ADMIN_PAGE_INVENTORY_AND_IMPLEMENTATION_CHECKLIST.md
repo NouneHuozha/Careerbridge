@@ -8,7 +8,8 @@ The earlier [Admin architecture and implementation plan](./ADMIN_ARCHITECTURE_AN
 ## Status key
 
 - **UI present** — a route/component exists; data connectivity and workflow behavior must still be checked separately.
-- **Preview-only** — interactions or records are illustrative/local and do not persist or perform external work.
+- **Local workflow** — form and preference state is interactive and browser-local; it does not perform server-side or external work.
+- **Backend unavailable** — the view is implemented with honest empty states, but requires a collection service for operational data/actions.
 - **Not built** — no route or screen exists yet.
 - **Known gap** — the wireframe requires a screen/type not represented by the current route or category model.
 
@@ -18,7 +19,7 @@ The earlier [Admin architecture and implementation plan](./ADMIN_ARCHITECTURE_AN
 |---|---|---|---|
 | Overview | `/admin` | UI present | Admin dashboard and recent activity. Confirm each metric's source before presenting it as live. |
 | Catalogue | `/admin/catalogue` | UI present; known gap | Browse catalogue types and records, inspect details and revisions, and open contextual activity. |
-| Data Intake | `/admin/data-intake` | Preview-only | Spreadsheet, manual-entry, and research-assisted draft preparation previews. No upload, fetch, job creation, or record writes. |
+| Data Intake | `/admin/data-intake` | Preview-only | Spreadsheet and manual-entry draft preparation previews. No upload, job creation, or record writes. |
 | Review Queue | `/admin/review` | UI present | Queue and claim-review workspace. Show only actions supported by the relevant server lifecycle. |
 | Sources | `/admin/sources` | UI present; preview-only operations | Source registry and maintenance views. A registered source does not imply automated fetching or change detection. |
 | Audit History | `/admin/audit` | Preview-only | Illustrative lifecycle event directory and event details; not a general system log. |
@@ -49,14 +50,25 @@ The earlier [Admin architecture and implementation plan](./ADMIN_ARCHITECTURE_AN
 
 | View | Route | Status / acceptance note |
 |---|---|---|
-| Intake overview and shared lifecycle | `/admin/data-intake` | Preview-only. Show all three entry methods and their convergence on draft preparation → review → approval/publication. |
+| Intake overview and shared lifecycle | `/admin/data-intake` | Preview-only. Show spreadsheet and manual-entry preparation converging on draft preparation → review → approval/publication. |
 | Spreadsheet import | `/admin/data-intake/import` | Preview-only, five local steps: choose type/file, map columns, validate/correct sample rows, choose duplicate handling, and inspect an example summary. The selected file's contents are not read or uploaded. |
 | Manual type chooser | `/admin/data-intake/manual` | Preview-only. Offers Field, Course, Institution, Pathway, Examination, and Scholarship; Campuses and Course Offerings are related-record workflows. |
 | Type-specific manual form | `/admin/data-intake/manual/[recordType]` | Preview-only. Reuses available Catalogue field definitions and source/evidence concepts; Fields currently has only a minimal name/description form because no Admin Fields schema is defined. |
-| Research request | `/admin/data-intake/research` | Preview-only. A source URL is displayed as information only; no source is fetched and no background job is started. |
-| Candidate claim review | `/admin/data-intake/research/review` | Preview-only. Review/edit/accept/discard applies only to local sample state; candidate acceptance is not verification or publication. |
 | Intake history | `/admin/data-intake/history` | Preview-only example entries; manual form previews are not recorded as jobs. |
 | Intake job details | `/admin/data-intake/history/[jobId]` | Preview-only example metadata/results; no job or report is persisted. |
+| Automated collection overview | `/admin/data-intake/automated` | Local workflow. Counts derive from this browser's saved configurations and schedules; run/result counts remain zero until connected. |
+| New collection wizard | `/admin/data-intake/automated/new` | Local workflow. Validated four-step setup for category, scope, source intent, and review; saves a configuration but does not start a run. |
+| Source discovery and starting URLs | `/admin/data-intake/automated/discovery` | Local workflow for adding/removing starting URLs. No search, URL check, or fetch is performed. |
+| Collection configuration | `/admin/data-intake/automated/configuration?id=...` | Local workflow for editing category fields, collection options, and saved starting URLs. |
+| Schedule management, calendar, and schedule detail | `/admin/data-intake/automated/schedules`, `/admin/data-intake/automated/schedules/calendar`, `/admin/data-intake/automated/schedules/[scheduleId]` | Local workflow for creating, editing, pausing, and removing schedule preferences. Calendar shows configured start dates only; no scheduler executes them. |
+| Collection run details | `/admin/data-intake/automated/runs/[runId]` | Backend unavailable. Honest no-run state; no fabricated progress or run controls. |
+| Fetched content and item details | `/admin/data-intake/automated/fetched`, `/admin/data-intake/automated/fetched/[contentId]` | Backend unavailable. No fabricated pages, documents, previews, or fetch failures. |
+| Extracted information and candidate details | `/admin/data-intake/automated/extracted`, `/admin/data-intake/automated/extracted/[candidateId]` | Backend unavailable. No fabricated candidate values, evidence, or review actions. |
+| Change detection and comparison | `/admin/data-intake/automated/changes`, `/admin/data-intake/automated/changes/[changeId]` | Backend unavailable. No fabricated before/after values or proposed changes. |
+| Collection history | `/admin/data-intake/automated/history` | Backend unavailable. No fabricated run history or report export. |
+| Job details | `/admin/data-intake/automated/jobs/[jobId]` | Backend unavailable. No fabricated processing stages, logs, retry, or cancel actions. |
+| Failed fetches and failure details | `/admin/data-intake/automated/failures`, `/admin/data-intake/automated/failures/[failureId]` | Backend unavailable. No fabricated failures or retries. |
+| Collection rules | `/admin/data-intake/automated/rules` | Local workflow for browser preferences and pause display. Server-side safety, authorization, and scheduler behavior are not affected. |
 
 ### 4. Review Queue
 
@@ -119,7 +131,7 @@ Keep Settings as one small Admin section. Do not add role-management, system-con
 
 - [ ] Verify the sidebar, active item, page title, breadcrumb, full-width layout, and collapsible mobile navigation across all inventory routes.
 - [ ] Check loading, empty, error, and permission-denied states; confirm accessible labels, focus visibility, and table overflow handling.
-- [ ] Make preview/live status unambiguous. No example counts, jobs, sources, audit events, or account details should appear as real data.
+- [x] Make local/backend status unambiguous for Automated Collection. No example jobs, sources, run results, or failures appear as live data.
 - [ ] Keep frontend-only work read-only with respect to Neon and production. Do not upload sample files, fetch source URLs, or write catalogue records.
 - [ ] Run targeted tests, typecheck, lint, and browser acceptance. Defer production build while `.next/dev/lock` exists; retry after the development server has shut down normally.
 
