@@ -112,6 +112,7 @@ export default function FieldsDirectoryPage({ fields }: { fields: PublishedField
                     alt=""
                     width={112}
                     height={112}
+                    unoptimized
                     className="h-20 w-20 shrink-0 rounded-xl object-cover sm:h-28 sm:w-28"
                   />
                   <span className="flex min-w-0 flex-1 flex-col self-stretch py-1">

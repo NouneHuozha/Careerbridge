@@ -5,10 +5,7 @@ import {
   requireAdmin,
 } from "../../../../admin-auth";
 import { getIdentityLockPool } from "../../../../../db/pool";
-import {
-  assertDevelopmentTarget,
-  verifyNeonDevelopmentEndpoint,
-} from "../../../../../../scripts/import-real-pathway-draft.mjs";
+import { assertDevelopmentTarget } from "../../../../../../scripts/import-real-pathway-draft.mjs";
 import {
   approveRealPathwayDraft,
   publishApprovedRealPathway,
@@ -92,8 +89,6 @@ export async function POST(request: NextRequest) {
       neonBranch: process.env.NEON_BRANCH,
       vercel: process.env.VERCEL,
     });
-    verifyNeonDevelopmentEndpoint();
-
     const actor = await requireAdmin();
 
     const contentLength = Number(request.headers.get("content-length") ?? 0);

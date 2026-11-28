@@ -128,9 +128,12 @@ export default function CourseCatalog({ courses }: { courses: Course[] }) {
       const courseField = possibilityFields.find(
         (item) => item.id === course.fieldId,
       );
+      const learningAreaText = course.learningAreas
+        .flatMap((area) => [area.title, area.description])
+        .join(" ");
       const matchesSearch =
         !normalizedSearch ||
-        `${course.name} ${course.description} ${courseField?.name ?? ""} ${course.qualification}`
+        `${course.name} ${course.description} ${courseField?.name ?? ""} ${course.qualification} ${learningAreaText}`
           .toLocaleLowerCase()
           .includes(normalizedSearch);
       return (

@@ -6,7 +6,6 @@ import {
   ArrowRight,
   BookOpen,
   MapPin,
-  ShieldCheck,
 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -165,7 +164,6 @@ export default async function CourseDetailPage({
             <h2 className="font-serif text-xl font-semibold">At a glance</h2>
             <dl className="mt-4 divide-y divide-[#e8ede8]">
               <Fact label="Qualification" value={course.qualification} />
-              <Fact label="Typical duration" value="Not verified; check with the provider" />
               <Fact label="Main focus" value={course.description} />
             </dl>
           </aside>
@@ -357,13 +355,25 @@ export default async function CourseDetailPage({
                     {institution.institution.type && (
                       <p className="mt-1 text-sm text-[#718078]">{institution.institution.type}</p>
                     )}
-                    <Link
-                      href={href}
-                      className="cb-card-action mt-4 w-fit"
-                    >
-                      View institution
-                      <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                    </Link>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <Link
+                        href={href}
+                        className="cb-card-action"
+                      >
+                        View institution
+                        <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                      </Link>
+                      {institution.prospectus?.url && (
+                        <a
+                          href={institution.prospectus.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-[#145543] underline underline-offset-2 hover:text-[#0f4537]"
+                        >
+                          Prospectus ↗
+                        </a>
+                      )}
+                    </div>
                   </article>
                 );
               })}
@@ -390,85 +400,9 @@ export default async function CourseDetailPage({
           )}
         </section>
 
-        <section
-          className="cb-reveal mt-11 border-y border-[#dce5dd] py-8 sm:py-10"
-          style={{ animationDelay: "220ms" }}
-          aria-labelledby="further-study-title"
-        >
-          <SectionEyebrow>What can you study next?</SectionEyebrow>
-          <h2
-            id="further-study-title"
-            className="mt-2 font-serif text-2xl font-semibold tracking-[-.03em] sm:text-3xl"
-          >
-            Possible further-study options
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#59665e]">
-              No verified progression options are listed yet. A course can be added here only after its qualification and the next programme&apos;s official entry requirements are checked.
-          </p>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {[1, 2].map((item) => (
-                <div key={item} className="rounded-xl border border-dashed border-[#cbd9cf] bg-white/70 px-4 py-4 text-sm text-[#68766e]">
-                  Further-study course link pending verification
-                </div>
-              ))}
-            </div>
-            <p className="mt-4 text-sm leading-6 text-[#68766e]">
-              These options depend on the qualification and the next course&apos;s requirements.
-            </p>
-        </section>
-
-        <section
-            className="cb-reveal border-b border-[#dce5dd] py-8 sm:py-10"
-            style={{ animationDelay: "270ms" }}
-            aria-labelledby="related-opportunities-title"
-        >
-            <SectionEyebrow>Related examinations &amp; scholarships</SectionEyebrow>
-            <h2 id="related-opportunities-title" className="sr-only">
-              Related examinations and scholarships
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-[#68766e]">
-              Relevant opportunities connected to this course, when applicable.
-            </p>
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              {[
-                {
-                  label: "Examinations",
-                  text: "No course-specific exam link is verified yet. A direct relationship and current official exam information need confirmation.",
-                },
-                {
-                  label: "Scholarships",
-                  text: "No course-specific scholarship link is verified yet. Eligibility for this course and the current application source need confirmation.",
-                },
-              ].map((item) => (
-                <div key={item.label} className="rounded-xl border border-[#dce7df] bg-white p-5">
-                  <p className="font-serif text-lg font-semibold text-[#29483a]">
-                    {item.label} links pending verification
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-[#59665e]">{item.text}</p>
-                </div>
-              ))}
-            </div>
-        </section>
-
-        <section
-            className="mt-8"
-          aria-labelledby="information-sources-title"
-        >
-          <div className="flex items-start gap-3">
-            <ShieldCheck aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-[#718078]" />
-            <div>
-              <h2
-                id="information-sources-title"
-                className="text-sm font-semibold text-[#354b40]"
-              >
-                Information sources
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-[#718078]">
-                This overview is general guidance, not an admission notice. Confirm current eligibility and entry requirements with the provider.
-              </p>
-            </div>
-          </div>
-        </section>
+        <p className="mt-10 text-sm leading-6 text-[#718078]">
+          Course details and entry requirements can vary by programme and provider. Confirm current requirements before applying.
+        </p>
 
         <Link
           href={catalogHref}

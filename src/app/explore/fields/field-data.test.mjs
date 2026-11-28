@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import test from "node:test";
 
@@ -36,7 +36,7 @@ test("all field experiences consume one complete record for each field", () => {
 
   for (const field of possibilityFields) {
     assert.strictEqual(fieldGuideData[field.id], field);
-    assert.ok(field.name && field.description && field.image && field.imageAlt);
+    assert.ok(field.name && field.description && field.image);
     assert.ok(
       field.overview.shortDescription &&
         field.overview.introduction &&
@@ -53,7 +53,7 @@ test("all field experiences consume one complete record for each field", () => {
     assert.ok(field.studyRoutes["class-10"].length > 0);
     assert.ok(field.studyRoutes["class-12"].length > 0);
     assert.ok(field.opportunities.length > 0);
-    assert.ok(existsSync(new URL(`../../../../public${field.image}`, import.meta.url)));
+    assert.match(field.image, /^\/api\/fields\/[^/]+\/image$/);
   }
 });
 

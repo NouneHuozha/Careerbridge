@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import {
-  assertDevelopmentTarget,
-  verifyNeonDevelopmentEndpoint,
-} from "../../../scripts/import-real-pathway-draft.mjs";
+import { assertDevelopmentTarget } from "../../../scripts/import-real-pathway-draft.mjs";
 import { getPool } from "../../db/pool";
 import {
   AdminAccessDeniedError,
@@ -23,7 +20,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       neonBranch: process.env.NEON_BRANCH,
       vercel: process.env.VERCEL,
     });
-    verifyNeonDevelopmentEndpoint();
     const database = await getPool().query(
       "SELECT current_database() AS database_name",
     );

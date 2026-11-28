@@ -112,7 +112,9 @@ Module._load = function (request, parent, isMain) {
         state.developmentTargetChecks += 1;
         if (!state.developmentTargetAllowed) throw new Error("Development target refused.");
       },
-      verifyNeonDevelopmentEndpoint() {},
+      verifyNeonDevelopmentEndpoint() {
+        throw new Error("Neon management API is unavailable.");
+      },
     };
   }
   if (request === "../../../../../../scripts/publish-real-pathway.mjs" &&

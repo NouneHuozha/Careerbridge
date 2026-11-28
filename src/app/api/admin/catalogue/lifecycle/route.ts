@@ -6,10 +6,7 @@ import {
   requireAdmin,
 } from "../../../../admin-auth";
 import { getIdentityLockPool } from "../../../../../db/pool";
-import {
-  assertDevelopmentTarget,
-  verifyNeonDevelopmentEndpoint,
-} from "../../../../../../scripts/import-real-pathway-draft.mjs";
+import { assertDevelopmentTarget } from "../../../../../../scripts/import-real-pathway-draft.mjs";
 import {
   associateRealExamScholarshipReviewSource,
   approveRealExamScholarshipDraft,
@@ -190,7 +187,6 @@ async function verifyDevelopmentTarget() {
     neonBranch: process.env.NEON_BRANCH,
     vercel: process.env.VERCEL,
   });
-  verifyNeonDevelopmentEndpoint();
 }
 
 function typedValues(kind: CatalogueKind, row: Record<string, unknown>) {

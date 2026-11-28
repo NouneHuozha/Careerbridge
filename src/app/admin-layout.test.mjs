@@ -53,7 +53,9 @@ Module._load = function (request, parent, isMain) {
       assertDevelopmentTarget() {
         if (!state.developmentTargetAllowed) throw new Error("Development target refused.");
       },
-      verifyNeonDevelopmentEndpoint() {},
+      verifyNeonDevelopmentEndpoint() {
+        throw new Error("Neon management API is unavailable.");
+      },
     };
   }
   if (request === "../../db/pool" && parent?.filename.endsWith("admin\\layout.tsx")) {

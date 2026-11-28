@@ -79,8 +79,9 @@ export function FieldOverviewDialog({
           <div className="relative h-40 overflow-hidden rounded-2xl bg-[#e6eeea] sm:h-44">
             <Image
               src={field.image}
-              alt={field.imageAlt}
+              alt={`Image for ${field.name}`}
               fill
+              unoptimized
               sizes="250px"
               className="object-cover"
             />

@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test:fields:postgres": "node --test src/db/fields-postgres.integration.test.mjs",
+    "test:field-image-upload": "node --test src/app/api/admin/catalogue/fields/image-upload.test.mjs",
     "test:institutions:postgres": "node --test src/db/institutions-postgres.integration.test.mjs",
     "test:real-course-draft:postgres": "node --test src/db/real-course-draft-import.integration.test.mjs",
     "test:student-data:postgres": "node --test src/app/student-data-postgres.integration.test.mjs",
@@ -21,7 +22,8 @@
     "pathways:bootstrap-admin": "node scripts/bootstrap-pathway-admin.mjs",
     "admin:transfer-role": "node scripts/transfer-careerbridge-admin-role.mjs",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "import:field-images:development": "node scripts/import-field-images.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.10.0",

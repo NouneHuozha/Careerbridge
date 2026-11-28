@@ -75,6 +75,26 @@ async function preflightRecord(client, courseId, revisionId) {
   if (row.item_type !== "course" || row.typed_revision_id !== row.id) {
     return { outcome: "invalid_state", issues: [issue("typed_revision", "The course common revision does not have a matching typed course revision.")] };
   }
+  if (row.publication_status !== "published") {
+    const itemLock = await client.query(
+      "SELECT id FROM public.catalog_items WHERE id=$1 AND item_type='course' FOR UPDATE",
+      [row.item_id],
+    );
+    if (itemLock.rowCount !== 1) {
+      return { outcome: "invalid_state", issues: [issue("course_identity", "The course identity could not be locked for publication.")] };
+    }
+    const latest = await client.query(
+      `SELECT id
+         FROM public.catalog_item_revisions
+        WHERE catalog_item_id=$1 AND data_classification='real'
+        ORDER BY revision_number DESC
+        LIMIT 1`,
+      [row.item_id],
+    );
+    if (latest.rows[0]?.id !== row.id) {
+      return { outcome: "invalid_lifecycle", issues: [issue("stale_revision", "Only the latest saved real course revision can be approved or published.")] };
+    }
+  }
 
   const field = await client.query(
     `SELECT i.id AS item_id, i.item_type, i.published_revision_id, r.id AS revision_id,

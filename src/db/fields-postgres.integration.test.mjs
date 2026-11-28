@@ -27,12 +27,14 @@ const tableNames = [
   "catalog_item_aliases",
   "catalog_item_revisions",
   "field_revisions",
+  "field_revision_images",
   "source_registry",
   "catalog_revision_sources",
 ];
 let appPool;
 let schemaCreated = false;
 let fieldReader;
+let fieldImages;
 
 require.extensions[".ts"] = (module, filename) => {
   const { readFileSync } = require("node:fs");
@@ -50,6 +52,7 @@ Module._load = function (request, parent, isMain) {
   return originalLoad.call(this, request, parent, isMain);
 };
 fieldReader = require("./fields.ts");
+fieldImages = require("./field-images.ts");
 Module._load = originalLoad;
 
 const ids = {
@@ -59,6 +62,7 @@ const ids = {
   demoItem: "10000000-0000-4000-8000-000000000004",
   testItem: "10000000-0000-4000-8000-000000000005",
   publishedRevision: "20000000-0000-4000-8000-000000000001",
+  publishedUpdateRevision: "20000000-0000-4000-8000-000000000006",
   draftRevision: "20000000-0000-4000-8000-000000000002",
   noPointerRevision: "20000000-0000-4000-8000-000000000003",
   demoRevision: "20000000-0000-4000-8000-000000000004",
@@ -137,6 +141,17 @@ async function prepareDatabase() {
         )
       `);
       await client.query(`
+        CREATE TABLE public.field_revision_images (
+          revision_id uuid PRIMARY KEY REFERENCES public.catalog_item_revisions(id) ON DELETE CASCADE,
+          image_data bytea,
+          image_content_type text,
+          image_removed boolean NOT NULL DEFAULT false,
+          CHECK ((image_data IS NULL) = (image_content_type IS NULL)),
+          CHECK (image_content_type IS NULL OR image_content_type IN ('image/jpeg', 'image/png', 'image/webp')),
+          CHECK (NOT image_removed OR image_data IS NULL)
+        )
+      `);
+      await client.query(`
         CREATE TABLE public.source_registry (
           id uuid PRIMARY KEY,
           source_name text NOT NULL,
@@ -195,6 +210,25 @@ async function prepareDatabase() {
       }
 
       await client.query(
+        `INSERT INTO public.field_revision_images
+          (revision_id, image_data, image_content_type)
+         VALUES ($1, $2, 'image/jpeg')`,
+        [ids.publishedRevision, Buffer.from([0xff, 0xd8, 0xff, 0x11])],
+      );
+      await client.query(
+        `INSERT INTO public.catalog_item_revisions
+          (id, catalog_item_id, revision_number, publication_status, title, summary,
+           data_classification, verification_status, published_at)
+         VALUES ($1, $2, 2, 'draft', 'Draft field update', NULL, 'real', 'unverified', NULL)`,
+        [ids.publishedUpdateRevision, ids.publishedItem],
+      );
+      await client.query(
+        `INSERT INTO public.field_revisions (revision_id, field_content)
+         VALUES ($1, $2::jsonb)`,
+        [ids.publishedUpdateRevision, JSON.stringify(publishedContent)],
+      );
+
+      await client.query(
         `INSERT INTO public.catalog_item_aliases
           (source_system, external_type, external_key, external_context_key, catalog_item_id)
          VALUES
@@ -239,7 +273,7 @@ after(async () => {
   if (appPool) await appPool.end();
   if (schemaCreated) {
     await testPool.query(`
-      DROP TABLE public.catalog_revision_sources, public.field_revisions,
+      DROP TABLE public.catalog_revision_sources, public.field_revision_images, public.field_revisions,
         public.source_registry, public.catalog_item_aliases,
         public.catalog_items, public.catalog_item_revisions
     `);
@@ -290,6 +324,44 @@ test("PostgreSQL excludes drafts, records without a pointer, and demo/test recor
   for (const id of ["draft-field", "unpublished-field", "demo-field", "test-field"]) {
     assert.equal(await fieldReader.getPublishedField(id), null, `${id} must not be visible.`);
   }
+});
+
+test("PostgreSQL keeps draft images private and preserves the published image until a removal is published", async () => {
+  const publishedImage = await fieldImages.getPublishedFieldImage("technology");
+  assert.deepEqual([...publishedImage.imageData], [0xff, 0xd8, 0xff, 0x11]);
+  assert.equal(publishedImage.imageContentType, "image/jpeg");
+
+  const adminPreview = await fieldImages.getAdminFieldImage("technology");
+  assert.deepEqual(adminPreview.imageData, publishedImage.imageData);
+
+  await testPool.query(
+    `INSERT INTO public.field_revision_images
+      (revision_id, image_removed)
+     VALUES ($1, true)`,
+    [ids.publishedUpdateRevision],
+  );
+  const removedDraft = await fieldImages.getAdminFieldImage("technology");
+  assert.equal(removedDraft.imageData, null);
+  assert.equal(removedDraft.imageRemoved, true);
+  assert.deepEqual(
+    (await fieldImages.getPublishedFieldImage("technology")).imageData,
+    publishedImage.imageData,
+  );
+
+  await testPool.query(
+    `UPDATE public.catalog_item_revisions
+        SET publication_status = 'published', published_at = NOW()
+      WHERE id = $1`,
+    [ids.publishedUpdateRevision],
+  );
+  await testPool.query(
+    "UPDATE public.catalog_items SET published_revision_id = $1 WHERE id = $2",
+    [ids.publishedUpdateRevision, ids.publishedItem],
+  );
+  fieldImages.invalidatePublishedFieldImageCache();
+  const publishedRemoval = await fieldImages.getPublishedFieldImage("technology");
+  assert.equal(publishedRemoval.imageData, null);
+  assert.equal(publishedRemoval.imageRemoved, true);
 });
 
 test("PostgreSQL returns null for a missing field and an empty array when none are published", async () => {

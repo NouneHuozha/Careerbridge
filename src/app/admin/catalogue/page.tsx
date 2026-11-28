@@ -3,29 +3,22 @@ import { Suspense } from "react";
 import {
   AlertTriangle,
   ArrowRight,
-  BookOpen,
   Building2,
   CheckCircle2,
   ClipboardCheck,
   Clock3,
-  Files,
   GraduationCap,
-  History,
   Landmark,
   LibraryBig,
-  MapPin,
   Route,
   type LucideIcon,
 } from "lucide-react";
-import type {
-  AdminAuditAction,
-  AdminAuditKind,
-  CatalogItemType,
-} from "../../../db/schema/catalog";
+import type { CatalogItemType } from "../../../db/schema/catalog";
 import {
-  getAdminDashboardData,
-  type RecentAdminActivity,
-} from "../dashboard-data";
+  getCatalogueOverviewData,
+  type CatalogueOverviewCategory,
+  type RecentCatalogueRecord,
+} from "./catalogue-overview-data";
 import {
   AdminEmptyState,
   AdminMetricCard,
@@ -36,83 +29,34 @@ import {
 import { AdminDate } from "../admin-date";
 import { CatalogueRetryButton } from "./retry-button";
 
-const auditKindLabels: Record<AdminAuditKind, string> = {
-  exam: "Examination",
-  scholarship: "Scholarship",
-  institution: "Institution",
-  campus: "Campus",
-  course_offering: "Course offering",
-  pathway: "Pathway",
+const categoryIcons: Record<string, LucideIcon> = {
+  fields: LibraryBig,
+  courses: GraduationCap,
+  institutions: Building2,
+  pathways: Route,
+  examinations: ClipboardCheck,
+  scholarships: Landmark,
 };
 
-const auditActionLabels: Record<AdminAuditAction, string> = {
-  submit: "Submitted",
-  "associate-source": "Associated source",
-  review: "Reviewed",
-  approve: "Approved",
-  reject: "Rejected",
-  publish: "Published",
+const categoryLabels: Record<CatalogItemType, string> = {
+  field: "Fields",
+  course: "Courses",
+  course_offering: "Courses",
+  institution: "Institutions",
+  campus: "Institutions",
+  pathway: "Pathways",
+  examination: "Examinations",
+  scholarship: "Scholarships",
 };
 
-type BrowseCategory = {
-  type: Exclude<CatalogItemType, "field">;
-  label: string;
-  description: string;
-  icon: LucideIcon;
-  href: string;
+const publicationLabels: Record<string, string> = {
+  draft: "Draft",
+  in_review: "In review",
+  approved: "Approved",
+  published: "Published",
+  rejected: "Rejected",
+  archived: "Archived",
 };
-
-const browseCategories: BrowseCategory[] = [
-  {
-    type: "course",
-    label: "Courses",
-    description: "Programmes, qualifications and entry stages",
-    icon: GraduationCap,
-    href: "/admin/catalogue/courses",
-  },
-  {
-    type: "course_offering",
-    label: "Course offerings",
-    description: "Courses delivered by an institution or campus",
-    icon: BookOpen,
-    href: "/admin/catalogue/course-offerings",
-  },
-  {
-    type: "institution",
-    label: "Institutions",
-    description: "Universities, colleges and other providers",
-    icon: Building2,
-    href: "/admin/catalogue/institutions",
-  },
-  {
-    type: "campus",
-    label: "Campuses",
-    description: "Institution locations and campus records",
-    icon: MapPin,
-    href: "/admin/catalogue/campuses",
-  },
-  {
-    type: "pathway",
-    label: "Pathways",
-    description: "Education and progression routes",
-    icon: Route,
-    href: "/admin/catalogue/pathways",
-  },
-  {
-    type: "examination",
-    label: "Examinations",
-    description: "Exams, conducting bodies and eligibility",
-    icon: ClipboardCheck,
-    href: "/admin/catalogue/examinations",
-  },
-  {
-    type: "scholarship",
-    label: "Scholarships",
-    description: "Funding opportunities and eligibility",
-    icon: Landmark,
-    href: "/admin/catalogue/scholarships",
-  },
-];
 
 export default function CataloguePage() {
   return (
@@ -123,9 +67,9 @@ export default function CataloguePage() {
 }
 
 async function CatalogueOverview() {
-  let dashboard: Awaited<ReturnType<typeof getAdminDashboardData>>;
+  let overview: Awaited<ReturnType<typeof getCatalogueOverviewData>>;
   try {
-    dashboard = await getAdminDashboardData();
+    overview = await getCatalogueOverviewData();
   } catch (error) {
     console.error(
       "[careerbridge-next] Catalogue overview data query failed",
@@ -145,7 +89,7 @@ async function CatalogueOverview() {
             Catalogue overview is temporarily unavailable
           </h1>
           <p className="mt-2 text-sm leading-6 text-[#526b72]">
-            We could not load catalogue totals or recent activity.
+            We could not load catalogue totals or recently updated records.
           </p>
           <CatalogueRetryButton />
         </div>
@@ -153,36 +97,35 @@ async function CatalogueOverview() {
     );
   }
 
-  const { catalogue, recentActivity } = dashboard;
-  const counts = new Map(catalogue.byType.map(({ type, count }) => [type, count]));
+  const { metrics: catalogue, categories, recentRecords } = overview;
   const metrics = [
     {
       label: "Total records",
       value: catalogue.totalItems,
-      detail: "Across all catalogue types",
+      detail: "Across all catalogue record types",
       icon: LibraryBig,
       accentClass: "bg-[#eaf2ed] text-[#286c60]",
     },
     {
       label: "Published",
       value: catalogue.publishedItems,
-      detail: "Live student content",
+      detail: "Records with a valid published revision",
       icon: CheckCircle2,
       accentClass: "bg-[#eaf2ed] text-[#286c60]",
     },
     {
-      label: "Unpublished",
-      value: catalogue.unpublishedItems,
-      detail: "No valid published version",
-      icon: Files,
-      accentClass: "bg-[#eef2f6] text-[#496b85]",
-    },
-    {
-      label: "In review",
+      label: "In Review",
       value: catalogue.inReviewItems,
       detail: "Latest revisions awaiting review",
       icon: Clock3,
       accentClass: "bg-[#f6f1e5] text-[#8a6c2e]",
+    },
+    {
+      label: "Without Published Version",
+      value: catalogue.withoutPublishedVersion,
+      detail: "No valid published revision",
+      icon: LibraryBig,
+      accentClass: "bg-[#eef2f6] text-[#496b85]",
     },
   ];
 
@@ -201,72 +144,61 @@ async function CatalogueOverview() {
       </dl>
 
       <AdminSectionCard
-        id="browse-categories"
-        title="Browse categories"
-        description="Open a record type to search and review its catalogue entries."
-        action={<AdminStatusBadge tone="muted">7 record categories</AdminStatusBadge>}
+        id="catalogue-categories"
+        title="Catalogue categories"
+        description="Campuses are grouped with Institutions; Course Offerings are grouped with Courses."
+        action={<AdminStatusBadge tone="muted">6 categories</AdminStatusBadge>}
       >
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {browseCategories.map((category) => (
+          {categories.map((category) => (
             <CategoryCard
-              key={category.type}
+              key={category.slug}
               category={category}
-              count={counts.get(category.type) ?? 0}
             />
           ))}
         </ul>
-        <p className="mt-4 border-t border-[#edf1ee] pt-3 text-xs leading-5 text-[#657976]">
-          The total also includes {(counts.get("field") ?? 0).toLocaleString("en-IN")} supporting Field taxonomy records; Fields are not a browse category.
-        </p>
       </AdminSectionCard>
 
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(17rem,0.8fr)_minmax(0,1.4fr)]">
-        <AdminSectionCard
-          id="catalogue-attention"
-          title="Needs attention"
-          description="Only supported catalogue review states are shown."
-        >
-          <div className="flex items-start gap-3 rounded-lg border border-[#eee4cb] bg-[#fbf8ef] p-4">
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white text-[#8a6c2e]">
-              <Clock3 aria-hidden="true" className="size-[18px]" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-[#17364a]">Records awaiting review</p>
-              <p className="mt-1 text-xs leading-5 text-[#657976]">
-                Latest revisions currently in review
-              </p>
-            </div>
-            <span className="shrink-0 text-2xl font-semibold tabular-nums text-[#17364a]">
-              {catalogue.inReviewItems.toLocaleString("en-IN")}
-            </span>
+      <AdminSectionCard
+        id="recent-catalogue-records"
+        title="Recently updated records"
+        description="The five most recently updated records with a current real catalogue revision."
+        action={
+          <Link
+            href="#catalogue-categories"
+            className="inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-[#286c60] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#377b78]"
+          >
+            View All <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
+        }
+      >
+        {recentRecords.length === 0 ? (
+          <AdminEmptyState
+            title="No recently updated records"
+            description="Records with a real catalogue revision will appear here after they are added."
+            icon={LibraryBig}
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[42rem] border-collapse text-left">
+              <thead>
+                <tr className="border-b border-[#e5ece8] text-xs font-semibold uppercase tracking-wide text-[#71817d]">
+                  <th scope="col" className="px-3 py-3">Record</th>
+                  <th scope="col" className="px-3 py-3">Category</th>
+                  <th scope="col" className="px-3 py-3">Latest revision</th>
+                  <th scope="col" className="px-3 py-3">Status</th>
+                  <th scope="col" className="px-3 py-3">Updated</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#edf1ee]">
+                {recentRecords.map((record) => (
+                  <RecentRecordRow key={record.id} record={record} />
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#edf1ee] pt-4">
-            <span className="text-xs text-[#657976]">Review screens are a non-persistent UI preview.</span>
-            <AdminStatusBadge tone="muted">Preview only</AdminStatusBadge>
-          </div>
-        </AdminSectionCard>
-
-        <AdminSectionCard
-          id="catalogue-recent-activity"
-          title="Recently updated"
-          description="Latest committed catalogue lifecycle activity."
-          action={<AdminStatusBadge tone="muted">Audit-backed</AdminStatusBadge>}
-        >
-          {recentActivity.length === 0 ? (
-            <AdminEmptyState
-              title="No recent catalogue changes"
-              description="Committed catalogue lifecycle actions will appear here."
-              icon={History}
-            />
-          ) : (
-            <ul className="divide-y divide-[#edf1ee]">
-              {recentActivity.slice(0, 5).map((event) => (
-                <ActivityItem key={event.id} event={event} />
-              ))}
-            </ul>
-          )}
-        </AdminSectionCard>
-      </div>
+        )}
+      </AdminSectionCard>
     </div>
   );
 }
@@ -283,19 +215,18 @@ function CatalogueOverviewFallback() {
           />
         ))}
       </div>
-      <div className="h-80 animate-pulse rounded-xl border border-[#dce5e0] bg-white" />
+      <div className="h-56 animate-pulse rounded-xl border border-[#dce5e0] bg-white" />
+      <div className="h-72 animate-pulse rounded-xl border border-[#dce5e0] bg-white" />
     </div>
   );
 }
 
 function CategoryCard({
   category,
-  count,
 }: {
-  category: BrowseCategory;
-  count: number;
+  category: CatalogueOverviewCategory;
 }) {
-  const { icon: Icon } = category;
+  const Icon = categoryIcons[category.slug];
   const content = (
     <>
       <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-[#edf4ef] text-[#377b78]">
@@ -305,7 +236,7 @@ function CategoryCard({
         <span className="flex items-center justify-between gap-3">
           <span className="truncate text-sm font-semibold text-[#17364a]">{category.label}</span>
           <span className="shrink-0 text-lg font-semibold tabular-nums text-[#17364a]">
-            {count.toLocaleString("en-IN")}
+            {category.count.toLocaleString("en-IN")}
           </span>
         </span>
         <span className="mt-1 block text-xs leading-5 text-[#657976]">{category.description}</span>
@@ -320,30 +251,32 @@ function CategoryCard({
         href={category.href}
         className="flex min-h-[6.25rem] items-center gap-3 rounded-lg border border-[#dce5e0] bg-white p-4 transition-colors hover:border-[#9dbdb2] hover:bg-[#fbfcfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#377b78]"
       >
-          {content}
+        {content}
       </Link>
     </li>
   );
 }
 
-function ActivityItem({ event }: { event: RecentAdminActivity }) {
-  const itemLabel = event.itemTitle?.trim() || event.itemId;
-  const actor = event.actorName?.trim() || `Admin #${event.actorId}`;
-
+function RecentRecordRow({ record }: { record: RecentCatalogueRecord }) {
   return (
-    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 py-4 first:pt-0 last:pb-0">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#f1f5f2] text-[#526b72]">
-        <History aria-hidden="true" className="size-[17px]" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-[#17364a]" title={itemLabel}>{itemLabel}</p>
-        <p className="mt-1 text-xs text-[#657976]">
-          {auditActionLabels[event.action]} · {auditKindLabels[event.kind]} · {actor}
-        </p>
-      </div>
-      <span className="shrink-0 text-xs tabular-nums text-[#71817d]">
-        <AdminDate value={event.createdAt} />
-      </span>
-    </li>
+    <tr>
+      <th scope="row" className="max-w-[22rem] px-3 py-4 text-sm font-semibold text-[#17364a]">
+        <span className="block truncate" title={record.title}>{record.title}</span>
+      </th>
+      <td className="whitespace-nowrap px-3 py-4 text-sm text-[#526b72]">
+        {categoryLabels[record.itemType]}
+      </td>
+      <td className="whitespace-nowrap px-3 py-4 text-sm text-[#526b72]">
+        Revision {record.revisionNumber}
+      </td>
+      <td className="whitespace-nowrap px-3 py-4">
+        <AdminStatusBadge tone={record.publicationStatus === "published" ? "accent" : "muted"}>
+          {publicationLabels[record.publicationStatus] ?? record.publicationStatus}
+        </AdminStatusBadge>
+      </td>
+      <td className="whitespace-nowrap px-3 py-4 text-sm tabular-nums text-[#71817d]">
+        <AdminDate value={record.updatedAt} />
+      </td>
+    </tr>
   );
 }

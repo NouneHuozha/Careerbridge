@@ -3,6 +3,7 @@ import {
   check,
   boolean,
   char,
+  customType,
   foreignKey,
   index,
   integer,
@@ -16,6 +17,10 @@ import {
 } from "drizzle-orm/pg-core";
 
 type JsonObject = Record<string, unknown>;
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
 
 export type CatalogItemType =
   | "field"
@@ -177,6 +182,32 @@ export const fieldRevisions = pgTable(
     check(
       "field_revisions_content_object_check",
       sql`jsonb_typeof(${table.fieldContent}) = 'object'`,
+    ),
+  ],
+);
+
+export const fieldRevisionImages = pgTable(
+  "field_revision_images",
+  {
+    revisionId: uuid("revision_id")
+      .primaryKey()
+      .references(() => catalogItemRevisions.id, { onDelete: "cascade" }),
+    imageData: bytea("image_data"),
+    imageContentType: text("image_content_type"),
+    imageRemoved: boolean("image_removed").notNull().default(false),
+  },
+  (table) => [
+    check(
+      "field_revision_images_image_pair_check",
+      sql`(${table.imageData} IS NULL) = (${table.imageContentType} IS NULL)`,
+    ),
+    check(
+      "field_revision_images_content_type_check",
+      sql`${table.imageContentType} IS NULL OR ${table.imageContentType} IN ('image/jpeg', 'image/png', 'image/webp')`,
+    ),
+    check(
+      "field_revision_images_removed_check",
+      sql`NOT ${table.imageRemoved} OR ${table.imageData} IS NULL`,
     ),
   ],
 );

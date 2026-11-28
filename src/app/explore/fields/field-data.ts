@@ -1,4 +1,5 @@
 import type { ActivityId } from "../../discover/flow-data";
+import { getFieldImage } from "./field-image";
 
 type StudyStage = "class-10" | "class-12";
 
@@ -22,7 +23,6 @@ type FieldGuideContent = {
   name: string;
   description: string;
   image: string;
-  imageAlt: string;
   overview: {
     shortDescription: string;
     introduction: string;
@@ -49,8 +49,7 @@ export const fieldGuideData = {
     id: "technology",
     name: "Technology",
     description: "Computers, software and digital systems.",
-    image: "/images/fields/technology.jpg",
-    imageAlt: "Computer circuit board with small electronic components",
+    image: getFieldImage("technology"),
     overview: {
       shortDescription: "Using digital tools and computer systems to solve practical problems.",
       introduction: "Technology focuses on creating, maintaining and improving digital tools and computer systems. It helps people communicate, find information and complete tasks.",
@@ -113,8 +112,7 @@ export const fieldGuideData = {
     id: "engineering",
     name: "Engineering",
     description: "Designing, testing and improving practical solutions.",
-    image: "/images/fields/engineering.jpg",
-    imageAlt: "Building design plans and architecture models",
+    image: getFieldImage("engineering"),
     overview: {
       shortDescription: "Designing, testing and improving structures, machines and systems.",
       introduction: "Engineering uses science, mathematics and design to develop practical solutions. It helps create and maintain the structures, machines and systems people use.",
@@ -177,8 +175,7 @@ export const fieldGuideData = {
     id: "healthcare",
     name: "Healthcare",
     description: "Health, medicine, patient care and community wellbeing.",
-    image: "/images/fields/healthcare.jpg",
-    imageAlt: "Healthcare professionals caring for a patient",
+    image: getFieldImage("healthcare"),
     overview: {
       shortDescription: "Protecting health, preventing illness and helping people recover.",
       introduction: "Healthcare is about protecting people's health, preventing illness and helping people recover when they become sick or injured.",
@@ -244,8 +241,7 @@ export const fieldGuideData = {
     id: "business",
     name: "Business & Management",
     description: "How organisations plan, manage resources and serve people.",
-    image: "/images/fields/business-management.jpg",
-    imageAlt: "A team working together around a table",
+    image: getFieldImage("business"),
     overview: {
       shortDescription: "How organisations plan their work, use resources and serve people.",
       introduction: "Business and management focuses on how organisations plan, make decisions and use resources. It helps them meet people's needs and work towards their goals.",
@@ -308,8 +304,7 @@ export const fieldGuideData = {
     id: "law",
     name: "Law",
     description: "Legal systems, rights, responsibilities and justice.",
-    image: "/images/fields/law.jpg",
-    imageAlt: "Law books and legal documents",
+    image: getFieldImage("law"),
     overview: {
       shortDescription: "Understanding laws, rights and ways to resolve disputes.",
       introduction: "Law focuses on the rules that organise society, protect rights and guide how disputes are handled. Legal work helps people and organisations understand their responsibilities and options.",
@@ -372,8 +367,7 @@ export const fieldGuideData = {
     id: "government",
     name: "Government & Public Service",
     description: "Public services, policy and work that supports communities.",
-    image: "/images/fields/government-public-service.jpg",
-    imageAlt: "A public government building",
+    image: getFieldImage("government"),
     overview: {
       shortDescription: "Organising public services and plans that support communities.",
       introduction: "Government and public service focuses on how public organisations serve communities and put laws, plans and services into practice. Its work can include administration, policy and local services.",
@@ -436,8 +430,7 @@ export const fieldGuideData = {
     id: "education",
     name: "Education",
     description: "Teaching, learning and helping people develop.",
-    image: "/images/fields/education.jpg",
-    imageAlt: "Students learning together in a classroom",
+    image: getFieldImage("education"),
     overview: {
       shortDescription: "Helping people learn, practise skills and develop understanding.",
       introduction: "Education helps people learn new ideas and skills. It includes teaching, planning learning activities and supporting people as they practise and develop.",
@@ -500,8 +493,7 @@ export const fieldGuideData = {
     id: "science",
     name: "Science & Research",
     description: "Asking questions, testing evidence and understanding the world.",
-    image: "/images/fields/science-research.jpg",
-    imageAlt: "Scientific equipment in a research laboratory",
+    image: getFieldImage("science"),
     overview: {
       shortDescription: "Investigating questions and using evidence to understand the world.",
       introduction: "Science and research use observation, testing and evidence to investigate questions about the natural world, people and technology. The findings can help others understand problems and make informed decisions.",
@@ -564,8 +556,7 @@ export const fieldGuideData = {
     id: "arts-design",
     name: "Arts & Design",
     description: "Creative expression, visual communication and design.",
-    image: "/images/fields/arts-design.jpg",
-    imageAlt: "Paints and art materials on a work surface",
+    image: getFieldImage("arts-design"),
     overview: {
       shortDescription: "Using creative ideas to communicate and shape useful experiences.",
       introduction: "Arts and design use creative thinking to express ideas and solve visual or practical problems. They can shape images, objects, spaces and digital experiences.",
@@ -628,8 +619,7 @@ export const fieldGuideData = {
     id: "media",
     name: "Media",
     description: "Stories, journalism and ideas shared through media.",
-    image: "/images/fields/media.jpg",
-    imageAlt: "Camera equipment used to create media",
+    image: getFieldImage("media"),
     overview: {
       shortDescription: "Creating and sharing stories, information and ideas with audiences.",
       introduction: "Media is how stories, information and ideas are created and shared. It includes reporting, writing, photography, audio, film and digital content.",
@@ -692,8 +682,7 @@ export const fieldGuideData = {
     id: "agriculture-environment",
     name: "Agriculture & Environment",
     description: "Food, farming, natural resources and the environment.",
-    image: "/images/fields/agriculture-environment.jpg",
-    imageAlt: "Green agricultural fields in a rural landscape",
+    image: getFieldImage("agriculture-environment"),
     overview: {
       shortDescription: "Growing food and caring for land, water and natural systems.",
       introduction: "Agriculture and environment connect food production with plants, animals, land and water. The field includes growing and caring for living things and looking after natural resources.",
@@ -756,8 +745,7 @@ export const fieldGuideData = {
     id: "hospitality-tourism",
     name: "Hospitality & Tourism",
     description: "Travel, accommodation, food and welcoming experiences.",
-    image: "/images/fields/hospitality-tourism.jpg",
-    imageAlt: "A traveller looking out over a scenic landscape",
+    image: getFieldImage("hospitality-tourism"),
     overview: {
       shortDescription: "Helping people travel, stay, eat and feel welcome.",
       introduction: "Hospitality and tourism support people when they travel, stay somewhere, eat out or attend events. The work combines guest service with planning and daily operations.",
@@ -820,8 +808,7 @@ export const fieldGuideData = {
     id: "social-sciences",
     name: "Social Sciences",
     description: "People, communities and how society works.",
-    image: "/images/fields/social-sciences.jpg",
-    imageAlt: "A group of people spending time together outdoors",
+    image: getFieldImage("social-sciences"),
     overview: {
       shortDescription: "Studying people, communities and how society changes.",
       introduction: "Social sciences study how people live together, make decisions and respond to change. They use evidence about people's experiences to understand social questions.",

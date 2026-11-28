@@ -41,8 +41,9 @@ function FieldCards({
           <div className="relative aspect-[3/2] overflow-hidden bg-[#e6eeea]">
             <Image
               src={field.image}
-              alt={field.imageAlt}
+              alt={`Image for ${field.name}`}
               fill
+              unoptimized
               sizes="(max-width: 640px) 48vw, (max-width: 1024px) 32vw, (max-width: 1536px) 24vw, 18vw"
               className="object-cover transition-transform duration-500 group-hover:scale-[1.035] motion-reduce:transform-none motion-reduce:transition-none"
             />

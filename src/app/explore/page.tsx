@@ -221,8 +221,9 @@ export default function ExplorePage() {
                     <div className="relative aspect-[2.15/1] overflow-hidden bg-[#dce7df]">
                       <Image
                         src={field.image}
-                        alt={field.imageAlt}
+                        alt={`Image for ${field.name}`}
                         fill
+                        unoptimized
                         sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 33vw"
                         loading={index < 3 ? "eager" : "lazy"}
                         className="object-cover"
@@ -390,8 +391,9 @@ export default function ExplorePage() {
                 >
                   <Image
                     src={field.image}
-                    alt={field.imageAlt}
+                    alt={`Image for ${field.name}`}
                     fill
+                    unoptimized
                     sizes="(max-width: 1023px) 33vw, 24vw"
                     className="object-cover"
                   />

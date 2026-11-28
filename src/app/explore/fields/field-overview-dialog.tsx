@@ -123,6 +123,7 @@ export function FieldOverviewDialog({
               src={getFieldImage(field.id)}
               alt=""
               fill
+              unoptimized
               sizes="250px"
               className="object-cover"
             />

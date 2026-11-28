@@ -44,6 +44,7 @@ const navigationSections = [
 ];
 
 const catalogueCategoryLabels: Record<string, string> = {
+  fields: "Fields",
   courses: "Courses",
   institutions: "Institutions",
   campuses: "Campuses",

@@ -977,6 +977,69 @@ if (!databaseUrl) {
     } finally { client.release(); }
   });
 
+  test("a newer saved real revision prevents publishing an older approved revision", async () => {
+    const client = await testPool.connect();
+    try {
+      await resetCourse(client);
+      const first = await importer.importOneRealCourseDraft(client, verifiedRecord());
+      await publisher.approveRealCourseDraft(client, { courseId: "test-course", revisionId: first.revisionId });
+      await publisher.publishApprovedRealCourse(client, {
+        courseId: "test-course",
+        revisionId: first.revisionId,
+        expectedPublishedRevisionId: null,
+      });
+
+      const secondRecord = verifiedRecord();
+      secondRecord.revision = { ...secondRecord.revision, title: "Approved but stale Course" };
+      const second = await importer.importOneRealCourseDraft(client, secondRecord);
+      await publisher.approveRealCourseDraft(client, { courseId: "test-course", revisionId: second.revisionId });
+      const third = await client.query(
+        `INSERT INTO public.catalog_item_revisions
+           (catalog_item_id, revision_number, publication_status, title, summary, description,
+            data_classification, verification_status, published_at)
+         SELECT catalog_item_id, 3, 'draft', 'Newer saved Course', summary, description,
+                data_classification, verification_status, NULL
+           FROM public.catalog_item_revisions WHERE id=$1 RETURNING id`,
+        [second.revisionId],
+      );
+      const thirdRevisionId = third.rows[0].id;
+      await client.query(
+        `INSERT INTO public.course_revisions
+           (revision_id, field_item_id, field_revision_id, qualification, stages,
+            entry_after_class10, entry_after_class12, is_exploration_category, course_content)
+         SELECT $2, field_item_id, field_revision_id, qualification, stages,
+                entry_after_class10, entry_after_class12, is_exploration_category, course_content
+           FROM public.course_revisions WHERE revision_id=$1`,
+        [second.revisionId, thirdRevisionId],
+      );
+      await client.query(
+        `INSERT INTO public.catalog_revision_sources
+           (revision_id, source_id, claim_key, checked_at, verified_at, verification_status)
+         SELECT $2, source_id, claim_key, checked_at, verified_at, verification_status
+           FROM public.catalog_revision_sources WHERE revision_id=$1`,
+        [second.revisionId, thirdRevisionId],
+      );
+
+      await assert.rejects(
+        publisher.publishApprovedRealCourse(client, {
+          courseId: "test-course",
+          revisionId: second.revisionId,
+          expectedPublishedRevisionId: first.revisionId,
+        }),
+        /latest saved real course revision/,
+      );
+      const state = await client.query(
+        `SELECT item.published_revision_id, older.publication_status AS older_status
+           FROM public.catalog_items AS item
+           JOIN public.catalog_item_revisions AS older ON older.id=$2
+          WHERE item.id=$1`,
+        [ids.courseItem, second.revisionId],
+      );
+      assert.equal(state.rows[0].published_revision_id, first.revisionId);
+      assert.equal(state.rows[0].older_status, "approved");
+    } finally { client.release(); }
+  });
+
   test("publication rollback and concurrent requests cannot leave inconsistent pointers", async () => {
     const first = await testPool.connect();
     const second = await testPool.connect();

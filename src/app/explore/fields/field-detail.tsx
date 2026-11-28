@@ -68,6 +68,7 @@ export function FieldDetail({
               src={getFieldImage(field.id)}
               alt=""
               fill
+              unoptimized
               priority
               sizes="(max-width: 1023px) 100vw, 48vw"
               className="object-cover"
